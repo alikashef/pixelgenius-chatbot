@@ -1,6 +1,8 @@
 import os
+import uuid
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import RedirectResponse
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -16,6 +18,8 @@ ZARINPAL_REQUEST_URL = "https://api.zarinpal.com/pg/v4/payment/request.json"
 ZARINPAL_VERIFY_URL = "https://api.zarinpal.com/pg/v4/payment/verify.json"
 ZARINPAL_GATE_URL = "https://www.zarinpal.com/pg/StartPay/"
 MERCHANT_ID = os.getenv("ZARINPAL_MERCHANT_ID", "")
+
+DEV_MODE = not MERCHANT_ID  # mock when no merchant id
 
 
 @router.post("/payment/request", response_model=PaymentRequestOut)
@@ -34,6 +38,15 @@ async def payment_request(
         raise HTTPException(status_code=400, detail="این سفارش آماده پرداخت نیست")
     if not order.payment_amount:
         raise HTTPException(status_code=400, detail="مبلغ پرداخت تعیین نشده")
+
+    if DEV_MODE:
+        authority = f"DEV-{uuid.uuid4().hex[:16].upper()}"
+        order.zarinpal_authority = authority
+        await db.commit()
+        # redirect directly to verify with mock OK status
+        mock_verify_url = f"{body.callback_url}?Authority={authority}&Status=OK"
+        print(f"[DEV] Mock payment → {mock_verify_url}")
+        return PaymentRequestOut(payment_url=mock_verify_url, authority=authority)
 
     zarinpal_payload = {
         "merchant_id": MERCHANT_ID,
@@ -69,6 +82,12 @@ async def payment_verify(Authority: str, Status: str, db: AsyncSession = Depends
         order.status = OrderStatus.cancelled
         await db.commit()
         return PaymentVerifyOut(success=False, message="پرداخت لغو شد")
+
+    if DEV_MODE and Authority.startswith("DEV-"):
+        order.status = OrderStatus.paid
+        order.paid_at = datetime.now(timezone.utc)
+        await db.commit()
+        return PaymentVerifyOut(success=True, ref_id="DEV-REF-123456", order_id=order.id, message="پرداخت موفق (محیط توسعه)")
 
     zarinpal_payload = {
         "merchant_id": MERCHANT_ID,
