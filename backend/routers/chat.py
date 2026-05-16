@@ -1,10 +1,14 @@
 import os
 from fastapi import APIRouter, HTTPException
-from anthropic import AsyncAnthropic
+from openai import AsyncOpenAI
 from schemas import ChatRequest, ChatResponse
 
 router = APIRouter()
-client = AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+
+client = AsyncOpenAI(
+    base_url="https://api.gapgpt.app/v1",
+    api_key=os.getenv("GAPGPT_API_KEY", ""),
+)
 
 SYSTEM_PROMPT = """
 تو یه مشاور فروش هوشمند برای یه تیم توسعه وب هستی. هدفت اینه که اطلاعات پروژه مشتری رو بگیری و به پرداخت برسونی.
@@ -40,16 +44,15 @@ SYSTEM_PROMPT = """
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
-    if not os.getenv("ANTHROPIC_API_KEY"):
-        raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY not configured")
+    if not os.getenv("GAPGPT_API_KEY"):
+        raise HTTPException(status_code=500, detail="GAPGPT_API_KEY not configured")
 
     messages = [{"role": m.role, "content": m.content} for m in request.messages]
 
-    response = await client.messages.create(
-        model="claude-sonnet-4-20250514",
+    response = await client.chat.completions.create(
+        model="gapgpt-qwen-3.6",
+        messages=[{"role": "system", "content": SYSTEM_PROMPT}] + messages,
         max_tokens=1024,
-        system=SYSTEM_PROMPT,
-        messages=messages,
     )
 
-    return ChatResponse(content=response.content[0].text)
+    return ChatResponse(content=response.choices[0].message.content)

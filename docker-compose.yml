@@ -25,7 +25,7 @@ services:
       - "8000:8000"
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/freelance_intake
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      GAPGPT_API_KEY: ${GAPGPT_API_KEY}
       ZARINPAL_MERCHANT_ID: ${ZARINPAL_MERCHANT_ID}
       JWT_SECRET: ${JWT_SECRET}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
