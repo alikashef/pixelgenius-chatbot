@@ -1,9 +1,14 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from database import create_tables
-from routers import chat, payment, orders, auth
+from routers import chat, payment, orders, auth, customer_auth, customer
+
+UPLOAD_DIR = Path("/app/uploads")
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @asynccontextmanager
@@ -22,10 +27,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
+
 app.include_router(chat.router, prefix="/api")
 app.include_router(payment.router, prefix="/api")
 app.include_router(orders.router, prefix="/api")
 app.include_router(auth.router, prefix="/api")
+app.include_router(customer_auth.router, prefix="/api")
+app.include_router(customer.router, prefix="/api")
 
 
 @app.get("/health")

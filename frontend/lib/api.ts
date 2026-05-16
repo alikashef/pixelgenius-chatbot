@@ -16,6 +16,27 @@ export interface Proposal {
   priceLabel: string;
 }
 
+export interface Order {
+  id: string;
+  customer_id: string | null;
+  project_name: string;
+  summary: string;
+  features: string[];
+  tech_stack: string;
+  delivery_days: number;
+  price_estimate: number;
+  price_label: string;
+  final_price: number | null;
+  payment_percentage: number | null;
+  payment_amount: number | null;
+  proposal_file: string | null;
+  admin_note: string | null;
+  status: "pending_review" | "approved" | "awaiting_payment" | "paid" | "cancelled";
+  paid_at: string | null;
+  created_at: string;
+}
+
+// ── Chat ─────────────────────────────────────────────────────────────────────
 export async function sendChat(messages: Message[]): Promise<string> {
   const res = await fetch(`${API_URL}/api/chat`, {
     method: "POST",
@@ -27,33 +48,88 @@ export async function sendChat(messages: Message[]): Promise<string> {
   return data.content;
 }
 
-export async function requestPayment(proposal: Proposal, callbackUrl: string) {
-  const res = await fetch(`${API_URL}/api/payment/request`, {
+// ── Customer Auth ─────────────────────────────────────────────────────────────
+export async function sendOtp(phone: string) {
+  const res = await fetch(`${API_URL}/api/customer/otp/send`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ phone }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "خطا در ارسال کد");
+  }
+  return res.json();
+}
+
+export async function verifyOtp(phone: string, code: string) {
+  const res = await fetch(`${API_URL}/api/customer/otp/verify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ phone, code }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "کد اشتباه است");
+  }
+  return res.json();
+}
+
+// ── Customer Orders ───────────────────────────────────────────────────────────
+export async function submitOrder(token: string, proposal: Proposal): Promise<Order> {
+  const res = await fetch(`${API_URL}/api/customer/orders`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({
       project_name: proposal.projectName,
       summary: proposal.summary,
       features: proposal.features,
       tech_stack: proposal.tech,
       delivery_days: proposal.days,
-      price: proposal.price,
+      price_estimate: proposal.price,
       price_label: proposal.priceLabel,
-      callback_url: callbackUrl,
     }),
+  });
+  if (!res.ok) throw new Error("خطا در ثبت درخواست");
+  return res.json();
+}
+
+export async function fetchMyOrders(token: string): Promise<Order[]> {
+  const res = await fetch(`${API_URL}/api/customer/orders`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (res.status === 401) throw new Error("UNAUTHORIZED");
+  if (!res.ok) throw new Error("خطا در دریافت سفارشات");
+  return res.json();
+}
+
+export async function fetchMyOrder(token: string, id: string): Promise<Order> {
+  const res = await fetch(`${API_URL}/api/customer/orders/${id}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (res.status === 401) throw new Error("UNAUTHORIZED");
+  if (!res.ok) throw new Error("خطا در دریافت سفارش");
+  return res.json();
+}
+
+// ── Payment ───────────────────────────────────────────────────────────────────
+export async function requestPayment(token: string, orderId: string, callbackUrl: string) {
+  const res = await fetch(`${API_URL}/api/payment/request`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ order_id: orderId, callback_url: callbackUrl }),
   });
   if (!res.ok) throw new Error("خطا در ایجاد درخواست پرداخت");
   return res.json();
 }
 
 export async function verifyPayment(authority: string, status: string) {
-  const res = await fetch(
-    `${API_URL}/api/payment/verify?Authority=${authority}&Status=${status}`
-  );
+  const res = await fetch(`${API_URL}/api/payment/verify?Authority=${authority}&Status=${status}`);
   if (!res.ok) throw new Error("خطا در تایید پرداخت");
   return res.json();
 }
 
+// ── Admin ─────────────────────────────────────────────────────────────────────
 export async function adminLogin(username: string, password: string) {
   const res = await fetch(`${API_URL}/api/auth/login`, {
     method: "POST",
@@ -64,7 +140,7 @@ export async function adminLogin(username: string, password: string) {
   return res.json();
 }
 
-export async function fetchOrders(token: string) {
+export async function fetchOrders(token: string): Promise<Order[]> {
   const res = await fetch(`${API_URL}/api/orders`, {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -81,10 +157,30 @@ export async function fetchStats(token: string) {
   return res.json();
 }
 
-export async function fetchOrder(token: string, id: string) {
-  const res = await fetch(`${API_URL}/api/orders/${id}`, {
-    headers: { Authorization: `Bearer ${token}` },
+export async function approveOrder(
+  token: string,
+  orderId: string,
+  finalPrice: number,
+  paymentPercentage: number,
+  adminNote?: string
+) {
+  const res = await fetch(`${API_URL}/api/orders/${orderId}/approve`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ final_price: finalPrice, payment_percentage: paymentPercentage, admin_note: adminNote }),
   });
-  if (!res.ok) throw new Error("خطا در دریافت سفارش");
+  if (!res.ok) throw new Error("خطا در تایید سفارش");
+  return res.json();
+}
+
+export async function uploadProposal(token: string, orderId: string, file: File) {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${API_URL}/api/orders/${orderId}/proposal`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+  if (!res.ok) throw new Error("خطا در آپلود فایل");
   return res.json();
 }
