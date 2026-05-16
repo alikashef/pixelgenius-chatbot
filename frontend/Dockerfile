@@ -1,4 +1,4 @@
-FROM node:20-alpine AS base
+FROM docker.arvancloud.ir/library/node:20-alpine AS base
 RUN npm install -g pnpm --registry https://mirror-npm.runflare.com
 
 FROM base AS deps

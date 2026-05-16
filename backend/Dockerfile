@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM docker.arvancloud.ir/library/python:3.12-slim
 
 WORKDIR /app
 

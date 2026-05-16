@@ -2,7 +2,7 @@ version: "3.9"
 
 services:
   db:
-    image: postgres:16-alpine
+    image: docker.arvancloud.ir/library/postgres:16-alpine
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
