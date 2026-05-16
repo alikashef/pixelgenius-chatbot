@@ -1,10 +1,10 @@
 FROM docker.arvancloud.ir/library/node:20-alpine AS base
-RUN npm install -g pnpm --registry https://mirror-npm.runflare.com
+RUN npm install -g pnpm --registry https://registry.npmmirror.com
 
 FROM base AS deps
 WORKDIR /app
 COPY package.json ./
-RUN pnpm install --registry https://mirror-npm.runflare.com
+RUN pnpm install --registry https://registry.npmmirror.com
 
 FROM base AS builder
 WORKDIR /app
