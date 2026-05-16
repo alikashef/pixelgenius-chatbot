@@ -1,14 +1,30 @@
 import os
 from fastapi import APIRouter, HTTPException
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, APIConnectionError, APITimeoutError
 from schemas import ChatRequest, ChatResponse
 
 router = APIRouter()
 
-client = AsyncOpenAI(
-    base_url="https://api.gapgpt.app/v1",
-    api_key=os.getenv("GAPGPT_API_KEY", ""),
-)
+API_KEY = os.getenv("GAPGPT_API_KEY", "")
+PRIMARY_URL = "https://api.gapgpt.app/v1"
+FALLBACK_URL = "https://api.gapapi.com/v1"
+
+client_primary = AsyncOpenAI(base_url=PRIMARY_URL, api_key=API_KEY)
+client_fallback = AsyncOpenAI(base_url=FALLBACK_URL, api_key=API_KEY)
+
+
+async def call_ai(messages: list) -> str:
+    for client in (client_primary, client_fallback):
+        try:
+            response = await client.chat.completions.create(
+                model="gapgpt-qwen-3.6",
+                messages=[{"role": "system", "content": SYSTEM_PROMPT}] + messages,
+                max_tokens=1024,
+            )
+            return response.choices[0].message.content
+        except (APIConnectionError, APITimeoutError):
+            continue
+    raise HTTPException(status_code=503, detail="سرویس هوش مصنوعی در دسترس نیست")
 
 SYSTEM_PROMPT = """
 تو یه مشاور فروش هوشمند برای یه تیم توسعه وب هستی. هدفت اینه که اطلاعات پروژه مشتری رو بگیری و به پرداخت برسونی.
@@ -49,10 +65,5 @@ async def chat(request: ChatRequest):
 
     messages = [{"role": m.role, "content": m.content} for m in request.messages]
 
-    response = await client.chat.completions.create(
-        model="gapgpt-qwen-3.6",
-        messages=[{"role": "system", "content": SYSTEM_PROMPT}] + messages,
-        max_tokens=1024,
-    )
-
-    return ChatResponse(content=response.choices[0].message.content)
+    content = await call_ai(messages)
+    return ChatResponse(content=content)
