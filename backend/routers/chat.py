@@ -1,30 +1,14 @@
 import os
+import logging
 from fastapi import APIRouter, HTTPException
 from openai import AsyncOpenAI, APIConnectionError, APITimeoutError
 from schemas import ChatRequest, ChatResponse
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
-API_KEY = os.getenv("GAPGPT_API_KEY", "")
 PRIMARY_URL = "https://api.gapgpt.app/v1"
 FALLBACK_URL = "https://api.gapapi.com/v1"
-
-client_primary = AsyncOpenAI(base_url=PRIMARY_URL, api_key=API_KEY)
-client_fallback = AsyncOpenAI(base_url=FALLBACK_URL, api_key=API_KEY)
-
-
-async def call_ai(messages: list) -> str:
-    for client in (client_primary, client_fallback):
-        try:
-            response = await client.chat.completions.create(
-                model="gapgpt-qwen-3.6",
-                messages=[{"role": "system", "content": SYSTEM_PROMPT}] + messages,
-                max_tokens=1024,
-            )
-            return response.choices[0].message.content
-        except (APIConnectionError, APITimeoutError):
-            continue
-    raise HTTPException(status_code=503, detail="سرویس هوش مصنوعی در دسترس نیست")
 
 SYSTEM_PROMPT = """
 تو یه مشاور فروش هوشمند برای یه تیم توسعه وب هستی. هدفت اینه که اطلاعات پروژه مشتری رو بگیری و به پرداخت برسونی.
@@ -58,12 +42,38 @@ SYSTEM_PROMPT = """
 """
 
 
+async def call_ai(api_key: str, messages: list) -> str:
+    for base_url in (PRIMARY_URL, FALLBACK_URL):
+        client = AsyncOpenAI(base_url=base_url, api_key=api_key)
+        try:
+            response = await client.chat.completions.create(
+                model="gapgpt-qwen-3.6",
+                messages=[{"role": "system", "content": SYSTEM_PROMPT}] + messages,
+                max_tokens=1024,
+            )
+            return response.choices[0].message.content
+        except (APIConnectionError, APITimeoutError) as e:
+            logger.warning(f"Connection failed for {base_url}: {e}")
+            continue
+        except Exception as e:
+            logger.error(f"Unexpected error for {base_url}: {e}", exc_info=True)
+            continue
+    raise HTTPException(status_code=503, detail="سرویس هوش مصنوعی در دسترس نیست")
+
+
 @router.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
-    if not os.getenv("GAPGPT_API_KEY"):
+    api_key = os.getenv("GAPGPT_API_KEY", "")
+    if not api_key:
         raise HTTPException(status_code=500, detail="GAPGPT_API_KEY not configured")
 
     messages = [{"role": m.role, "content": m.content} for m in request.messages]
 
-    content = await call_ai(messages)
-    return ChatResponse(content=content)
+    try:
+        content = await call_ai(api_key, messages)
+        return ChatResponse(content=content)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Chat error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
