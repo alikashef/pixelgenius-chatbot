@@ -1,1 +1,1 @@
-from routers import chat, payment, orders, auth, customer_auth, customer  # noqa: F401
+from routers import chat, payment, orders, auth, customer_auth, customer, settings  # noqa: F401

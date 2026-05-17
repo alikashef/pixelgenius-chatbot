@@ -18,13 +18,13 @@ const STATUS_CLASS: Record<Order["status"], string> = {
   pending_review: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
   approved: "bg-blue-500/10 text-blue-400 border-blue-500/20",
   awaiting_payment: "bg-orange-500/10 text-orange-400 border-orange-500/20",
-  paid: "bg-accent/10 text-accent border-accent/20",
+  paid: "bg-emerald-50 text-emerald-700 border-emerald-200",
   cancelled: "bg-red-500/10 text-red-400 border-red-500/20",
 };
 
 function CheckIcon() {
   return (
-    <svg className="w-4 h-4 text-accent flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <svg className="w-4 h-4 text-emerald-700 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
     </svg>
   );
@@ -71,7 +71,7 @@ export default function OrderDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-bg flex items-center justify-center">
+      <div className="min-h-screen bg-[linear-gradient(180deg,#f8fcfa_0%,#f1f7f4_100%)] flex items-center justify-center">
         <div className="w-10 h-10 border-4 border-accent border-t-transparent rounded-full animate-spin" />
       </div>
     );
@@ -79,22 +79,22 @@ export default function OrderDetailPage() {
 
   if (!order) {
     return (
-      <div className="min-h-screen bg-bg flex items-center justify-center">
-        <p className="text-muted">{error || "سفارش یافت نشد"}</p>
+      <div className="min-h-screen bg-[linear-gradient(180deg,#f8fcfa_0%,#f1f7f4_100%)] flex items-center justify-center">
+        <p className="text-slate-500">{error || "سفارش یافت نشد"}</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-bg">
-      <header className="border-b border-border px-6 py-4 flex items-center gap-3">
+    <div className="min-h-screen bg-[linear-gradient(180deg,#f8fcfa_0%,#f1f7f4_100%)]">
+      <header className="border-b border-border bg-white/90 backdrop-blur px-6 py-4 flex items-center gap-3">
         <button
           onClick={() => router.push("/panel")}
-          className="text-muted hover:text-gray-200 transition-colors"
+          className="text-slate-500 hover:text-slate-800 transition-colors"
         >
           ← برگشت
         </button>
-        <h1 className="font-bold text-gray-100">{order.project_name}</h1>
+        <h1 className="font-bold text-slate-900">{order.project_name}</h1>
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-8 space-y-6">
@@ -110,17 +110,17 @@ export default function OrderDetailPage() {
         </div>
 
         {/* Proposal Details */}
-        <div className="bg-surface border border-border rounded-2xl p-6 space-y-5">
+        <div className="bg-white border border-border rounded-2xl p-6 space-y-5">
           <div>
-            <p className="text-muted text-xs mb-2">خلاصه پروژه</p>
-            <p className="text-gray-200 text-sm leading-relaxed">{order.summary}</p>
+            <p className="text-slate-500 text-xs mb-2">خلاصه پروژه</p>
+            <p className="text-slate-800 text-sm leading-relaxed">{order.summary}</p>
           </div>
 
           <div>
-            <p className="text-muted text-xs mb-3">امکانات</p>
+            <p className="text-slate-500 text-xs mb-3">امکانات</p>
             <ul className="space-y-2">
               {order.features.map((f, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm text-gray-200">
+                <li key={i} className="flex items-start gap-2 text-sm text-slate-800">
                   <CheckIcon />
                   <span>{f}</span>
                 </li>
@@ -130,19 +130,44 @@ export default function OrderDetailPage() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-muted text-xs mb-1">تکنولوژی</p>
-              <p className="text-gray-200 text-sm">{order.tech_stack}</p>
+              <p className="text-slate-500 text-xs mb-1">تکنولوژی</p>
+              <p className="text-slate-800 text-sm">{order.tech_stack}</p>
             </div>
             <div>
-              <p className="text-muted text-xs mb-1">مدت تحویل</p>
-              <p className="text-gray-200 text-sm">{order.delivery_days} روز</p>
+              <p className="text-slate-500 text-xs mb-1">مدت تحویل</p>
+              <p className="text-slate-800 text-sm">{order.delivery_days} روز</p>
             </div>
           </div>
 
           <div>
-            <p className="text-muted text-xs mb-1">تخمین اولیه قیمت</p>
-            <p className="text-gray-400 text-sm">{order.price_label}</p>
+            <p className="text-slate-500 text-xs mb-1">تخمین اولیه قیمت</p>
+            <p className="text-slate-600 text-sm">{order.price_label}</p>
           </div>
+        </div>
+
+        <div className="bg-white border border-border rounded-2xl p-6 space-y-4">
+          <p className="text-slate-500 text-xs">تاریخچه مکالمه همین پروژه</p>
+          {(order.chat_history || []).length === 0 ? (
+            <p className="text-sm text-slate-600">
+              برای این پروژه هنوز تاریخچه‌ای ثبت نشده (احتمالاً قبل از فعال شدن این قابلیت ساخته شده).
+            </p>
+          ) : (
+            <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+              {(order.chat_history || []).map((message, index) => (
+                <div
+                  key={`${message.role}-${index}`}
+                  className={`rounded-xl px-4 py-3 text-sm leading-relaxed ${
+                    message.role === "user"
+                      ? "bg-emerald-50 border border-emerald-200 text-slate-900"
+                      : "bg-white border border-border text-slate-700"
+                  }`}
+                >
+                  <p className="text-xs mb-1 opacity-70">{message.role === "user" ? "شما" : "مشاور هوشمند"}</p>
+                  <p className="whitespace-pre-wrap">{message.content}</p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Proposal PDF */}
@@ -151,54 +176,54 @@ export default function OrderDetailPage() {
             href={`${API_URL}${order.proposal_file}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-3 bg-surface border border-border hover:border-accent/50 rounded-xl p-4 transition-colors"
+            className="flex items-center gap-3 bg-white border border-border hover:border-emerald-300 rounded-xl p-4 transition-colors"
           >
-            <div className="w-10 h-10 bg-accent/10 rounded-lg flex items-center justify-center flex-shrink-0">
-              <svg className="w-5 h-5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="w-10 h-10 bg-emerald-50 rounded-lg flex items-center justify-center flex-shrink-0">
+              <svg className="w-5 h-5 text-emerald-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
               </svg>
             </div>
             <div>
-              <p className="text-gray-100 text-sm font-medium">پروپوزال کامل پروژه</p>
-              <p className="text-muted text-xs">کلیک کنید برای دانلود / مشاهده</p>
+              <p className="text-slate-900 text-sm font-medium">پروپوزال کامل پروژه</p>
+              <p className="text-slate-500 text-xs">کلیک کنید برای دانلود / مشاهده</p>
             </div>
           </a>
         )}
 
         {/* Payment Section */}
         {order.status === "awaiting_payment" && order.payment_amount && (
-          <div className="bg-surface border border-border rounded-2xl p-6 space-y-4">
-            <p className="text-muted text-xs">جزئیات پرداخت</p>
+          <div className="bg-white border border-border rounded-2xl p-6 space-y-4">
+            <p className="text-slate-500 text-xs">جزئیات پرداخت</p>
             <div className="grid grid-cols-2 gap-4">
-              <div className="bg-bg border border-border rounded-xl p-4 text-center">
-                <p className="text-muted text-xs mb-1">قیمت نهایی پروژه</p>
-                <p className="text-gray-100 font-bold">{order.final_price?.toLocaleString("fa-IR")} ریال</p>
+              <div className="bg-[#f7fbf9] border border-border rounded-xl p-4 text-center">
+                <p className="text-slate-500 text-xs mb-1">قیمت نهایی پروژه</p>
+                <p className="text-slate-900 font-bold">{order.final_price?.toLocaleString("fa-IR")} ریال</p>
               </div>
-              <div className="bg-bg border border-border rounded-xl p-4 text-center">
-                <p className="text-muted text-xs mb-1">درصد پیش‌پرداخت</p>
-                <p className="text-gray-100 font-bold">{order.payment_percentage}٪</p>
+              <div className="bg-[#f7fbf9] border border-border rounded-xl p-4 text-center">
+                <p className="text-slate-500 text-xs mb-1">درصد پیش‌پرداخت</p>
+                <p className="text-slate-900 font-bold">{order.payment_percentage}٪</p>
               </div>
             </div>
-            <div className="bg-accent/5 border border-accent/20 rounded-xl p-4 flex items-center justify-between">
-              <p className="text-gray-200 text-sm">مبلغ قابل پرداخت</p>
-              <p className="text-accent font-bold text-lg">{order.payment_amount.toLocaleString("fa-IR")} ریال</p>
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center justify-between">
+              <p className="text-slate-800 text-sm">مبلغ قابل پرداخت</p>
+              <p className="text-emerald-700 font-bold text-lg">{order.payment_amount.toLocaleString("fa-IR")} ریال</p>
             </div>
             {error && <p className="text-red-400 text-sm text-center">{error}</p>}
             <button
               onClick={handlePay}
               disabled={paying}
-              className="w-full bg-accent hover:bg-accent-hover disabled:opacity-60 text-black font-bold rounded-xl py-4 text-sm transition-colors"
+              className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold rounded-xl py-4 text-sm transition-colors"
             >
               {paying ? "در حال انتقال به درگاه..." : "پرداخت آنلاین"}
             </button>
-            <p className="text-center text-muted text-xs">پرداخت از طریق درگاه امن زرین‌پال</p>
+            <p className="text-center text-slate-500 text-xs">پرداخت از طریق درگاه امن زرین‌پال</p>
           </div>
         )}
 
         {order.status === "paid" && order.paid_at && (
-          <div className="bg-accent/5 border border-accent/20 rounded-xl p-5 text-center">
-            <p className="text-accent font-semibold mb-1">پرداخت با موفقیت انجام شد</p>
-            <p className="text-muted text-xs">
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-5 text-center">
+            <p className="text-emerald-700 font-semibold mb-1">پرداخت با موفقیت انجام شد</p>
+            <p className="text-slate-500 text-xs">
               {new Date(order.paid_at).toLocaleDateString("fa-IR", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}
             </p>
           </div>

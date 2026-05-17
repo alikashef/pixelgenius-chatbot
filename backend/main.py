@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from database import create_tables
-from routers import chat, payment, orders, auth, customer_auth, customer
+from routers import chat, payment, orders, auth, customer_auth, customer, settings
 
 UPLOAD_DIR = Path("/app/uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -35,6 +35,7 @@ app.include_router(orders.router, prefix="/api")
 app.include_router(auth.router, prefix="/api")
 app.include_router(customer_auth.router, prefix="/api")
 app.include_router(customer.router, prefix="/api")
+app.include_router(settings.router, prefix="/api")
 
 
 @app.get("/health")

@@ -2,7 +2,15 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { fetchOrders, fetchStats, approveOrder, uploadProposal, Order } from "@/lib/api";
+import {
+  fetchOrders,
+  fetchStats,
+  approveOrder,
+  uploadProposal,
+  fetchAISettings,
+  updateAISettings,
+  Order,
+} from "@/lib/api";
 
 interface Stats {
   total_orders: number;
@@ -23,7 +31,7 @@ const STATUS_CLASS: Record<Order["status"], string> = {
   pending_review: "bg-yellow-500/10 text-yellow-400",
   approved: "bg-blue-500/10 text-blue-400",
   awaiting_payment: "bg-orange-500/10 text-orange-400",
-  paid: "bg-accent/10 text-accent",
+  paid: "bg-emerald-50 text-emerald-700",
   cancelled: "bg-red-500/10 text-red-400",
 };
 
@@ -33,11 +41,35 @@ function formatDate(iso: string) {
   });
 }
 
+const SETTING_SECTIONS = [
+  "project_price_ranges",
+  "budget_plan_thresholds",
+  "currency_label",
+  "timeline_estimates",
+  "ai_sales_rules",
+  "recommended_technologies",
+  "chatbot_question_flow",
+  "predefined_response_templates",
+  "lead_scoring_rules",
+  "payment_terms",
+];
+
+function toLines(value: unknown) {
+  return Array.isArray(value) ? value.join("\n") : "";
+}
+
+function fromLines(value: string) {
+  return value.split("\n").map((line) => line.trim()).filter(Boolean);
+}
+
 export default function AdminDashboard() {
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [selected, setSelected] = useState<Order | null>(null);
+  const [activeTab, setActiveTab] = useState<"orders" | "settings">("orders");
+  const [settings, setSettings] = useState<Record<string, unknown>>({});
+  const [savingSettings, setSavingSettings] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -57,9 +89,10 @@ export default function AdminDashboard() {
     const token = getToken();
     if (!token) { router.replace("/admin/login"); return; }
     try {
-      const [o, s] = await Promise.all([fetchOrders(token), fetchStats(token)]);
+      const [o, s, aiSettings] = await Promise.all([fetchOrders(token), fetchStats(token), fetchAISettings(token)]);
       setOrders(o);
       setStats(s);
+      setSettings(aiSettings);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "";
       if (msg === "UNAUTHORIZED") { localStorage.removeItem("admin_token"); router.replace("/admin/login"); }
@@ -112,28 +145,78 @@ export default function AdminDashboard() {
     }
   }
 
+  async function handleSaveSettings() {
+    setSavingSettings(true);
+    setError("");
+    try {
+      const data = await updateAISettings(getToken(), settings);
+      setSettings(data.settings);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "خطا در ذخیره تنظیمات");
+    } finally {
+      setSavingSettings(false);
+    }
+  }
+
+  function setSettingValue(key: string, value: unknown) {
+    setSettings((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function updateArrayItem(key: string, index: number, patch: Record<string, unknown>) {
+    const list = Array.isArray(settings[key]) ? [...(settings[key] as Record<string, unknown>[])] : [];
+    list[index] = { ...(list[index] || {}), ...patch };
+    setSettingValue(key, list);
+  }
+
+  function addArrayItem(key: string, item: Record<string, unknown>) {
+    const list = Array.isArray(settings[key]) ? [...(settings[key] as Record<string, unknown>[])] : [];
+    setSettingValue(key, [...list, item]);
+  }
+
+  function removeArrayItem(key: string, index: number) {
+    const list = Array.isArray(settings[key]) ? [...(settings[key] as unknown[])] : [];
+    setSettingValue(key, list.filter((_, itemIndex) => itemIndex !== index));
+  }
+
   const payAmount = finalPrice && payPercent
     ? Math.round(parseInt(finalPrice) * parseInt(payPercent) / 100)
     : null;
 
   if (loading) {
-    return <div className="min-h-screen bg-bg flex items-center justify-center">
+    return <div className="min-h-screen bg-[linear-gradient(180deg,#f8fcfa_0%,#f1f7f4_100%)] flex items-center justify-center">
       <div className="w-10 h-10 border-4 border-accent border-t-transparent rounded-full animate-spin" />
     </div>;
   }
 
   return (
-    <div className="min-h-screen bg-bg">
-      <header className="border-b border-border px-6 py-4 flex items-center justify-between">
-        <h1 className="font-bold text-gray-100">پنل ادمین</h1>
+    <div className="min-h-screen bg-[linear-gradient(180deg,#f8fcfa_0%,#f1f7f4_100%)]">
+      <header className="border-b border-border bg-white/90 backdrop-blur px-6 py-4 flex items-center justify-between">
+        <h1 className="font-bold text-slate-900">پنل ادمین</h1>
         <button onClick={() => { localStorage.removeItem("admin_token"); router.push("/admin/login"); }}
-          className="text-muted hover:text-gray-200 text-sm transition-colors">خروج</button>
+          className="text-slate-500 hover:text-slate-800 text-sm transition-colors">خروج</button>
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-8">
         {error && <p className="text-red-400 text-center">{error}</p>}
 
-        {stats && (
+        <div className="flex gap-2 border-b border-border">
+          {[
+            ["orders", "سفارشات"],
+            ["settings", "تنظیمات فروش و AI"],
+          ].map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setActiveTab(key as "orders" | "settings")}
+              className={`px-4 py-3 text-sm transition-colors ${
+                activeTab === key ? "border-b-2 border-emerald-600 text-emerald-700" : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {activeTab === "orders" && stats && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <StatCard label="کل سفارشات" value={stats.total_orders.toLocaleString("fa-IR")} />
             <StatCard label="در انتظار" value={stats.pending_review.toLocaleString("fa-IR")} warn />
@@ -142,28 +225,28 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        <div className="bg-surface border border-border rounded-2xl overflow-hidden">
+        {activeTab === "orders" && <div className="bg-white border border-border rounded-2xl overflow-hidden">
           <div className="px-6 py-4 border-b border-border">
-            <h2 className="font-semibold text-gray-100">سفارشات</h2>
+            <h2 className="font-semibold text-slate-900">سفارشات</h2>
           </div>
           {orders.length === 0 ? (
-            <p className="text-muted text-center py-12">هیچ سفارشی ثبت نشده</p>
+            <p className="text-slate-500 text-center py-12">هیچ سفارشی ثبت نشده</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border">
                     {["پروژه", "تخمین قیمت", "قیمت نهایی", "وضعیت", "تاریخ", ""].map((h) => (
-                      <th key={h} className="text-right text-muted text-xs px-5 py-3 font-medium">{h}</th>
+                      <th key={h} className="text-right text-slate-500 text-xs px-5 py-3 font-medium">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {orders.map((order) => (
-                    <tr key={order.id} className="border-b border-border/50 hover:bg-bg/50 transition-colors">
-                      <td className="px-5 py-4 text-sm text-gray-200 max-w-[180px] truncate">{order.project_name}</td>
-                      <td className="px-5 py-4 text-sm text-muted">{order.price_label}</td>
-                      <td className="px-5 py-4 text-sm text-accent">
+                    <tr key={order.id} className="border-b border-border/50 hover:bg-[#f7fbf9]/50 transition-colors">
+                      <td className="px-5 py-4 text-sm text-slate-800 max-w-[180px] truncate">{order.project_name}</td>
+                      <td className="px-5 py-4 text-sm text-slate-500">{order.price_label}</td>
+                      <td className="px-5 py-4 text-sm text-emerald-700">
                         {order.final_price ? `${order.final_price.toLocaleString("fa-IR")} ریال` : "—"}
                       </td>
                       <td className="px-5 py-4">
@@ -171,9 +254,9 @@ export default function AdminDashboard() {
                           {STATUS_LABEL[order.status]}
                         </span>
                       </td>
-                      <td className="px-5 py-4 text-xs text-muted">{formatDate(order.created_at)}</td>
+                      <td className="px-5 py-4 text-xs text-slate-500">{formatDate(order.created_at)}</td>
                       <td className="px-5 py-4">
-                        <button onClick={() => openOrder(order)} className="text-accent hover:text-accent-hover text-xs transition-colors">
+                        <button onClick={() => openOrder(order)} className="text-emerald-700 hover:text-emerald-700-hover text-xs transition-colors">
                           مدیریت
                         </button>
                       </td>
@@ -183,35 +266,172 @@ export default function AdminDashboard() {
               </table>
             </div>
           )}
-        </div>
+        </div>}
+
+        {activeTab === "settings" && (
+          <div className="space-y-5">
+            <div className="bg-white border border-border rounded-2xl px-6 py-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h2 className="font-semibold text-slate-900">تنظیمات فروش و هوش مصنوعی</h2>
+                <p className="text-slate-500 text-xs mt-1">
+                  این فرم‌ها مستقیماً روی رفتار چت‌بات اثر می‌گذارند؛ بدون تغییر کد می‌توانید قیمت، بودجه، سوال‌ها و قوانین فروش را اصلاح کنید.
+                </p>
+              </div>
+              <button
+                onClick={handleSaveSettings}
+                disabled={savingSettings}
+                className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold rounded-xl px-5 py-3 text-sm transition-colors"
+              >
+                {savingSettings ? "در حال ذخیره..." : "ذخیره همه تنظیمات"}
+              </button>
+            </div>
+
+            <section className="bg-white border border-border rounded-2xl p-5 space-y-4">
+              <h3 className="text-slate-900 font-semibold">واحد پول و شرایط پرداخت</h3>
+              <div className="grid gap-4 md:grid-cols-3">
+                <Field label="برچسب ارز">
+                  <input value={String(settings.currency_label || "")} onChange={(e) => setSettingValue("currency_label", e.target.value)}
+                    className="admin-input" placeholder="میلیون تومان" />
+                </Field>
+                <Field label="پیش‌پرداخت پیش‌فرض (%)">
+                  <input type="number" value={String((settings.payment_terms as any)?.default_deposit_percentage || "")}
+                    onChange={(e) => setSettingValue("payment_terms", { ...(settings.payment_terms as object || {}), default_deposit_percentage: Number(e.target.value) })}
+                    className="admin-input" />
+                </Field>
+                <Field label="حداقل پیش‌پرداخت (%)">
+                  <input type="number" value={String((settings.payment_terms as any)?.minimum_deposit_percentage || "")}
+                    onChange={(e) => setSettingValue("payment_terms", { ...(settings.payment_terms as object || {}), minimum_deposit_percentage: Number(e.target.value) })}
+                    className="admin-input" />
+                </Field>
+              </div>
+              <Field label="توضیح شرایط پرداخت">
+                <textarea value={String((settings.payment_terms as any)?.notes || "")}
+                  onChange={(e) => setSettingValue("payment_terms", { ...(settings.payment_terms as object || {}), notes: e.target.value })}
+                  className="admin-textarea min-h-[90px]" />
+              </Field>
+            </section>
+
+            <EditableList
+              title="بازه قیمت پروژه‌ها"
+              items={Array.isArray(settings.project_price_ranges) ? settings.project_price_ranges as Record<string, unknown>[] : []}
+              onAdd={() => addArrayItem("project_price_ranges", { key: "", label: "", price_range: "", timeline: "" })}
+              renderItem={(item, index) => (
+                <div className="grid gap-3 md:grid-cols-4">
+                  <Field label="کلید"><input className="admin-input" value={String(item.key || "")} onChange={(e) => updateArrayItem("project_price_ranges", index, { key: e.target.value })} /></Field>
+                  <Field label="عنوان"><input className="admin-input" value={String(item.label || "")} onChange={(e) => updateArrayItem("project_price_ranges", index, { label: e.target.value })} /></Field>
+                  <Field label="بازه قیمت"><input className="admin-input" value={String(item.price_range || "")} onChange={(e) => updateArrayItem("project_price_ranges", index, { price_range: e.target.value })} /></Field>
+                  <Field label="زمان"><input className="admin-input" value={String(item.timeline || "")} onChange={(e) => updateArrayItem("project_price_ranges", index, { timeline: e.target.value })} /></Field>
+                </div>
+              )}
+              onRemove={(index) => removeArrayItem("project_price_ranges", index)}
+            />
+
+            <EditableList
+              title="سطح‌های بودجه"
+              items={Array.isArray(settings.budget_plan_thresholds) ? settings.budget_plan_thresholds as Record<string, unknown>[] : []}
+              onAdd={() => addArrayItem("budget_plan_thresholds", { key: "", display: "", min_million_toman: "", max_million_toman: "" })}
+              renderItem={(item, index) => (
+                <div className="grid gap-3 md:grid-cols-4">
+                  <Field label="کلید"><input className="admin-input" value={String(item.key || "")} onChange={(e) => updateArrayItem("budget_plan_thresholds", index, { key: e.target.value })} /></Field>
+                  <Field label="عنوان فارسی"><input className="admin-input" value={String(item.display || "")} onChange={(e) => updateArrayItem("budget_plan_thresholds", index, { display: e.target.value })} /></Field>
+                  <Field label="حداقل (میلیون تومان)"><input className="admin-input" value={String(item.min_million_toman ?? "")} onChange={(e) => updateArrayItem("budget_plan_thresholds", index, { min_million_toman: e.target.value ? Number(e.target.value) : undefined })} /></Field>
+                  <Field label="حداکثر (میلیون تومان)"><input className="admin-input" value={String(item.max_million_toman ?? "")} onChange={(e) => updateArrayItem("budget_plan_thresholds", index, { max_million_toman: e.target.value ? Number(e.target.value) : undefined })} /></Field>
+                </div>
+              )}
+              onRemove={(index) => removeArrayItem("budget_plan_thresholds", index)}
+            />
+
+            <SettingsTextarea title="قوانین فروش AI" value={toLines(settings.ai_sales_rules)} onChange={(value) => setSettingValue("ai_sales_rules", fromLines(value))} />
+            <SettingsTextarea title="جریان سوال‌های چت‌بات" value={toLines(settings.chatbot_question_flow)} onChange={(value) => setSettingValue("chatbot_question_flow", fromLines(value))} />
+
+            <EditableList
+              title="تکنولوژی‌های پیشنهادی"
+              items={Array.isArray(settings.recommended_technologies) ? settings.recommended_technologies as Record<string, unknown>[] : []}
+              onAdd={() => addArrayItem("recommended_technologies", { condition: "", recommendation: "" })}
+              renderItem={(item, index) => (
+                <div className="grid gap-3 md:grid-cols-2">
+                  <Field label="شرط"><input className="admin-input" value={String(item.condition || "")} onChange={(e) => updateArrayItem("recommended_technologies", index, { condition: e.target.value })} /></Field>
+                  <Field label="پیشنهاد"><input className="admin-input" value={String(item.recommendation || "")} onChange={(e) => updateArrayItem("recommended_technologies", index, { recommendation: e.target.value })} /></Field>
+                </div>
+              )}
+              onRemove={(index) => removeArrayItem("recommended_technologies", index)}
+            />
+
+            <EditableList
+              title="زمان‌بندی‌ها"
+              items={Array.isArray(settings.timeline_estimates) ? settings.timeline_estimates as Record<string, unknown>[] : []}
+              onAdd={() => addArrayItem("timeline_estimates", { project_type: "", estimate: "" })}
+              renderItem={(item, index) => (
+                <div className="grid gap-3 md:grid-cols-2">
+                  <Field label="نوع پروژه"><input className="admin-input" value={String(item.project_type || "")} onChange={(e) => updateArrayItem("timeline_estimates", index, { project_type: e.target.value })} /></Field>
+                  <Field label="زمان تخمینی"><input className="admin-input" value={String(item.estimate || "")} onChange={(e) => updateArrayItem("timeline_estimates", index, { estimate: e.target.value })} /></Field>
+                </div>
+              )}
+              onRemove={(index) => removeArrayItem("timeline_estimates", index)}
+            />
+
+            <section className="bg-white border border-border rounded-2xl p-5 space-y-4">
+              <h3 className="text-slate-900 font-semibold">قالب‌های پاسخ آماده</h3>
+              {Object.entries((settings.predefined_response_templates || {}) as Record<string, string>).map(([key, value]) => (
+                <Field key={key} label={key}>
+                  <textarea
+                    value={value}
+                    onChange={(e) => setSettingValue("predefined_response_templates", { ...(settings.predefined_response_templates as object || {}), [key]: e.target.value })}
+                    className="admin-textarea min-h-[90px]"
+                  />
+                </Field>
+              ))}
+            </section>
+
+            <EditableList
+              title="قوانین امتیازدهی لید"
+              items={Array.isArray(settings.lead_scoring_rules) ? settings.lead_scoring_rules as Record<string, unknown>[] : []}
+              onAdd={() => addArrayItem("lead_scoring_rules", { condition: "", score: 0 })}
+              renderItem={(item, index) => (
+                <div className="grid gap-3 md:grid-cols-[1fr_120px]">
+                  <Field label="شرط"><input className="admin-input" value={String(item.condition || "")} onChange={(e) => updateArrayItem("lead_scoring_rules", index, { condition: e.target.value })} /></Field>
+                  <Field label="امتیاز"><input type="number" className="admin-input" value={String(item.score || 0)} onChange={(e) => updateArrayItem("lead_scoring_rules", index, { score: Number(e.target.value) })} /></Field>
+                </div>
+              )}
+              onRemove={(index) => removeArrayItem("lead_scoring_rules", index)}
+            />
+
+            <details className="bg-white border border-border rounded-2xl p-5">
+              <summary className="cursor-pointer text-slate-900 font-semibold">نمایش JSON خام برای بررسی فنی</summary>
+              <pre dir="ltr" className="mt-4 overflow-auto rounded-xl bg-[#f7fbf9] p-4 text-xs leading-6 text-slate-700">
+                {JSON.stringify(Object.fromEntries(SETTING_SECTIONS.map((key) => [key, settings[key]])), null, 2)}
+              </pre>
+            </details>
+          </div>
+        )}
       </main>
 
       {/* Order Management Modal */}
       {selected && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50"
           onClick={() => setSelected(null)}>
-          <div className="bg-surface border border-border rounded-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto"
+          <div className="bg-white border border-border rounded-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border sticky top-0 bg-surface">
-              <h3 className="font-semibold text-gray-100 truncate">{selected.project_name}</h3>
-              <button onClick={() => setSelected(null)} className="text-muted hover:text-gray-200 transition-colors flex-shrink-0 mr-4">✕</button>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border sticky top-0 bg-white">
+              <h3 className="font-semibold text-slate-900 truncate">{selected.project_name}</h3>
+              <button onClick={() => setSelected(null)} className="text-slate-500 hover:text-slate-800 transition-colors flex-shrink-0 mr-4">✕</button>
             </div>
 
             <div className="p-6 space-y-6">
               {/* Info */}
               <div className="space-y-3 text-sm">
-                <p className="text-muted text-xs">خلاصه</p>
-                <p className="text-gray-300 leading-relaxed">{selected.summary}</p>
+                <p className="text-slate-500 text-xs">خلاصه</p>
+                <p className="text-slate-700 leading-relaxed">{selected.summary}</p>
                 <ul className="space-y-1 mt-2">
                   {selected.features.map((f, i) => (
-                    <li key={i} className="text-gray-400 flex gap-2"><span className="text-accent">•</span>{f}</li>
+                    <li key={i} className="text-slate-600 flex gap-2"><span className="text-emerald-700">•</span>{f}</li>
                   ))}
                 </ul>
                 <div className="grid grid-cols-2 gap-3 pt-1">
-                  <div><p className="text-muted text-xs mb-1">تکنولوژی</p><p className="text-gray-300">{selected.tech_stack}</p></div>
-                  <div><p className="text-muted text-xs mb-1">تحویل</p><p className="text-gray-300">{selected.delivery_days} روز</p></div>
-                  <div><p className="text-muted text-xs mb-1">تخمین اولیه</p><p className="text-gray-300">{selected.price_label}</p></div>
-                  <div><p className="text-muted text-xs mb-1">وضعیت</p>
+                  <div><p className="text-slate-500 text-xs mb-1">تکنولوژی</p><p className="text-slate-700">{selected.tech_stack}</p></div>
+                  <div><p className="text-slate-500 text-xs mb-1">تحویل</p><p className="text-slate-700">{selected.delivery_days} روز</p></div>
+                  <div><p className="text-slate-500 text-xs mb-1">تخمین اولیه</p><p className="text-slate-700">{selected.price_label}</p></div>
+                  <div><p className="text-slate-500 text-xs mb-1">وضعیت</p>
                     <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_CLASS[selected.status]}`}>
                       {STATUS_LABEL[selected.status]}
                     </span>
@@ -219,37 +439,62 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
+              <div className="border-t border-border pt-5 space-y-3">
+                <p className="text-slate-900 text-sm font-medium">تاریخچه چت این پروژه</p>
+                {(selected.chat_history || []).length === 0 ? (
+                  <p className="text-sm text-slate-600">
+                    برای این سفارش تاریخچه چت ثبت نشده (احتمالاً سفارش قدیمی است).
+                  </p>
+                ) : (
+                  <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+                    {(selected.chat_history || []).map((message, index) => (
+                      <div
+                        key={`${message.role}-${index}`}
+                        className={`rounded-xl px-4 py-3 text-sm leading-relaxed ${
+                          message.role === "user"
+                            ? "bg-emerald-50 border border-emerald-200 text-slate-900"
+                            : "bg-white border border-border text-slate-700"
+                        }`}
+                      >
+                        <p className="text-xs mb-1 opacity-70">{message.role === "user" ? "کاربر" : "دستیار"}</p>
+                        <p className="whitespace-pre-wrap">{message.content}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {/* Approve Section */}
               {selected.status !== "paid" && selected.status !== "cancelled" && (
                 <div className="border-t border-border pt-5 space-y-4">
-                  <p className="text-gray-100 text-sm font-medium">تایید و تعیین مبلغ</p>
+                  <p className="text-slate-900 text-sm font-medium">تایید و تعیین مبلغ</p>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-muted text-xs mb-2">قیمت نهایی (ریال)</label>
+                      <label className="block text-slate-500 text-xs mb-2">قیمت نهایی (ریال)</label>
                       <input type="number" value={finalPrice} onChange={(e) => setFinalPrice(e.target.value)}
                         placeholder="مثال: 18000000"
-                        className="w-full bg-bg border border-border rounded-xl px-3 py-2.5 text-sm text-gray-100 outline-none focus:border-accent transition-colors" />
+                        className="w-full bg-white border border-border rounded-xl px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-emerald-600 transition-colors" />
                     </div>
                     <div>
-                      <label className="block text-muted text-xs mb-2">درصد پیش‌پرداخت</label>
+                      <label className="block text-slate-500 text-xs mb-2">درصد پیش‌پرداخت</label>
                       <input type="number" min={10} max={100} value={payPercent} onChange={(e) => setPayPercent(e.target.value)}
-                        className="w-full bg-bg border border-border rounded-xl px-3 py-2.5 text-sm text-gray-100 outline-none focus:border-accent transition-colors" />
+                        className="w-full bg-white border border-border rounded-xl px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-emerald-600 transition-colors" />
                     </div>
                   </div>
                   {payAmount && (
-                    <div className="bg-accent/5 border border-accent/20 rounded-xl px-4 py-3 flex justify-between items-center">
-                      <p className="text-muted text-xs">مبلغ قابل پرداخت توسط مشتری</p>
-                      <p className="text-accent font-bold">{payAmount.toLocaleString("fa-IR")} ریال</p>
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 flex justify-between items-center">
+                      <p className="text-slate-500 text-xs">مبلغ قابل پرداخت توسط مشتری</p>
+                      <p className="text-emerald-700 font-bold">{payAmount.toLocaleString("fa-IR")} ریال</p>
                     </div>
                   )}
                   <div>
-                    <label className="block text-muted text-xs mb-2">یادداشت برای مشتری (اختیاری)</label>
+                    <label className="block text-slate-500 text-xs mb-2">یادداشت برای مشتری (اختیاری)</label>
                     <textarea value={adminNote} onChange={(e) => setAdminNote(e.target.value)} rows={2}
-                      className="w-full bg-bg border border-border rounded-xl px-3 py-2.5 text-sm text-gray-100 outline-none focus:border-accent transition-colors resize-none" />
+                      className="w-full bg-white border border-border rounded-xl px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-emerald-600 transition-colors resize-none" />
                   </div>
                   {error && <p className="text-red-400 text-sm">{error}</p>}
                   <button onClick={handleApprove} disabled={approving || !finalPrice}
-                    className="w-full bg-accent hover:bg-accent-hover disabled:opacity-60 text-black font-bold rounded-xl py-3 text-sm transition-colors">
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold rounded-xl py-3 text-sm transition-colors">
                     {approving ? "در حال ثبت..." : selected.status === "awaiting_payment" ? "به‌روزرسانی" : "تایید و ارسال به مشتری"}
                   </button>
                 </div>
@@ -257,14 +502,14 @@ export default function AdminDashboard() {
 
               {/* Upload Proposal */}
               <div className="border-t border-border pt-5">
-                <p className="text-gray-100 text-sm font-medium mb-3">آپلود پروپوزال PDF</p>
+                <p className="text-slate-900 text-sm font-medium mb-3">آپلود پروپوزال PDF</p>
                 {selected.proposal_file && (
-                  <p className="text-accent text-xs mb-2">✓ فایل آپلود شده: {selected.proposal_file.split("/").pop()}</p>
+                  <p className="text-emerald-700 text-xs mb-2">✓ فایل آپلود شده: {selected.proposal_file.split("/").pop()}</p>
                 )}
                 <input ref={fileRef} type="file" accept=".pdf,.doc,.docx" onChange={handleUpload}
                   className="hidden" />
                 <button onClick={() => fileRef.current?.click()} disabled={uploading}
-                  className="w-full border border-border hover:border-accent/50 text-gray-300 hover:text-gray-100 rounded-xl py-3 text-sm transition-colors disabled:opacity-60">
+                  className="w-full border border-border hover:border-emerald-300 text-slate-600 hover:text-slate-900 rounded-xl py-3 text-sm transition-colors disabled:opacity-60">
                   {uploading ? "در حال آپلود..." : selected.proposal_file ? "جایگزینی فایل" : "انتخاب و آپلود فایل"}
                 </button>
               </div>
@@ -278,9 +523,67 @@ export default function AdminDashboard() {
 
 function StatCard({ label, value, accent, warn }: { label: string; value: string; accent?: boolean; warn?: boolean }) {
   return (
-    <div className="bg-surface border border-border rounded-xl p-5 text-center">
-      <p className="text-muted text-xs mb-2">{label}</p>
-      <p className={`font-bold text-xl ${accent ? "text-accent" : warn ? "text-yellow-400" : "text-gray-100"}`}>{value}</p>
+    <div className="bg-white border border-border rounded-xl p-5 text-center">
+      <p className="text-slate-500 text-xs mb-2">{label}</p>
+      <p className={`font-bold text-xl ${accent ? "text-emerald-700" : warn ? "text-amber-600" : "text-slate-900"}`}>{value}</p>
     </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="block text-slate-500 text-xs mb-2">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function EditableList({
+  title,
+  items,
+  renderItem,
+  onAdd,
+  onRemove,
+}: {
+  title: string;
+  items: Record<string, unknown>[];
+  renderItem: (item: Record<string, unknown>, index: number) => React.ReactNode;
+  onAdd: () => void;
+  onRemove: (index: number) => void;
+}) {
+  return (
+    <section className="bg-white border border-border rounded-2xl p-5 space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-slate-900 font-semibold">{title}</h3>
+        <button onClick={onAdd} className="border border-border hover:border-emerald-300 text-slate-800 rounded-xl px-4 py-2 text-xs transition-colors">
+          افزودن
+        </button>
+      </div>
+      <div className="space-y-3">
+        {items.map((item, index) => (
+          <div key={index} className="bg-white border border-border rounded-xl p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex-1">{renderItem(item, index)}</div>
+              <button onClick={() => onRemove(index)} className="text-red-400 hover:text-red-300 text-xs px-2 py-2">
+                حذف
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function SettingsTextarea({ title, value, onChange }: { title: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <section className="bg-white border border-border rounded-2xl p-5 space-y-4">
+      <div>
+        <h3 className="text-slate-900 font-semibold">{title}</h3>
+        <p className="text-slate-500 text-xs mt-1">هر خط یک مورد جداگانه است.</p>
+      </div>
+      <textarea value={value} onChange={(e) => onChange(e.target.value)} className="admin-textarea min-h-[180px]" />
+    </section>
   );
 }

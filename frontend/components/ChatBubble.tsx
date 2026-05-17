@@ -12,8 +12,8 @@ export default function ChatBubble({ role, content }: Props) {
       <div
         className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
           isUser
-            ? "bg-surface border border-border text-gray-100"
-            : "bg-accent text-black font-medium"
+            ? "bg-white border border-border text-slate-900 shadow-sm"
+            : "bg-emerald-600 text-white font-medium shadow-sm"
         }`}
       >
         {content}

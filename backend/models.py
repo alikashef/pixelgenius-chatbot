@@ -1,7 +1,7 @@
 import uuid
 import enum
 from datetime import datetime, timezone
-from sqlalchemy import String, Text, Integer, Enum, DateTime, JSON, ForeignKey, Numeric
+from sqlalchemy import String, Text, Integer, Enum, DateTime, JSON, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from database import Base
 
@@ -19,10 +19,25 @@ class Customer(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     phone: Mapped[str] = mapped_column(String(20), unique=True, index=True)
+    first_name: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    last_name: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    business_type: Mapped[str | None] = mapped_column(String(120), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
     orders: Mapped[list["Order"]] = relationship("Order", back_populates="customer")
+
+
+class AIConfig(Base):
+    __tablename__ = "ai_configs"
+
+    key: Mapped[str] = mapped_column(String(80), primary_key=True)
+    value: Mapped[dict | list | str | int | float | bool | None] = mapped_column(JSON)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
 
 
 class Order(Base):
@@ -34,6 +49,7 @@ class Order(Base):
 
     project_name: Mapped[str] = mapped_column(String(255))
     summary: Mapped[str] = mapped_column(Text)
+    chat_history: Mapped[list] = mapped_column(JSON, default=list)
     features: Mapped[list] = mapped_column(JSON, default=list)
     tech_stack: Mapped[str] = mapped_column(String(255))
     delivery_days: Mapped[int] = mapped_column(Integer)

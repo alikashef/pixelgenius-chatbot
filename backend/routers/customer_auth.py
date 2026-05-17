@@ -24,17 +24,24 @@ async def send(body: OtpSendRequest, db: AsyncSession = Depends(get_db)):
 
 @router.post("/customer/otp/verify", response_model=CustomerTokenOut)
 async def verify(body: OtpVerifyRequest, db: AsyncSession = Depends(get_db)):
-    if not verify_otp(body.phone.strip(), body.code.strip()):
+    phone = body.phone.strip()
+
+    if not verify_otp(phone, body.code.strip()):
         raise HTTPException(status_code=400, detail="کد اشتباه یا منقضی شده")
 
-    result = await db.execute(select(Customer).where(Customer.phone == body.phone))
+    result = await db.execute(select(Customer).where(Customer.phone == phone))
     customer = result.scalar_one_or_none()
 
     if not customer:
-        customer = Customer(phone=body.phone.strip())
+        customer = Customer(phone=phone)
         db.add(customer)
         await db.commit()
         await db.refresh(customer)
 
     token = create_access_token({"sub": customer.id, "role": "customer"})
-    return CustomerTokenOut(access_token=token, token_type="bearer", customer_id=customer.id)
+    return CustomerTokenOut(
+        access_token=token,
+        token_type="bearer",
+        customer_id=customer.id,
+        first_name=customer.first_name,
+    )

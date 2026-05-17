@@ -5,10 +5,103 @@
 @tailwind utilities;
 
 :root {
-  --bg: #0a0a0a;
-  --surface: #141414;
-  --border: #222222;
+  --bg: #f4f8f6;
+  --surface: #ffffff;
+  --border: #dbe5e1;
+  --accent: #059669;
+  --accent-hover: #047857;
+  --text: #0f172a;
+  --toggle-bg: rgba(255, 255, 255, 0.92);
+  --toggle-text: #0f172a;
+}
+
+html[data-theme="dark"] {
+  --bg: #0b1220;
+  --surface: #111a2b;
+  --border: #22304a;
   --accent: #22c55e;
+  --accent-hover: #16a34a;
+  --text: #e5e7eb;
+  --toggle-bg: rgba(17, 26, 43, 0.9);
+  --toggle-text: #e5e7eb;
+}
+
+/* Dark-mode compatibility layer for existing Tailwind utility classes */
+html[data-theme="dark"] .bg-white {
+  background-color: #111a2b !important;
+}
+
+html[data-theme="dark"] .bg-white\/90 {
+  background-color: rgba(17, 26, 43, 0.9) !important;
+}
+
+html[data-theme="dark"] .bg-white\/95 {
+  background-color: rgba(17, 26, 43, 0.95) !important;
+}
+
+html[data-theme="dark"] .bg-\[\#f7fbf9\] {
+  background-color: #0b1220 !important;
+}
+
+html[data-theme="dark"] .bg-\[linear-gradient\(180deg\,\#f8fcfa_0\%\,\#f1f7f4_100\%\)\] {
+  background: linear-gradient(180deg, #0b1220 0%, #0f172a 100%) !important;
+}
+
+html[data-theme="dark"] .text-slate-900 {
+  color: #f3f4f6 !important;
+}
+
+html[data-theme="dark"] .text-slate-800 {
+  color: #e5e7eb !important;
+}
+
+html[data-theme="dark"] .text-slate-700 {
+  color: #cbd5e1 !important;
+}
+
+html[data-theme="dark"] .text-slate-600,
+html[data-theme="dark"] .text-slate-500 {
+  color: #94a3b8 !important;
+}
+
+html[data-theme="dark"] .border-border,
+html[data-theme="dark"] .border-slate-200,
+html[data-theme="dark"] .border-slate-100 {
+  border-color: #22304a !important;
+}
+
+html[data-theme="dark"] .border-border\/80 {
+  border-color: rgba(34, 48, 74, 0.8) !important;
+}
+
+/* Form fields in dark mode */
+html[data-theme="dark"] input,
+html[data-theme="dark"] textarea,
+html[data-theme="dark"] select {
+  color: #e5e7eb;
+  caret-color: #22c55e;
+}
+
+html[data-theme="dark"] input::placeholder,
+html[data-theme="dark"] textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+html[data-theme="dark"] .bg-white input,
+html[data-theme="dark"] .bg-white textarea,
+html[data-theme="dark"] .bg-white select,
+html[data-theme="dark"] input.bg-white,
+html[data-theme="dark"] textarea.bg-white,
+html[data-theme="dark"] select.bg-white {
+  background-color: #0f172a !important;
+  border-color: #334155 !important;
+}
+
+html[data-theme="dark"] input:focus,
+html[data-theme="dark"] textarea:focus,
+html[data-theme="dark"] select:focus {
+  border-color: #22c55e !important;
+  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.35);
 }
 
 * {
@@ -17,8 +110,8 @@
 
 html,
 body {
-  background-color: #0a0a0a;
-  color: #f9fafb;
+  background-color: var(--bg);
+  color: var(--text);
   font-family: 'Vazirmatn', sans-serif;
   direction: rtl;
   margin: 0;
@@ -30,14 +123,85 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #0a0a0a;
+  background: #edf2ef;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #222222;
+  background: #c7d4cf;
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #333333;
+  background: #aebfb9;
+}
+
+@keyframes landing-float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
+}
+
+@keyframes landing-progress {
+  0% {
+    width: 18%;
+  }
+  100% {
+    width: 66.666667%;
+  }
+}
+
+.landing-float {
+  animation: landing-float 5.5s ease-in-out infinite;
+}
+
+.landing-float-delayed {
+  animation: landing-float 6.5s ease-in-out infinite;
+  animation-delay: 1.1s;
+}
+
+.landing-progress {
+  animation: landing-progress 2.4s ease-out both;
+}
+
+.admin-input {
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid #dbe5e1;
+  background: #ffffff;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  color: #0f172a;
+  outline: none;
+  transition: border-color 150ms ease;
+}
+
+.theme-toggle {
+  border: 1px solid var(--border);
+  background: var(--toggle-bg);
+  color: var(--toggle-text);
+}
+
+.admin-input:focus {
+  border-color: var(--accent);
+}
+
+.admin-textarea {
+  width: 100%;
+  resize: vertical;
+  border-radius: 0.75rem;
+  border: 1px solid #dbe5e1;
+  background: #ffffff;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  line-height: 1.75rem;
+  color: #0f172a;
+  outline: none;
+  transition: border-color 150ms ease;
+}
+
+.admin-textarea:focus {
+  border-color: var(--accent);
 }

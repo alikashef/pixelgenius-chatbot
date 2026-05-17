@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
 from models import OrderStatus
@@ -18,6 +18,30 @@ class ChatResponse(BaseModel):
     content: str
 
 
+class LeadAnalysisOut(BaseModel):
+    project_type: str
+    project_goal: str
+    budget_level: str
+    budget_fit: str
+    recommended_solution: str
+    recommended_stack: str
+    estimated_price_range: str
+    estimated_timeline: str
+    client_risk_level: str
+    lead_score: int
+    client_message: str
+    admin_summary: str
+    missing_questions: list[str]
+
+
+class AISettingsOut(BaseModel):
+    settings: dict
+
+
+class AISettingsUpdateIn(BaseModel):
+    settings: dict
+
+
 # ── Customer Auth ────────────────────────────────────────────────────────────
 class OtpSendRequest(BaseModel):
     phone: str
@@ -26,18 +50,37 @@ class OtpSendRequest(BaseModel):
 class OtpVerifyRequest(BaseModel):
     phone: str
     code: str
+    first_name: Optional[str] = None
 
 
 class CustomerTokenOut(BaseModel):
     access_token: str
     token_type: str
     customer_id: str
+    first_name: Optional[str] = None
+
+
+class CustomerProfileOut(BaseModel):
+    id: str
+    phone: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    business_type: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
+class CustomerProfileUpdateIn(BaseModel):
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    business_type: Optional[str] = None
 
 
 # ── Orders ───────────────────────────────────────────────────────────────────
 class OrderCreateIn(BaseModel):
     project_name: str
     summary: str
+    chat_history: list[MessageIn] = Field(default_factory=list)
     features: list[str]
     tech_stack: str
     delivery_days: int
@@ -56,6 +99,7 @@ class OrderOut(BaseModel):
     customer_id: Optional[str] = None
     project_name: str
     summary: str
+    chat_history: list[MessageIn]
     features: list
     tech_stack: str
     delivery_days: int

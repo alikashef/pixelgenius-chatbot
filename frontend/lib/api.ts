@@ -16,11 +16,32 @@ export interface Proposal {
   priceLabel: string;
 }
 
+export interface LeadAnalysis {
+  project_type: string;
+  project_goal: string;
+  budget_level: string;
+  budget_fit: "low" | "fit" | "high";
+  recommended_solution: string;
+  recommended_stack: string;
+  estimated_price_range: string;
+  estimated_timeline: string;
+  client_risk_level: string;
+  lead_score: number;
+  client_message: string;
+  admin_summary: string;
+  missing_questions: string[];
+}
+
+export interface AISettingsResponse {
+  settings: Record<string, unknown>;
+}
+
 export interface Order {
   id: string;
   customer_id: string | null;
   project_name: string;
   summary: string;
+  chat_history: Message[];
   features: string[];
   tech_stack: string;
   delivery_days: number;
@@ -34,6 +55,14 @@ export interface Order {
   status: "pending_review" | "approved" | "awaiting_payment" | "paid" | "cancelled";
   paid_at: string | null;
   created_at: string;
+}
+
+export interface CustomerProfile {
+  id: string;
+  phone: string;
+  first_name: string | null;
+  last_name: string | null;
+  business_type: string | null;
 }
 
 // ── Chat ─────────────────────────────────────────────────────────────────────
@@ -76,13 +105,37 @@ export async function verifyOtp(phone: string, code: string) {
 }
 
 // ── Customer Orders ───────────────────────────────────────────────────────────
-export async function submitOrder(token: string, proposal: Proposal): Promise<Order> {
+export async function fetchCustomerProfile(token: string): Promise<CustomerProfile> {
+  const res = await fetch(`${API_URL}/api/customer/profile`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (res.status === 401 || res.status === 403) throw new Error("UNAUTHORIZED");
+  if (!res.ok) throw new Error("خطا در دریافت پروفایل");
+  return res.json();
+}
+
+export async function updateCustomerProfile(
+  token: string,
+  profile: Pick<CustomerProfile, "first_name" | "last_name" | "business_type">
+): Promise<CustomerProfile> {
+  const res = await fetch(`${API_URL}/api/customer/profile`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify(profile),
+  });
+  if (res.status === 401 || res.status === 403) throw new Error("UNAUTHORIZED");
+  if (!res.ok) throw new Error("خطا در ذخیره پروفایل");
+  return res.json();
+}
+
+export async function submitOrder(token: string, proposal: Proposal, chatHistory: Message[]): Promise<Order> {
   const res = await fetch(`${API_URL}/api/customer/orders`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({
       project_name: proposal.projectName,
       summary: proposal.summary,
+      chat_history: chatHistory,
       features: proposal.features,
       tech_stack: proposal.tech,
       delivery_days: proposal.days,
@@ -98,7 +151,7 @@ export async function fetchMyOrders(token: string): Promise<Order[]> {
   const res = await fetch(`${API_URL}/api/customer/orders`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (res.status === 401) throw new Error("UNAUTHORIZED");
+  if (res.status === 401 || res.status === 403) throw new Error("UNAUTHORIZED");
   if (!res.ok) throw new Error("خطا در دریافت سفارشات");
   return res.json();
 }
@@ -107,7 +160,7 @@ export async function fetchMyOrder(token: string, id: string): Promise<Order> {
   const res = await fetch(`${API_URL}/api/customer/orders/${id}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (res.status === 401) throw new Error("UNAUTHORIZED");
+  if (res.status === 401 || res.status === 403) throw new Error("UNAUTHORIZED");
   if (!res.ok) throw new Error("خطا در دریافت سفارش");
   return res.json();
 }
@@ -144,7 +197,7 @@ export async function fetchOrders(token: string): Promise<Order[]> {
   const res = await fetch(`${API_URL}/api/orders`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (res.status === 401) throw new Error("UNAUTHORIZED");
+  if (res.status === 401 || res.status === 403) throw new Error("UNAUTHORIZED");
   if (!res.ok) throw new Error("خطا در دریافت سفارشات");
   return res.json();
 }
@@ -153,6 +206,7 @@ export async function fetchStats(token: string) {
   const res = await fetch(`${API_URL}/api/orders/stats`, {
     headers: { Authorization: `Bearer ${token}` },
   });
+  if (res.status === 401 || res.status === 403) throw new Error("UNAUTHORIZED");
   if (!res.ok) throw new Error("خطا در دریافت آمار");
   return res.json();
 }
@@ -182,5 +236,26 @@ export async function uploadProposal(token: string, orderId: string, file: File)
     body: form,
   });
   if (!res.ok) throw new Error("خطا در آپلود فایل");
+  return res.json();
+}
+
+export async function fetchAISettings(token: string): Promise<Record<string, unknown>> {
+  const res = await fetch(`${API_URL}/api/settings/ai`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (res.status === 401 || res.status === 403) throw new Error("UNAUTHORIZED");
+  if (!res.ok) throw new Error("خطا در دریافت تنظیمات هوش مصنوعی");
+  const data: AISettingsResponse = await res.json();
+  return data.settings;
+}
+
+export async function updateAISettings(token: string, settings: Record<string, unknown>) {
+  const res = await fetch(`${API_URL}/api/settings/ai`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ settings }),
+  });
+  if (res.status === 401 || res.status === 403) throw new Error("UNAUTHORIZED");
+  if (!res.ok) throw new Error("خطا در ذخیره تنظیمات هوش مصنوعی");
   return res.json();
 }

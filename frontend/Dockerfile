@@ -1,10 +1,10 @@
-FROM docker.arvancloud.ir/library/node:20-alpine AS base
-RUN npm install -g pnpm --registry https://registry.npmmirror.com
+FROM node:20-alpine AS base
+RUN npm install -g pnpm
 
 FROM base AS deps
 WORKDIR /app
-COPY package.json ./
-RUN pnpm install --registry https://registry.npmmirror.com
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
 
 FROM base AS builder
 WORKDIR /app

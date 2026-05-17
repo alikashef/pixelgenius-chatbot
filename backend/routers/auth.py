@@ -12,5 +12,5 @@ async def login(body: LoginRequest):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="نام کاربری یا رمز عبور اشتباه است",
         )
-    token = create_access_token({"sub": body.username})
+    token = create_access_token({"sub": body.username, "role": "admin"})
     return TokenOut(access_token=token, token_type="bearer")
