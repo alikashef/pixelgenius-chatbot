@@ -9,6 +9,7 @@ function LoginContent() {
   const params = useSearchParams();
   const phoneParam = params.get("phone") || "";
   const redirect = params.get("redirect") || "/panel";
+  const handoffParam = params.get("handoff") || "";
 
   const [phone, setPhone] = useState(phoneParam);
   const [code, setCode] = useState("");
@@ -17,6 +18,25 @@ function LoginContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [countdown, setCountdown] = useState(phoneParam ? 120 : 0);
+
+  function readHandoff(): { proposal: Proposal; chatHistory: Message[] } | null {
+    if (!handoffParam) return null;
+    try {
+      const normalized = handoffParam.replace(/-/g, "+").replace(/_/g, "/");
+      const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), "=");
+      const parsed = JSON.parse(decodeURIComponent(escape(atob(padded)))) as {
+        proposal?: Proposal;
+        chatHistory?: Message[];
+      };
+      if (parsed.proposal?.type !== "proposal" || !Array.isArray(parsed.chatHistory)) return null;
+      return {
+        proposal: parsed.proposal,
+        chatHistory: parsed.chatHistory.filter((message) => message.role === "user" || message.role === "assistant"),
+      };
+    } catch {
+      return null;
+    }
+  }
 
   useEffect(() => {
     if (!phoneParam) return;
@@ -77,7 +97,21 @@ function LoginContent() {
       }
 
       // auto-submit proposal if exists
+      const handoff = readHandoff();
       const storedProposal = localStorage.getItem("proposal");
+      if (handoff) {
+        try {
+          const order = await submitOrder(token, handoff.proposal, handoff.chatHistory);
+          localStorage.removeItem("proposal");
+          localStorage.removeItem(`chat_draft_customer_${data.customer_id}`);
+          localStorage.removeItem("chat_draft_anonymous");
+          router.push(`/panel/${order.id}`);
+          return;
+        } catch {
+          // handoff submit failed — fall back to normal redirect
+        }
+      }
+
       if (storedProposal) {
         try {
           const proposal: Proposal = JSON.parse(storedProposal);

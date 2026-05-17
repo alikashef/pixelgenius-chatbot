@@ -5,14 +5,14 @@
 
 ## پوشه‌های راهنما
 
-- **پروژه کلی** → `.Codex/project/overview.md`
-- **چت‌بات (system prompt + قوانین)** → `.Codex/chat/rules.md`
-- **بک‌اند (FastAPI)** → `.Codex/backend/architecture.md`
-- **فرانت‌اند (Next.js)** → `.Codex/frontend/architecture.md`
+- **پروژه کلی** → `.codex/project/overview.md`
+- **چت‌بات (system prompt + قوانین)** → `.codex/chat/rules.md`
+- **بک‌اند (FastAPI)** → `.codex/backend/architecture.md`
+- **فرانت‌اند (Next.js)** → `.codex/frontend/architecture.md`
 
 ## قوانین کلی Codex
 
-- همیشه قبل از تغییر یه بخش، فایل `.Codex` مربوطش رو بخون
+- همیشه قبل از تغییر یه بخش، فایل `.codex` مربوطش رو بخون
 - کامنت فارسی ننویس مگه اینکه صریح خواسته بشه
 - فایل جدید نساز مگه ضروری باشه
 - commit message به انگلیسی

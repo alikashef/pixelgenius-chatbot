@@ -5,14 +5,14 @@
 
 ## پوشه‌های راهنما
 
-- **پروژه کلی** → `.claude/project/overview.md`
-- **چت‌بات (system prompt + قوانین)** → `.claude/chat/rules.md`
-- **بک‌اند (FastAPI)** → `.claude/backend/architecture.md`
-- **فرانت‌اند (Next.js)** → `.claude/frontend/architecture.md`
+- **پروژه کلی** → `.codex/project/overview.md`
+- **چت‌بات (system prompt + قوانین)** → `.codex/chat/rules.md`
+- **بک‌اند (FastAPI)** → `.codex/backend/architecture.md`
+- **فرانت‌اند (Next.js)** → `.codex/frontend/architecture.md`
 
 ## قوانین کلی Claude
 
-- همیشه قبل از تغییر یه بخش، فایل `.claude` مربوطش رو بخون
+- همیشه قبل از تغییر یه بخش، فایل `.codex` مربوطش رو بخون
 - کامنت فارسی ننویس مگه اینکه صریح خواسته بشه
 - فایل جدید نساز مگه ضروری باشه
 - commit message به انگلیسی

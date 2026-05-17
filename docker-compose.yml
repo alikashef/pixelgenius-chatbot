@@ -1,6 +1,21 @@
-version: "3.9"
-
 services:
+  caddy:
+    image: docker.arvancloud.ir/library/caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:-chat.pixelgenius.ir}
+      CADDY_EMAIL: ${CADDY_EMAIL:-admin@pixelgenius.ir}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+      - backend
+
   db:
     image: docker.arvancloud.ir/library/postgres:16-alpine
     restart: unless-stopped
@@ -20,6 +35,10 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        PYTHON_IMAGE: ${PYTHON_IMAGE:-docker.arvancloud.ir/library/python:3.12-slim}
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
+        PIP_TRUSTED_HOST: ${PIP_TRUSTED_HOST:-}
     restart: unless-stopped
     ports:
       - "8000:8000"
@@ -43,6 +62,10 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        NODE_IMAGE: ${NODE_IMAGE:-docker.arvancloud.ir/library/node:20-alpine}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org/}
     restart: unless-stopped
     ports:
       - "3000:3000"
@@ -54,3 +77,5 @@ services:
 volumes:
   pgdata:
   uploads:
+  caddy_data:
+  caddy_config:

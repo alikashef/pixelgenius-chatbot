@@ -13,9 +13,6 @@ node_modules/
 .env.local
 *.log
 
-# Docker
-.dockerignore
-
 # OS
 .DS_Store
 Thumbs.db
