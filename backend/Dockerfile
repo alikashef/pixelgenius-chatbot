@@ -1,4 +1,4 @@
-ARG PYTHON_IMAGE=docker.arvancloud.ir/library/python:3.12-slim
+ARG PYTHON_IMAGE=python:3.12-slim
 FROM ${PYTHON_IMAGE}
 
 WORKDIR /app

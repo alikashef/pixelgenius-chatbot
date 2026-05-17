@@ -1,6 +1,8 @@
 services:
   caddy:
-    image: docker.arvancloud.ir/library/caddy:2-alpine
+    image: caddy:2-alpine
+    profiles:
+      - edge
     restart: unless-stopped
     ports:
       - "80:80"
@@ -17,7 +19,7 @@ services:
       - backend
 
   db:
-    image: docker.arvancloud.ir/library/postgres:16-alpine
+    image: postgres:16-alpine
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
@@ -36,12 +38,10 @@ services:
       context: ./backend
       dockerfile: Dockerfile
       args:
-        PYTHON_IMAGE: ${PYTHON_IMAGE:-docker.arvancloud.ir/library/python:3.12-slim}
+        PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.12-slim}
         PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
         PIP_TRUSTED_HOST: ${PIP_TRUSTED_HOST:-}
     restart: unless-stopped
-    ports:
-      - "8000:8000"
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/freelance_intake
       GAPGPT_API_KEY: ${GAPGPT_API_KEY}
@@ -63,14 +63,12 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        NODE_IMAGE: ${NODE_IMAGE:-docker.arvancloud.ir/library/node:20-alpine}
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+        NODE_IMAGE: ${NODE_IMAGE:-node:20-alpine}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
         NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org/}
     restart: unless-stopped
-    ports:
-      - "3000:3000"
     environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
     depends_on:
       - backend
 

@@ -1,7 +1,7 @@
-ARG NODE_IMAGE=docker.arvancloud.ir/library/node:20-alpine
+ARG NODE_IMAGE=node:20-alpine
 FROM ${NODE_IMAGE} AS base
 ARG NPM_REGISTRY=https://registry.npmjs.org/
-RUN npm config set registry ${NPM_REGISTRY} && npm install -g pnpm
+RUN npm config set registry ${NPM_REGISTRY} && npm config set strict-ssl false && npm install -g pnpm
 
 FROM base AS deps
 WORKDIR /app
@@ -10,7 +10,7 @@ RUN pnpm install --frozen-lockfile
 
 FROM base AS builder
 WORKDIR /app
-ARG NEXT_PUBLIC_API_URL=http://localhost:8000
+ARG NEXT_PUBLIC_API_URL=
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .

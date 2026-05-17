@@ -2,7 +2,7 @@
 	email {$CADDY_EMAIL}
 }
 
-{$APP_DOMAIN} {
+(app_routes) {
 	encode gzip zstd
 
 	header {
@@ -14,6 +14,10 @@
 		reverse_proxy backend:8000
 	}
 
+	handle /health {
+		reverse_proxy backend:8000
+	}
+
 	handle /uploads/* {
 		reverse_proxy backend:8000
 	}
@@ -21,4 +25,12 @@
 	handle {
 		reverse_proxy frontend:3000
 	}
+}
+
+{$APP_DOMAIN} {
+	import app_routes
+}
+
+http://:80 {
+	import app_routes
 }
