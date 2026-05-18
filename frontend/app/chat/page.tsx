@@ -2,6 +2,8 @@
 
 import { useState, useRef, useEffect, FormEvent, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { IconArrowUp, IconPlus, IconSparkles, IconUser } from "@tabler/icons-react";
 import ChatBubble from "@/components/ChatBubble";
 import { sendChat, sendOtp, submitOrder, Message, Proposal, LeadAnalysis } from "@/lib/api";
 
@@ -12,7 +14,7 @@ const WELCOME: Message = {
 
 const PHONE_ASK: Message = {
   role: "assistant",
-  content: "پروپوزال پروژه‌تون آماده‌ست! 🎉\nبرای ثبت درخواست نیاز به یه حساب کاربری داریم. شماره موبایلتون رو بنویسید تا برام حساب بسازیم:",
+  content: "پروپوزال پروژه‌تون آماده‌ست! 🎉\nبرای ثبت درخواست نیاز به یه حساب کاربری داریم. شماره موبایلتون رو بنویسید:",
 };
 
 const SUBMITTED: Message = {
@@ -59,7 +61,7 @@ function createSessionId() {
 }
 
 function getSessionTitle(messages: Message[]) {
-  const firstUser = messages.find((message) => message.role === "user");
+  const firstUser = messages.find((m) => m.role === "user");
   if (!firstUser) return "چت جدید";
   return firstUser.content.slice(0, 50);
 }
@@ -96,14 +98,12 @@ function readDraft(key: string): ChatDraft | null {
   } catch {
     return null;
   }
-
   return null;
 }
 
 function parseLeadAnalysis(reply: string): LeadAnalysis | null {
   const trimmed = reply.trim();
   if (!trimmed.startsWith("{")) return null;
-
   try {
     const parsed = JSON.parse(trimmed) as Partial<LeadAnalysis>;
     if (
@@ -126,7 +126,6 @@ function parseLeadAnalysis(reply: string): LeadAnalysis | null {
   } catch {
     return null;
   }
-
   return null;
 }
 
@@ -177,6 +176,7 @@ function ChatPageInner() {
   const [phoneStep, setPhoneStep] = useState(false);
   const [sendingOtp, setSendingOtp] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const hydratedRef = useRef(false);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -207,7 +207,7 @@ function ChatPageInner() {
       const sessions = readCustomerSessions(currentCustomerId);
       if (!forceNew) {
         const selected = requestedSessionId
-          ? sessions.find((session) => session.id === requestedSessionId)
+          ? sessions.find((s) => s.id === requestedSessionId)
           : sessions[0];
         if (selected) {
           draft = selected.draft;
@@ -217,7 +217,6 @@ function ChatPageInner() {
     }
 
     setSessionId(nextSessionId);
-
     if (draft) {
       setMessages(draft.messages);
       setInput(draft.input);
@@ -227,7 +226,6 @@ function ChatPageInner() {
       setInput("");
       setPhoneStep(false);
     }
-
     hydratedRef.current = true;
   }, [searchParams]);
 
@@ -237,42 +235,25 @@ function ChatPageInner() {
 
   useEffect(() => {
     if (!hydratedRef.current) return;
-
-    const draft: ChatDraft = {
-      version: CHAT_VERSION,
-      messages,
-      input,
-      phoneStep,
-    };
+    const draft: ChatDraft = { version: CHAT_VERSION, messages, input, phoneStep };
     localStorage.setItem(chatKey, JSON.stringify(draft));
-
     if (customerToken && customerId && sessionId) {
-      const sessions = readCustomerSessions(customerId).filter((session) => session.id !== sessionId);
-      sessions.unshift({
-        id: sessionId,
-        title: getSessionTitle(messages),
-        updated_at: new Date().toISOString(),
-        draft,
-      });
+      const sessions = readCustomerSessions(customerId).filter((s) => s.id !== sessionId);
+      sessions.unshift({ id: sessionId, title: getSessionTitle(messages), updated_at: new Date().toISOString(), draft });
       writeCustomerSessions(customerId, sessions.slice(0, 25));
     }
   }, [chatKey, customerId, customerToken, input, messages, phoneStep, sessionId]);
 
   useEffect(() => {
     if (customerToken || messages.length <= 1) return;
-
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = "";
-    };
-
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [customerToken, messages.length]);
 
   function resetChat() {
     if (customerToken && customerId && sessionId) {
-      const sessions = readCustomerSessions(customerId).filter((session) => session.id !== sessionId);
+      const sessions = readCustomerSessions(customerId).filter((s) => s.id !== sessionId);
       writeCustomerSessions(customerId, sessions);
       const nextSession = createSessionId();
       setSessionId(nextSession);
@@ -290,12 +271,7 @@ function ChatPageInner() {
     e.preventDefault();
     const text = input.trim();
     if (!text || loading) return;
-
-    // phone collection step
-    if (phoneStep) {
-      await handlePhoneSubmit(text);
-      return;
-    }
+    if (phoneStep) { await handlePhoneSubmit(text); return; }
 
     const newMessages: Message[] = [...messages, { role: "user", content: text }];
     setMessages(newMessages);
@@ -316,20 +292,13 @@ function ChatPageInner() {
           localStorage.removeItem("proposal");
           localStorage.removeItem(chatKey);
           if (customerId && sessionId) {
-            const sessions = readCustomerSessions(customerId).filter((session) => session.id !== sessionId);
+            const sessions = readCustomerSessions(customerId).filter((s) => s.id !== sessionId);
             writeCustomerSessions(customerId, sessions);
           }
-          setMessages([
-            ...newMessages,
-            {
-              ...SUBMITTED,
-              content: `${customerName ? `${customerName} جان، ` : ""}${clientReply}\n\n${SUBMITTED.content}`,
-            },
-          ]);
+          setMessages([...newMessages, { ...SUBMITTED, content: `${customerName ? `${customerName} جان، ` : ""}${clientReply}\n\n${SUBMITTED.content}` }]);
           setTimeout(() => router.push(`/panel/${order.id}`), 1200);
           return;
         }
-
         localStorage.setItem("proposal", JSON.stringify(proposal));
         setMessages([...newMessages, { role: "assistant", content: `${clientReply}\n\n${PHONE_ASK.content}` }]);
         setPhoneStep(true);
@@ -341,6 +310,7 @@ function ChatPageInner() {
       setError(err instanceof Error ? err.message : "خطای ناشناخته");
     } finally {
       setLoading(false);
+      inputRef.current?.focus();
     }
   }
 
@@ -351,98 +321,120 @@ function ChatPageInner() {
     setInput("");
     try {
       await sendOtp(phone);
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: `کد تایید به ${phone} ارسال شد. الان بهتون منتقل می‌کنم تا کد رو وارد کنید...` },
-      ]);
-      setTimeout(() => {
-        router.push(`/login?phone=${encodeURIComponent(phone)}&redirect=/panel`);
-      }, 1200);
+      setMessages((prev) => [...prev, { role: "assistant", content: `کد تایید به ${phone} ارسال شد. الان بهتون منتقل می‌کنم تا کد رو وارد کنید...` }]);
+      setTimeout(() => router.push(`/login?phone=${encodeURIComponent(phone)}&redirect=/panel`), 1200);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "خطا در ارسال کد");
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: "مشکلی در ارسال کد پیش اومد. شماره رو دوباره وارد کنید:" },
-      ]);
+      setMessages((prev) => [...prev, { role: "assistant", content: "مشکلی در ارسال کد پیش اومد. شماره رو دوباره وارد کنید:" }]);
     } finally {
       setSendingOtp(false);
     }
   }
 
-  const placeholder = phoneStep ? "09xxxxxxxxx" : "پیام خود را بنویسید...";
+  const placeholder = phoneStep ? "09xxxxxxxxx" : "پیام بنویسید...";
   const isLoading = loading || sendingOtp;
 
   return (
-    <div className="flex flex-col h-screen bg-[linear-gradient(180deg,#f8fcfa_0%,#f1f7f4_100%)]">
-      <header className="border-b border-border/80 bg-white/90 backdrop-blur px-6 py-4 flex items-center gap-3">
-        <div className="w-3 h-3 rounded-full bg-accent animate-pulse" />
-        <span className="font-semibold text-slate-900">مشاور پروژه</span>
-        <span className="text-slate-500 text-xs">آنلاین</span>
-        {messages.length > 1 && (
-          <button
-            onClick={resetChat}
-            className="text-slate-500 hover:text-slate-800 text-sm transition-colors"
+    <div className="flex h-screen flex-col bg-[hsl(var(--background))]">
+      {/* header */}
+      <header className="flex items-center gap-3 border-b border-[hsl(var(--border))] bg-[hsl(var(--background))]/80 px-5 py-3.5 backdrop-blur-xl">
+        <Link href="/" className="flex items-center gap-2 font-black text-white">
+          <span className="grid h-8 w-8 place-items-center rounded-xl bg-[--violet] shadow-md shadow-[--violet-glow]">
+            <IconSparkles size={16} stroke={2.2} />
+          </span>
+          <span className="hidden sm:inline text-sm">FreelioAI</span>
+        </Link>
+
+        <div className="flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full bg-violet-400 animate-pulse" />
+          <span className="text-xs text-[hsl(var(--muted-foreground))]">آنلاین</span>
+        </div>
+
+        <div className="mr-auto flex items-center gap-2">
+          {messages.length > 1 && (
+            <button
+              onClick={resetChat}
+              className="flex items-center gap-1.5 rounded-lg border border-[hsl(var(--border))] bg-[--surface] px-3 py-1.5 text-xs text-[hsl(var(--muted-foreground))] transition-colors hover:text-white"
+            >
+              <IconPlus size={13} stroke={2.5} />
+              چت جدید
+            </button>
+          )}
+          <Link
+            href={customerToken ? "/panel" : "/login?redirect=/panel"}
+            className="flex items-center gap-1.5 rounded-lg border border-[--violet-border] bg-[--violet-glow] px-3 py-1.5 text-xs font-semibold text-violet-300 transition-colors hover:text-white"
           >
-            چت جدید
-          </button>
-        )}
-        <button
-          onClick={() => router.push(customerToken ? "/panel" : "/login?redirect=/panel")}
-          className="text-emerald-700 hover:text-emerald-800 text-sm transition-colors mr-auto"
-        >
-          {customerToken ? "پنل کاربری" : "ورود مشتری"}
-        </button>
+            <IconUser size={13} stroke={2} />
+            {customerToken ? "پنل من" : "ورود"}
+          </Link>
+        </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6 max-w-3xl w-full mx-auto">
-        {!customerToken && (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-5 text-amber-800 text-sm leading-6">
-            لاگین نیستی؛ چت موقتاً روی همین مرورگر نگه داشته می‌شود، اما برای ذخیره امن و ثبت درخواست وارد شو یا تا پایان چت صفحه را نبند.
-          </div>
-        )}
-        {messages.map((m, i) => (
-          <ChatBubble key={i} role={m.role} content={m.content} />
-        ))}
-        {isLoading && (
-          <div className="flex justify-end mb-4">
-            <div className="bg-emerald-600 rounded-2xl px-5 py-3 flex gap-1">
-              {[0, 1, 2].map((i) => (
-                <span
-                  key={i}
-                  className="w-2 h-2 rounded-full bg-white opacity-80 animate-bounce"
-                  style={{ animationDelay: `${i * 0.15}s` }}
-                />
-              ))}
+      {/* messages */}
+      <div className="flex-1 overflow-y-auto px-4 py-6 md:px-8">
+        <div className="mx-auto max-w-2xl">
+          {!customerToken && (
+            <div className="mb-5 rounded-xl border border-yellow-500/20 bg-yellow-500/8 px-4 py-3 text-xs leading-6 text-yellow-400">
+              لاگین نیستی — چت موقتاً روی مرورگر ذخیره می‌شه. برای ثبت امن وارد شو یا صفحه رو نبند.
             </div>
-          </div>
-        )}
-        {error && <p className="text-red-600 text-center text-sm mb-4">{error}</p>}
-        <div ref={bottomRef} />
+          )}
+          {messages.map((m, i) => (
+            <ChatBubble key={i} role={m.role} content={m.content} />
+          ))}
+          {isLoading && (
+            <div className="mb-4 flex items-end gap-2.5 justify-end">
+              <span className="mb-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[--violet] text-[10px] font-black text-white shadow-lg shadow-[--violet-glow]">
+                AI
+              </span>
+              <div className="rounded-2xl rounded-tl-sm bg-[--surface-2] border border-[hsl(var(--border))] px-4 py-3">
+                <span className="flex gap-1">
+                  {[0, 1, 2].map((i) => (
+                    <span
+                      key={i}
+                      className="h-2 w-2 rounded-full bg-violet-400 animate-bounce"
+                      style={{ animationDelay: `${i * 150}ms` }}
+                    />
+                  ))}
+                </span>
+              </div>
+            </div>
+          )}
+          {error && (
+            <p className="mb-4 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2.5 text-center text-xs text-red-400">
+              {error}
+            </p>
+          )}
+          <div ref={bottomRef} />
+        </div>
       </div>
 
-      <form
-        onSubmit={handleSubmit}
-        className="border-t border-border px-4 md:px-8 py-4 max-w-3xl w-full mx-auto"
-      >
-        <div className="flex gap-3">
-          <input
-            type={phoneStep ? "tel" : "text"}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder={placeholder}
-            disabled={isLoading}
-            dir={phoneStep ? "ltr" : "rtl"}
-            className="flex-1 bg-white border border-border rounded-xl px-4 py-3 text-sm text-slate-900 placeholder-slate-400 outline-none focus:border-emerald-600 transition-colors disabled:opacity-50"
-          />
-          <button
-            type="submit"
-            disabled={isLoading || !input.trim()}
-            className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-xl px-5 py-3 text-sm transition-colors"
-          >
-            {phoneStep ? "ارسال کد" : "ارسال"}
-          </button>
-        </div>
-      </form>
+      {/* input */}
+      <div className="border-t border-[hsl(var(--border))] px-4 py-4 md:px-8">
+        <form onSubmit={handleSubmit} className="mx-auto max-w-2xl">
+          <div className="flex items-center gap-2 rounded-2xl border border-[hsl(var(--border))] bg-[--surface] px-4 py-2 transition-colors focus-within:border-[--violet-border]">
+            <input
+              ref={inputRef}
+              type={phoneStep ? "tel" : "text"}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder={placeholder}
+              disabled={isLoading}
+              dir={phoneStep ? "ltr" : "rtl"}
+              className="flex-1 bg-transparent py-1.5 text-sm text-[hsl(var(--foreground))] placeholder-[hsl(var(--muted-foreground))] outline-none disabled:opacity-50"
+            />
+            <button
+              type="submit"
+              disabled={isLoading || !input.trim()}
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[--violet] text-white shadow-md shadow-[--violet-glow] transition-all hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <IconArrowUp size={17} stroke={2.5} />
+            </button>
+          </div>
+          <p className="mt-2 text-center text-[10px] text-[hsl(var(--muted-foreground))]">
+            FreelioAI · هوش مصنوعی اشتباه می‌کنه — نتیجه نهایی رو بررسی کن
+          </p>
+        </form>
+      </div>
     </div>
   );
 }
