@@ -1,11 +1,9 @@
 import type { Metadata } from "next";
-import Navbar from "@/components/landing/Navbar";
 import HeroSection from "@/components/landing/HeroSection";
 import HowItWorksSection from "@/components/landing/HowItWorksSection";
 import FeaturesSection from "@/components/landing/FeaturesSection";
 import PricingSection from "@/components/landing/PricingSection";
 import CTASection from "@/components/landing/CTASection";
-import Footer from "@/components/landing/Footer";
 
 export const metadata: Metadata = {
   title: "FreelioAI — دستیار هوشمند فریلنسرهای حرفه‌ای",
@@ -22,13 +20,11 @@ export const metadata: Metadata = {
 export default function HomePage() {
   return (
     <main>
-      <Navbar />
       <HeroSection />
       <HowItWorksSection />
       <FeaturesSection />
       <PricingSection />
       <CTASection />
-      <Footer />
     </main>
   );
 }
