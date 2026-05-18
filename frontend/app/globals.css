@@ -1,207 +1,81 @@
-@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --bg: #f4f8f6;
-  --surface: #ffffff;
-  --border: #dbe5e1;
-  --accent: #059669;
-  --accent-hover: #047857;
-  --text: #0f172a;
-  --toggle-bg: rgba(255, 255, 255, 0.92);
-  --toggle-text: #0f172a;
-}
+@layer base {
+  :root {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 95%;
+    --card: 258 30% 8%;
+    --card-foreground: 0 0% 95%;
+    --primary: 263 70% 56%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 258 20% 12%;
+    --secondary-foreground: 0 0% 85%;
+    --muted: 258 20% 12%;
+    --muted-foreground: 0 0% 55%;
+    --accent: 263 70% 56%;
+    --accent-foreground: 0 0% 100%;
+    --border: 258 25% 16%;
+    --radius: 0.75rem;
 
-html[data-theme="dark"] {
-  --bg: #0b1220;
-  --surface: #111a2b;
-  --border: #22304a;
-  --accent: #22c55e;
-  --accent-hover: #16a34a;
-  --text: #e5e7eb;
-  --toggle-bg: rgba(17, 26, 43, 0.9);
-  --toggle-text: #e5e7eb;
-}
-
-/* Dark-mode compatibility layer for existing Tailwind utility classes */
-html[data-theme="dark"] .bg-white {
-  background-color: #111a2b !important;
-}
-
-html[data-theme="dark"] .bg-white\/90 {
-  background-color: rgba(17, 26, 43, 0.9) !important;
-}
-
-html[data-theme="dark"] .bg-white\/95 {
-  background-color: rgba(17, 26, 43, 0.95) !important;
-}
-
-html[data-theme="dark"] .bg-\[\#f7fbf9\] {
-  background-color: #0b1220 !important;
-}
-
-html[data-theme="dark"] .bg-\[linear-gradient\(180deg\,\#f8fcfa_0\%\,\#f1f7f4_100\%\)\] {
-  background: linear-gradient(180deg, #0b1220 0%, #0f172a 100%) !important;
-}
-
-html[data-theme="dark"] .text-slate-900 {
-  color: #f3f4f6 !important;
-}
-
-html[data-theme="dark"] .text-slate-800 {
-  color: #e5e7eb !important;
-}
-
-html[data-theme="dark"] .text-slate-700 {
-  color: #cbd5e1 !important;
-}
-
-html[data-theme="dark"] .text-slate-600,
-html[data-theme="dark"] .text-slate-500 {
-  color: #94a3b8 !important;
-}
-
-html[data-theme="dark"] .border-border,
-html[data-theme="dark"] .border-slate-200,
-html[data-theme="dark"] .border-slate-100 {
-  border-color: #22304a !important;
-}
-
-html[data-theme="dark"] .border-border\/80 {
-  border-color: rgba(34, 48, 74, 0.8) !important;
-}
-
-/* Form fields in dark mode */
-html[data-theme="dark"] input,
-html[data-theme="dark"] textarea,
-html[data-theme="dark"] select {
-  color: #e5e7eb;
-  caret-color: #22c55e;
-}
-
-html[data-theme="dark"] input::placeholder,
-html[data-theme="dark"] textarea::placeholder {
-  color: #94a3b8 !important;
-}
-
-html[data-theme="dark"] .bg-white input,
-html[data-theme="dark"] .bg-white textarea,
-html[data-theme="dark"] .bg-white select,
-html[data-theme="dark"] input.bg-white,
-html[data-theme="dark"] textarea.bg-white,
-html[data-theme="dark"] select.bg-white {
-  background-color: #0f172a !important;
-  border-color: #334155 !important;
-}
-
-html[data-theme="dark"] input:focus,
-html[data-theme="dark"] textarea:focus,
-html[data-theme="dark"] select:focus {
-  border-color: #22c55e !important;
-  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.35);
+    /* direct color tokens */
+    --violet: #7c3aed;
+    --violet-light: #a78bfa;
+    --violet-glow: rgba(124, 58, 237, 0.18);
+    --violet-border: rgba(124, 58, 237, 0.25);
+    --surface: #110f1e;
+    --surface-2: #1a1730;
+  }
 }
 
 * {
   box-sizing: border-box;
+  border-color: hsl(var(--border));
 }
 
 html,
 body {
-  background-color: var(--bg);
-  color: var(--text);
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
   font-family: 'Vazirmatn', sans-serif;
   direction: rtl;
   margin: 0;
   padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 5px;
 }
-
 ::-webkit-scrollbar-track {
-  background: #edf2ef;
+  background: transparent;
 }
-
 ::-webkit-scrollbar-thumb {
-  background: #c7d4cf;
-  border-radius: 3px;
+  background: #2d1b52;
+  border-radius: 4px;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #aebfb9;
+/* gradient text utility */
+.text-gradient {
+  background: linear-gradient(135deg, #a78bfa 0%, #7c3aed 50%, #c084fc 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
-@keyframes landing-float {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-12px);
-  }
+/* violet glow utility */
+.glow-violet {
+  box-shadow: 0 0 60px var(--violet-glow), 0 0 120px rgba(124, 58, 237, 0.08);
 }
 
-@keyframes landing-progress {
-  0% {
-    width: 18%;
-  }
-  100% {
-    width: 66.666667%;
-  }
-}
-
-.landing-float {
-  animation: landing-float 5.5s ease-in-out infinite;
-}
-
-.landing-float-delayed {
-  animation: landing-float 6.5s ease-in-out infinite;
-  animation-delay: 1.1s;
-}
-
-.landing-progress {
-  animation: landing-progress 2.4s ease-out both;
-}
-
-.admin-input {
-  width: 100%;
-  border-radius: 0.75rem;
-  border: 1px solid #dbe5e1;
-  background: #ffffff;
-  padding: 0.75rem 1rem;
-  font-size: 0.875rem;
-  color: #0f172a;
-  outline: none;
-  transition: border-color 150ms ease;
-}
-
-.theme-toggle {
-  border: 1px solid var(--border);
-  background: var(--toggle-bg);
-  color: var(--toggle-text);
-}
-
-.admin-input:focus {
-  border-color: var(--accent);
-}
-
-.admin-textarea {
-  width: 100%;
-  resize: vertical;
-  border-radius: 0.75rem;
-  border: 1px solid #dbe5e1;
-  background: #ffffff;
-  padding: 0.75rem 1rem;
-  font-size: 0.875rem;
-  line-height: 1.75rem;
-  color: #0f172a;
-  outline: none;
-  transition: border-color 150ms ease;
-}
-
-.admin-textarea:focus {
-  border-color: var(--accent);
+/* subtle grid background */
+.bg-grid {
+  background-image:
+    linear-gradient(rgba(124, 58, 237, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(124, 58, 237, 0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
 }
