@@ -22,7 +22,8 @@ CHAT_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 UPLOAD_ROOT = Path("/app/uploads")
 MAX_TEXT_CHARS = 20000
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
-TEXT_EXTENSIONS = {".txt", ".md", ".csv", ".json", ".log", ".xml", ".html", ".css", ".js", ".ts", ".tsx", ".py"}
+TEXT_EXTENSIONS = {".txt", ".md", ".csv", ".json", ".log", ".xml", ".html", ".css", ".js", ".ts", ".tsx", ".py", ".svg"}
+VISION_IMAGE_TYPES = {"image/png", "image/jpeg", "image/webp", "image/gif"}
 
 
 def _attachment_path(attachment: ChatAttachmentIn) -> Path | None:
@@ -81,7 +82,7 @@ def _build_attachment_context(attachments: list[ChatAttachmentIn]) -> tuple[str,
             continue
 
         content_type = attachment.content_type or ""
-        if content_type.startswith("image/") and path.stat().st_size <= MAX_IMAGE_BYTES:
+        if content_type in VISION_IMAGE_TYPES and path.stat().st_size <= MAX_IMAGE_BYTES:
             data = base64.b64encode(path.read_bytes()).decode("ascii")
             image_parts.append(
                 {
