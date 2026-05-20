@@ -3,9 +3,9 @@
 import { useState, useRef, useEffect, FormEvent, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { IconArrowUp, IconPlus, IconSparkles, IconUser } from "@tabler/icons-react";
+import { IconArrowUp, IconPaperclip, IconPlus, IconSparkles, IconUser, IconX } from "@tabler/icons-react";
 import ChatBubble from "@/components/ChatBubble";
-import { sendChat, sendOtp, submitOrder, Message, Proposal, LeadAnalysis } from "@/lib/api";
+import { sendChat, sendOtp, submitOrder, uploadChatFile, Message, Proposal, LeadAnalysis, OrderFile } from "@/lib/api";
 
 const WELCOME: Message = {
   role: "assistant",
@@ -30,6 +30,7 @@ interface ChatDraft {
   messages: Message[];
   input: string;
   phoneStep: boolean;
+  attachments?: OrderFile[];
 }
 
 interface ChatSession {
@@ -93,7 +94,7 @@ function readDraft(key: string): ChatDraft | null {
       typeof draft.input === "string" &&
       typeof draft.phoneStep === "boolean"
     ) {
-      return draft as ChatDraft;
+      return { ...draft, attachments: Array.isArray(draft.attachments) ? draft.attachments : [] } as ChatDraft;
     }
   } catch {
     return null;
@@ -175,8 +176,11 @@ function ChatPageInner() {
   const [error, setError] = useState("");
   const [phoneStep, setPhoneStep] = useState(false);
   const [sendingOtp, setSendingOtp] = useState(false);
+  const [attachments, setAttachments] = useState<OrderFile[]>([]);
+  const [uploadingFile, setUploadingFile] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const hydratedRef = useRef(false);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -221,10 +225,12 @@ function ChatPageInner() {
       setMessages(draft.messages);
       setInput(draft.input);
       setPhoneStep(token ? false : draft.phoneStep);
+      setAttachments(draft.attachments || []);
     } else {
       setMessages([getWelcome(firstName)]);
       setInput("");
       setPhoneStep(false);
+      setAttachments([]);
     }
     hydratedRef.current = true;
   }, [searchParams]);
@@ -235,14 +241,14 @@ function ChatPageInner() {
 
   useEffect(() => {
     if (!hydratedRef.current) return;
-    const draft: ChatDraft = { version: CHAT_VERSION, messages, input, phoneStep };
+    const draft: ChatDraft = { version: CHAT_VERSION, messages, input, phoneStep, attachments };
     localStorage.setItem(chatKey, JSON.stringify(draft));
     if (customerToken && customerId && sessionId) {
       const sessions = readCustomerSessions(customerId).filter((s) => s.id !== sessionId);
       sessions.unshift({ id: sessionId, title: getSessionTitle(messages), updated_at: new Date().toISOString(), draft });
       writeCustomerSessions(customerId, sessions.slice(0, 25));
     }
-  }, [chatKey, customerId, customerToken, input, messages, phoneStep, sessionId]);
+  }, [attachments, chatKey, customerId, customerToken, input, messages, phoneStep, sessionId]);
 
   useEffect(() => {
     if (customerToken || messages.length <= 1) return;
@@ -264,16 +270,40 @@ function ChatPageInner() {
     setMessages([getWelcome(customerName)]);
     setInput("");
     setPhoneStep(false);
+    setAttachments([]);
     setError("");
+  }
+
+  async function handleAttachmentChange(file?: File) {
+    if (!file) return;
+    setUploadingFile(true);
+    setError("");
+    try {
+      const uploaded = await uploadChatFile(file);
+      setAttachments((prev) => [...prev, uploaded]);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "خطا در آپلود فایل");
+    } finally {
+      setUploadingFile(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  function removeAttachment(id: string) {
+    setAttachments((prev) => prev.filter((file) => file.id !== id));
   }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     const text = input.trim();
-    if (!text || loading) return;
+    if ((phoneStep ? !text : (!text && attachments.length === 0)) || loading || uploadingFile) return;
     if (phoneStep) { await handlePhoneSubmit(text); return; }
 
-    const newMessages: Message[] = [...messages, { role: "user", content: text }];
+    const attachmentText = attachments.length
+      ? `\n\nفایل‌های پیوست:\n${attachments.map((file) => `- ${file.name}`).join("\n")}`
+      : "";
+    const userContent = text ? `${text}${attachmentText}` : `فایل‌های پیوست:\n${attachments.map((file) => `- ${file.name}`).join("\n")}`;
+    const newMessages: Message[] = [...messages, { role: "user", content: userContent }];
     setMessages(newMessages);
     setInput("");
     setLoading(true);
@@ -288,9 +318,10 @@ function ChatPageInner() {
         const proposal = leadToProposal(lead);
         const clientReply = lead.client_message || "پیشنهاد اولیه پروژه آماده شد.";
         if (customerToken) {
-          const order = await submitOrder(customerToken, proposal, newMessages);
+          const order = await submitOrder(customerToken, proposal, newMessages, attachments);
           localStorage.removeItem("proposal");
           localStorage.removeItem(chatKey);
+          setAttachments([]);
           if (customerId && sessionId) {
             const sessions = readCustomerSessions(customerId).filter((s) => s.id !== sessionId);
             writeCustomerSessions(customerId, sessions);
@@ -332,7 +363,7 @@ function ChatPageInner() {
   }
 
   const placeholder = phoneStep ? "09xxxxxxxxx" : "پیام بنویسید...";
-  const isLoading = loading || sendingOtp;
+  const isLoading = loading || sendingOtp || uploadingFile;
 
   return (
     <div className="flex h-[100dvh] min-h-[100dvh] flex-col overflow-hidden bg-[hsl(var(--background))]">
@@ -411,7 +442,42 @@ function ChatPageInner() {
       {/* input */}
       <div className="shrink-0 border-t border-[hsl(var(--border))] bg-[hsl(var(--background))]/95 px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3 backdrop-blur md:px-8">
         <form onSubmit={handleSubmit} className="mx-auto max-w-2xl">
+          {attachments.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-2">
+              {attachments.map((file) => (
+                <span
+                  key={file.id}
+                  className="inline-flex max-w-full items-center gap-2 rounded-xl border border-[--violet-border] bg-[--violet-glow] px-3 py-1.5 text-xs text-violet-200"
+                >
+                  <span className="max-w-[180px] truncate">{file.name}</span>
+                  <button type="button" onClick={() => removeAttachment(file.id)} className="text-violet-200 transition-colors hover:text-white">
+                    <IconX size={14} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
           <div className="flex items-center gap-2 rounded-2xl border border-[hsl(var(--border))] bg-[--surface] px-4 py-2 transition-colors focus-within:border-[--violet-border]">
+            {!phoneStep && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={isLoading}
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] transition-colors hover:border-[--violet-border] hover:text-white disabled:opacity-40"
+                  aria-label="افزودن فایل"
+                >
+                  <IconPaperclip size={17} stroke={2.2} />
+                </button>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  className="hidden"
+                  accept="image/*,.pdf,.doc,.docx,.txt,.zip,.rar"
+                  onChange={(e) => handleAttachmentChange(e.target.files?.[0])}
+                />
+              </>
+            )}
             <input
               ref={inputRef}
               type={phoneStep ? "tel" : "text"}
@@ -424,7 +490,7 @@ function ChatPageInner() {
             />
             <button
               type="submit"
-              disabled={isLoading || !input.trim()}
+              disabled={isLoading || (phoneStep ? !input.trim() : (!input.trim() && attachments.length === 0))}
               className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[--violet] text-white shadow-md shadow-[--violet-glow] transition-all hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <IconArrowUp size={17} stroke={2.5} />

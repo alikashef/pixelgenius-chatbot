@@ -77,6 +77,16 @@ class CustomerProfileUpdateIn(BaseModel):
 
 
 # ── Orders ───────────────────────────────────────────────────────────────────
+class OrderFileOut(BaseModel):
+    id: str
+    name: str
+    url: str
+    size: int
+    content_type: Optional[str] = None
+    uploaded_by: str
+    uploaded_at: datetime
+
+
 class OrderCreateIn(BaseModel):
     project_name: str
     summary: str
@@ -86,22 +96,13 @@ class OrderCreateIn(BaseModel):
     delivery_days: int
     price_estimate: int
     price_label: str
+    order_files: list[OrderFileOut] = Field(default_factory=list)
 
 
 class AdminApproveIn(BaseModel):
     final_price: int
     payment_percentage: int
     admin_note: Optional[str] = None
-
-
-class OrderFileOut(BaseModel):
-    id: str
-    name: str
-    url: str
-    size: int
-    content_type: Optional[str] = None
-    uploaded_by: str
-    uploaded_at: datetime
 
 
 class OrderOut(BaseModel):

@@ -3,7 +3,7 @@
 import { useState, useEffect, FormEvent, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { IconArrowRight, IconDeviceMobile, IconRefresh, IconShieldCheck } from "@tabler/icons-react";
-import { sendOtp, verifyOtp, submitOrder, Proposal, Message } from "@/lib/api";
+import { sendOtp, verifyOtp, submitOrder, Proposal, Message, OrderFile } from "@/lib/api";
 
 function LoginContent() {
   const router = useRouter();
@@ -20,7 +20,7 @@ function LoginContent() {
   const [error, setError] = useState("");
   const [countdown, setCountdown] = useState(phoneParam ? 120 : 0);
 
-  function readHandoff(): { proposal: Proposal; chatHistory: Message[] } | null {
+  function readHandoff(): { proposal: Proposal; chatHistory: Message[]; attachments: OrderFile[] } | null {
     if (!handoffParam) return null;
     try {
       const normalized = handoffParam.replace(/-/g, "+").replace(/_/g, "/");
@@ -28,11 +28,13 @@ function LoginContent() {
       const parsed = JSON.parse(decodeURIComponent(escape(atob(padded)))) as {
         proposal?: Proposal;
         chatHistory?: Message[];
+        attachments?: OrderFile[];
       };
       if (parsed.proposal?.type !== "proposal" || !Array.isArray(parsed.chatHistory)) return null;
       return {
         proposal: parsed.proposal,
         chatHistory: parsed.chatHistory.filter((message) => message.role === "user" || message.role === "assistant"),
+        attachments: Array.isArray(parsed.attachments) ? parsed.attachments : [],
       };
     } catch {
       return null;
@@ -102,7 +104,7 @@ function LoginContent() {
       const storedProposal = localStorage.getItem("proposal");
       if (handoff) {
         try {
-          const order = await submitOrder(token, handoff.proposal, handoff.chatHistory);
+          const order = await submitOrder(token, handoff.proposal, handoff.chatHistory, handoff.attachments);
           localStorage.removeItem("proposal");
           localStorage.removeItem(`chat_draft_customer_${data.customer_id}`);
           localStorage.removeItem("chat_draft_anonymous");
@@ -119,9 +121,11 @@ function LoginContent() {
           const customerDraft = localStorage.getItem(`chat_draft_customer_${data.customer_id}`);
           const anonymousDraft = localStorage.getItem("chat_draft_anonymous");
           const rawDraft = customerDraft || anonymousDraft;
-          const draftMessages: Message[] = rawDraft ? (JSON.parse(rawDraft).messages as Message[] || []) : [];
+          const parsedDraft = rawDraft ? JSON.parse(rawDraft) : null;
+          const draftMessages: Message[] = parsedDraft ? (parsedDraft.messages as Message[] || []) : [];
+          const attachments: OrderFile[] = Array.isArray(parsedDraft?.attachments) ? parsedDraft.attachments : [];
           const chatHistory = draftMessages.filter((message) => message.role === "user" || message.role === "assistant").slice(1);
-          await submitOrder(token, proposal, chatHistory);
+          await submitOrder(token, proposal, chatHistory, attachments);
           localStorage.removeItem("proposal");
           localStorage.removeItem(`chat_draft_customer_${data.customer_id}`);
           localStorage.removeItem("chat_draft_anonymous");

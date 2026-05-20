@@ -62,6 +62,7 @@ async def create_order(
         delivery_days=body.delivery_days,
         price_estimate=body.price_estimate,
         price_label=body.price_label,
+        order_files=[item.model_dump(mode="json") for item in body.order_files],
     )
     db.add(order)
     await db.commit()

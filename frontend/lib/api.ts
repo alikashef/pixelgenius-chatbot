@@ -142,7 +142,7 @@ export async function updateCustomerProfile(
   return res.json();
 }
 
-export async function submitOrder(token: string, proposal: Proposal, chatHistory: Message[]): Promise<Order> {
+export async function submitOrder(token: string, proposal: Proposal, chatHistory: Message[], orderFiles: OrderFile[] = []): Promise<Order> {
   const res = await fetch(`${API_URL}/api/customer/orders`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -155,9 +155,21 @@ export async function submitOrder(token: string, proposal: Proposal, chatHistory
       delivery_days: proposal.days,
       price_estimate: proposal.price,
       price_label: proposal.priceLabel,
+      order_files: orderFiles,
     }),
   });
   if (!res.ok) throw new Error("خطا در ثبت درخواست");
+  return res.json();
+}
+
+export async function uploadChatFile(file: File): Promise<OrderFile> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${API_URL}/api/chat/files`, {
+    method: "POST",
+    body: form,
+  });
+  if (!res.ok) throw new Error("خطا در آپلود فایل");
   return res.json();
 }
 
