@@ -1,25 +1,35 @@
 import os
 import httpx
 
-MELIPAYAMAK_USERNAME = os.getenv("MELIPAYAMAK_USERNAME", "")
-MELIPAYAMAK_PASSWORD = os.getenv("MELIPAYAMAK_PASSWORD", "")
-MELIPAYAMAK_FROM = os.getenv("MELIPAYAMAK_FROM", "")
+MELIPAYAMAK_SHARED_URL = os.getenv("MELIPAYAMAK_SHARED_URL", "")
+MELIPAYAMAK_BODY_ID = int(os.getenv("MELIPAYAMAK_BODY_ID", "459793"))
 
-BASE_URL = "https://api.melipayamak.com/api/send/simple"
+
+class SmsSendError(Exception):
+    pass
 
 
 async def send_otp(phone: str, code: str) -> bool:
-    text = f"کد تایید شما: {code}\nاعتبار: ۲ دقیقه"
-
-    if not MELIPAYAMAK_USERNAME:
-        # dev mode: print to console
+    if not MELIPAYAMAK_SHARED_URL:
         print(f"[OTP] {phone} → {code}")
         return True
 
-    url = f"{BASE_URL}/{MELIPAYAMAK_USERNAME}/{MELIPAYAMAK_PASSWORD}"
-    payload = {"from": MELIPAYAMAK_FROM, "to": phone, "text": text}
+    payload = {
+        "bodyId": MELIPAYAMAK_BODY_ID,
+        "to": phone,
+        "args": [code],
+    }
 
     async with httpx.AsyncClient(timeout=10) as client:
-        resp = await client.post(url, json=payload)
+        resp = await client.post(MELIPAYAMAK_SHARED_URL, json=payload)
+        resp.raise_for_status()
         data = resp.json()
-        return data.get("Value") not in (None, "", "0")
+
+    rec_id = data.get("recId")
+    status = data.get("status")
+    if rec_id:
+        return True
+
+    message = status or data
+    print(f"[SMS] Melipayamak failed for {phone}: {message}")
+    raise SmsSendError(str(message))

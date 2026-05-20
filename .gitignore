@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *.pyo
 .env
+.env.*
+!.env.example
+docker-compose.override.yml
 *.egg-info/
 .venv/
 venv/

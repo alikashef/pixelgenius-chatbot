@@ -6,7 +6,7 @@ from database import get_db
 from models import Customer
 from schemas import OtpSendRequest, OtpVerifyRequest, CustomerTokenOut
 from otp_store import generate_otp, verify_otp
-from sms import send_otp
+from sms import SmsSendError, send_otp
 from auth import create_access_token
 
 router = APIRouter()
@@ -16,9 +16,10 @@ router = APIRouter()
 async def send(body: OtpSendRequest, db: AsyncSession = Depends(get_db)):
     phone = body.phone.strip()
     code = generate_otp(phone)
-    sent = await send_otp(phone, code)
-    if not sent:
-        raise HTTPException(status_code=500, detail="ارسال پیامک ناموفق بود")
+    try:
+        await send_otp(phone, code)
+    except SmsSendError as exc:
+        raise HTTPException(status_code=502, detail=f"ارسال پیامک ناموفق بود: {exc}") from exc
     return {"message": "کد تایید ارسال شد"}
 
 

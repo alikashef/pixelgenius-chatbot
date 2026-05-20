@@ -365,7 +365,7 @@ function ChatPageInner() {
             className="flex items-center gap-1.5 rounded-lg border border-[--violet-border] bg-[--violet-glow] px-3 py-1.5 text-xs font-semibold text-violet-300 transition-colors hover:text-white"
           >
             <IconUser size={13} stroke={2} />
-            {customerToken ? "پنل من" : "ورود"}
+            حساب کاربری
           </Link>
         </div>
       </header>

@@ -2,6 +2,7 @@
 
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { IconLock, IconLogin2, IconShieldLock } from "@tabler/icons-react";
 import { adminLogin } from "@/lib/api";
 
 export default function AdminLoginPage() {
@@ -27,46 +28,49 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f7fbf9] flex items-center justify-center p-4">
-      <div className="bg-white border border-border rounded-2xl p-8 w-full max-w-sm">
-        <div className="mb-6 text-center">
-          <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center mx-auto mb-4">
-            <svg className="w-6 h-6 text-emerald-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-            </svg>
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[hsl(var(--background))] p-4">
+      <div className="pointer-events-none absolute inset-0 bg-grid opacity-70" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-[radial-gradient(ellipse_60%_50%_at_50%_0%,rgba(124,58,237,0.22),transparent)]" />
+
+      <div className="relative w-full max-w-sm overflow-hidden rounded-3xl border border-[hsl(var(--border))] bg-[--surface] p-7 shadow-2xl shadow-black/40">
+        <div className="mb-7 text-center">
+          <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl border border-[--violet-border] bg-[--violet-glow] text-violet-300 shadow-lg shadow-[--violet-glow]">
+            <IconShieldLock size={24} />
           </div>
-          <h1 className="text-xl font-bold text-slate-900">ورود به پنل ادمین</h1>
+          <h1 className="text-xl font-black text-[hsl(var(--foreground))]">ورود به پنل ادمین</h1>
+          <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">دسترسی امن برای مدیریت سفارش‌ها و تنظیمات AI</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-slate-500 text-xs mb-2">نام کاربری</label>
+            <label className="mb-2 block text-xs font-semibold text-[hsl(var(--muted-foreground))]">نام کاربری</label>
             <input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
-              className="w-full bg-[#f7fbf9] border border-border rounded-xl px-4 py-3 text-sm text-slate-900 outline-none focus:border-emerald-600 transition-colors"
+              className="w-full rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-4 py-3 text-sm text-[hsl(var(--foreground))] outline-none transition-colors focus:border-[--violet-border]"
             />
           </div>
           <div>
-            <label className="block text-slate-500 text-xs mb-2">رمز عبور</label>
+            <label className="mb-2 block text-xs font-semibold text-[hsl(var(--muted-foreground))]">رمز عبور</label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full bg-[#f7fbf9] border border-border rounded-xl px-4 py-3 text-sm text-slate-900 outline-none focus:border-emerald-600 transition-colors"
+              className="w-full rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-4 py-3 text-sm text-[hsl(var(--foreground))] outline-none transition-colors focus:border-[--violet-border]"
             />
           </div>
 
-          {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+          {error && <p className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-center text-sm text-red-400">{error}</p>}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold rounded-xl py-3 text-sm transition-colors mt-2"
+            className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-[--violet] py-3 text-sm font-bold text-white shadow-lg shadow-[--violet-glow] transition-all hover:bg-violet-700 disabled:opacity-60"
           >
+            {loading ? <IconLock size={18} /> : <IconLogin2 size={18} />}
             {loading ? "در حال ورود..." : "ورود"}
           </button>
         </form>

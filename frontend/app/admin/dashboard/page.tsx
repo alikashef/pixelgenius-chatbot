@@ -28,11 +28,11 @@ const STATUS_LABEL: Record<Order["status"], string> = {
 };
 
 const STATUS_CLASS: Record<Order["status"], string> = {
-  pending_review: "bg-yellow-500/10 text-yellow-400",
-  approved: "bg-blue-500/10 text-blue-400",
-  awaiting_payment: "bg-orange-500/10 text-orange-400",
-  paid: "bg-emerald-50 text-emerald-700",
-  cancelled: "bg-red-500/10 text-red-400",
+  pending_review: "bg-yellow-500/10 border border-yellow-500/20 text-yellow-400",
+  approved: "bg-blue-500/10 border border-blue-500/20 text-blue-400",
+  awaiting_payment: "bg-orange-500/10 border border-orange-500/20 text-orange-400",
+  paid: "bg-[--violet-glow] text-violet-300",
+  cancelled: "bg-red-500/10 border border-red-500/20 text-red-400",
 };
 
 function formatDate(iso: string) {
@@ -183,23 +183,26 @@ export default function AdminDashboard() {
     : null;
 
   if (loading) {
-    return <div className="min-h-screen bg-[linear-gradient(180deg,#f8fcfa_0%,#f1f7f4_100%)] flex items-center justify-center">
+    return <div className="min-h-screen bg-[hsl(var(--background))] flex items-center justify-center">
       <div className="w-10 h-10 border-4 border-accent border-t-transparent rounded-full animate-spin" />
     </div>;
   }
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#f8fcfa_0%,#f1f7f4_100%)]">
-      <header className="border-b border-border bg-white/90 backdrop-blur px-6 py-4 flex items-center justify-between">
-        <h1 className="font-bold text-slate-900">پنل ادمین</h1>
+    <div className="relative min-h-screen overflow-hidden bg-[hsl(var(--background))]">
+      <div className="pointer-events-none fixed inset-0 bg-grid opacity-60" />
+      <div className="pointer-events-none fixed inset-x-0 top-0 h-72 bg-[radial-gradient(ellipse_60%_50%_at_50%_0%,rgba(124,58,237,0.18),transparent)]" />
+
+      <header className="relative z-10 border-b border-[hsl(var(--border))] bg-[hsl(var(--background))]/80 backdrop-blur px-6 py-4 flex items-center justify-between">
+        <h1 className="font-bold text-[hsl(var(--foreground))]">پنل ادمین</h1>
         <button onClick={() => { localStorage.removeItem("admin_token"); router.push("/admin/login"); }}
-          className="text-slate-500 hover:text-slate-800 text-sm transition-colors">خروج</button>
+          className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] text-sm transition-colors">خروج</button>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-8 space-y-8">
+      <main className="relative z-10 max-w-6xl mx-auto px-4 py-8 space-y-8">
         {error && <p className="text-red-400 text-center">{error}</p>}
 
-        <div className="flex gap-2 border-b border-border">
+        <div className="flex gap-2 border-b border-[hsl(var(--border))]">
           {[
             ["orders", "سفارشات"],
             ["settings", "تنظیمات فروش و AI"],
@@ -208,7 +211,7 @@ export default function AdminDashboard() {
               key={key}
               onClick={() => setActiveTab(key as "orders" | "settings")}
               className={`px-4 py-3 text-sm transition-colors ${
-                activeTab === key ? "border-b-2 border-emerald-600 text-emerald-700" : "text-slate-500 hover:text-slate-800"
+                activeTab === key ? "border-b-2 border-[--violet] text-violet-300" : "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
               }`}
             >
               {label}
@@ -225,28 +228,28 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {activeTab === "orders" && <div className="bg-white border border-border rounded-2xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-border">
-            <h2 className="font-semibold text-slate-900">سفارشات</h2>
+        {activeTab === "orders" && <div className="bg-[--surface] border border-[hsl(var(--border))] rounded-2xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-[hsl(var(--border))]">
+            <h2 className="font-semibold text-[hsl(var(--foreground))]">سفارشات</h2>
           </div>
           {orders.length === 0 ? (
-            <p className="text-slate-500 text-center py-12">هیچ سفارشی ثبت نشده</p>
+            <p className="text-[hsl(var(--muted-foreground))] text-center py-12">هیچ سفارشی ثبت نشده</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-border">
+                  <tr className="border-b border-[hsl(var(--border))]">
                     {["پروژه", "تخمین قیمت", "قیمت نهایی", "وضعیت", "تاریخ", ""].map((h) => (
-                      <th key={h} className="text-right text-slate-500 text-xs px-5 py-3 font-medium">{h}</th>
+                      <th key={h} className="text-right text-[hsl(var(--muted-foreground))] text-xs px-5 py-3 font-medium">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {orders.map((order) => (
-                    <tr key={order.id} className="border-b border-border/50 hover:bg-[#f7fbf9]/50 transition-colors">
-                      <td className="px-5 py-4 text-sm text-slate-800 max-w-[180px] truncate">{order.project_name}</td>
-                      <td className="px-5 py-4 text-sm text-slate-500">{order.price_label}</td>
-                      <td className="px-5 py-4 text-sm text-emerald-700">
+                    <tr key={order.id} className="border-b border-[hsl(var(--border))]/50 hover:bg-[hsl(var(--background))]/50 transition-colors">
+                      <td className="px-5 py-4 text-sm text-[hsl(var(--foreground))] max-w-[180px] truncate">{order.project_name}</td>
+                      <td className="px-5 py-4 text-sm text-[hsl(var(--muted-foreground))]">{order.price_label}</td>
+                      <td className="px-5 py-4 text-sm text-violet-300">
                         {order.final_price ? `${order.final_price.toLocaleString("fa-IR")} ریال` : "—"}
                       </td>
                       <td className="px-5 py-4">
@@ -254,9 +257,9 @@ export default function AdminDashboard() {
                           {STATUS_LABEL[order.status]}
                         </span>
                       </td>
-                      <td className="px-5 py-4 text-xs text-slate-500">{formatDate(order.created_at)}</td>
+                      <td className="px-5 py-4 text-xs text-[hsl(var(--muted-foreground))]">{formatDate(order.created_at)}</td>
                       <td className="px-5 py-4">
-                        <button onClick={() => openOrder(order)} className="text-emerald-700 hover:text-emerald-700-hover text-xs transition-colors">
+                        <button onClick={() => openOrder(order)} className="text-violet-300 hover:text-violet-200 text-xs transition-colors">
                           مدیریت
                         </button>
                       </td>
@@ -270,24 +273,24 @@ export default function AdminDashboard() {
 
         {activeTab === "settings" && (
           <div className="space-y-5">
-            <div className="bg-white border border-border rounded-2xl px-6 py-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="bg-[--surface] border border-[hsl(var(--border))] rounded-2xl px-6 py-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
-                <h2 className="font-semibold text-slate-900">تنظیمات فروش و هوش مصنوعی</h2>
-                <p className="text-slate-500 text-xs mt-1">
+                <h2 className="font-semibold text-[hsl(var(--foreground))]">تنظیمات فروش و هوش مصنوعی</h2>
+                <p className="text-[hsl(var(--muted-foreground))] text-xs mt-1">
                   این فرم‌ها مستقیماً روی رفتار چت‌بات اثر می‌گذارند؛ بدون تغییر کد می‌توانید قیمت، بودجه، سوال‌ها و قوانین فروش را اصلاح کنید.
                 </p>
               </div>
               <button
                 onClick={handleSaveSettings}
                 disabled={savingSettings}
-                className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold rounded-xl px-5 py-3 text-sm transition-colors"
+                className="bg-[--violet] hover:bg-violet-700 disabled:opacity-60 text-white font-bold rounded-xl px-5 py-3 text-sm transition-colors"
               >
                 {savingSettings ? "در حال ذخیره..." : "ذخیره همه تنظیمات"}
               </button>
             </div>
 
-            <section className="bg-white border border-border rounded-2xl p-5 space-y-4">
-              <h3 className="text-slate-900 font-semibold">واحد پول و شرایط پرداخت</h3>
+            <section className="bg-[--surface] border border-[hsl(var(--border))] rounded-2xl p-5 space-y-4">
+              <h3 className="text-[hsl(var(--foreground))] font-semibold">واحد پول و شرایط پرداخت</h3>
               <div className="grid gap-4 md:grid-cols-3">
                 <Field label="برچسب ارز">
                   <input value={String(settings.currency_label || "")} onChange={(e) => setSettingValue("currency_label", e.target.value)}
@@ -370,8 +373,8 @@ export default function AdminDashboard() {
               onRemove={(index) => removeArrayItem("timeline_estimates", index)}
             />
 
-            <section className="bg-white border border-border rounded-2xl p-5 space-y-4">
-              <h3 className="text-slate-900 font-semibold">قالب‌های پاسخ آماده</h3>
+            <section className="bg-[--surface] border border-[hsl(var(--border))] rounded-2xl p-5 space-y-4">
+              <h3 className="text-[hsl(var(--foreground))] font-semibold">قالب‌های پاسخ آماده</h3>
               {Object.entries((settings.predefined_response_templates || {}) as Record<string, string>).map(([key, value]) => (
                 <Field key={key} label={key}>
                   <textarea
@@ -396,9 +399,9 @@ export default function AdminDashboard() {
               onRemove={(index) => removeArrayItem("lead_scoring_rules", index)}
             />
 
-            <details className="bg-white border border-border rounded-2xl p-5">
-              <summary className="cursor-pointer text-slate-900 font-semibold">نمایش JSON خام برای بررسی فنی</summary>
-              <pre dir="ltr" className="mt-4 overflow-auto rounded-xl bg-[#f7fbf9] p-4 text-xs leading-6 text-slate-700">
+            <details className="bg-[--surface] border border-[hsl(var(--border))] rounded-2xl p-5">
+              <summary className="cursor-pointer text-[hsl(var(--foreground))] font-semibold">نمایش JSON خام برای بررسی فنی</summary>
+              <pre dir="ltr" className="mt-4 overflow-auto rounded-xl bg-[hsl(var(--background))] p-4 text-xs leading-6 text-[hsl(var(--secondary-foreground))]">
                 {JSON.stringify(Object.fromEntries(SETTING_SECTIONS.map((key) => [key, settings[key]])), null, 2)}
               </pre>
             </details>
@@ -410,28 +413,28 @@ export default function AdminDashboard() {
       {selected && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50"
           onClick={() => setSelected(null)}>
-          <div className="bg-white border border-border rounded-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto"
+          <div className="bg-[--surface] border border-[hsl(var(--border))] rounded-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border sticky top-0 bg-white">
-              <h3 className="font-semibold text-slate-900 truncate">{selected.project_name}</h3>
-              <button onClick={() => setSelected(null)} className="text-slate-500 hover:text-slate-800 transition-colors flex-shrink-0 mr-4">✕</button>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[hsl(var(--border))] sticky top-0 bg-[--surface]">
+              <h3 className="font-semibold text-[hsl(var(--foreground))] truncate">{selected.project_name}</h3>
+              <button onClick={() => setSelected(null)} className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors flex-shrink-0 mr-4">✕</button>
             </div>
 
             <div className="p-6 space-y-6">
               {/* Info */}
               <div className="space-y-3 text-sm">
-                <p className="text-slate-500 text-xs">خلاصه</p>
-                <p className="text-slate-700 leading-relaxed">{selected.summary}</p>
+                <p className="text-[hsl(var(--muted-foreground))] text-xs">خلاصه</p>
+                <p className="text-[hsl(var(--secondary-foreground))] leading-relaxed">{selected.summary}</p>
                 <ul className="space-y-1 mt-2">
                   {selected.features.map((f, i) => (
-                    <li key={i} className="text-slate-600 flex gap-2"><span className="text-emerald-700">•</span>{f}</li>
+                    <li key={i} className="text-[hsl(var(--muted-foreground))] flex gap-2"><span className="text-violet-300">•</span>{f}</li>
                   ))}
                 </ul>
                 <div className="grid grid-cols-2 gap-3 pt-1">
-                  <div><p className="text-slate-500 text-xs mb-1">تکنولوژی</p><p className="text-slate-700">{selected.tech_stack}</p></div>
-                  <div><p className="text-slate-500 text-xs mb-1">تحویل</p><p className="text-slate-700">{selected.delivery_days} روز</p></div>
-                  <div><p className="text-slate-500 text-xs mb-1">تخمین اولیه</p><p className="text-slate-700">{selected.price_label}</p></div>
-                  <div><p className="text-slate-500 text-xs mb-1">وضعیت</p>
+                  <div><p className="text-[hsl(var(--muted-foreground))] text-xs mb-1">تکنولوژی</p><p className="text-[hsl(var(--secondary-foreground))]">{selected.tech_stack}</p></div>
+                  <div><p className="text-[hsl(var(--muted-foreground))] text-xs mb-1">تحویل</p><p className="text-[hsl(var(--secondary-foreground))]">{selected.delivery_days} روز</p></div>
+                  <div><p className="text-[hsl(var(--muted-foreground))] text-xs mb-1">تخمین اولیه</p><p className="text-[hsl(var(--secondary-foreground))]">{selected.price_label}</p></div>
+                  <div><p className="text-[hsl(var(--muted-foreground))] text-xs mb-1">وضعیت</p>
                     <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_CLASS[selected.status]}`}>
                       {STATUS_LABEL[selected.status]}
                     </span>
@@ -439,10 +442,10 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              <div className="border-t border-border pt-5 space-y-3">
-                <p className="text-slate-900 text-sm font-medium">تاریخچه چت این پروژه</p>
+              <div className="border-t border-[hsl(var(--border))] pt-5 space-y-3">
+                <p className="text-[hsl(var(--foreground))] text-sm font-medium">تاریخچه چت این پروژه</p>
                 {(selected.chat_history || []).length === 0 ? (
-                  <p className="text-sm text-slate-600">
+                  <p className="text-sm text-[hsl(var(--muted-foreground))]">
                     برای این سفارش تاریخچه چت ثبت نشده (احتمالاً سفارش قدیمی است).
                   </p>
                 ) : (
@@ -452,8 +455,8 @@ export default function AdminDashboard() {
                         key={`${message.role}-${index}`}
                         className={`rounded-xl px-4 py-3 text-sm leading-relaxed ${
                           message.role === "user"
-                            ? "bg-emerald-50 border border-emerald-200 text-slate-900"
-                            : "bg-white border border-border text-slate-700"
+                            ? "bg-[--violet-glow] border border-[--violet-border] text-[hsl(var(--foreground))]"
+                            : "bg-[--surface] border border-[hsl(var(--border))] text-[hsl(var(--secondary-foreground))]"
                         }`}
                       >
                         <p className="text-xs mb-1 opacity-70">{message.role === "user" ? "کاربر" : "دستیار"}</p>
@@ -466,50 +469,50 @@ export default function AdminDashboard() {
 
               {/* Approve Section */}
               {selected.status !== "paid" && selected.status !== "cancelled" && (
-                <div className="border-t border-border pt-5 space-y-4">
-                  <p className="text-slate-900 text-sm font-medium">تایید و تعیین مبلغ</p>
+                <div className="border-t border-[hsl(var(--border))] pt-5 space-y-4">
+                  <p className="text-[hsl(var(--foreground))] text-sm font-medium">تایید و تعیین مبلغ</p>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-slate-500 text-xs mb-2">قیمت نهایی (ریال)</label>
+                      <label className="block text-[hsl(var(--muted-foreground))] text-xs mb-2">قیمت نهایی (ریال)</label>
                       <input type="number" value={finalPrice} onChange={(e) => setFinalPrice(e.target.value)}
                         placeholder="مثال: 18000000"
-                        className="w-full bg-white border border-border rounded-xl px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-emerald-600 transition-colors" />
+                        className="w-full bg-[--surface] border border-[hsl(var(--border))] rounded-xl px-3 py-2.5 text-sm text-[hsl(var(--foreground))] outline-none focus:border-[--violet] transition-colors" />
                     </div>
                     <div>
-                      <label className="block text-slate-500 text-xs mb-2">درصد پیش‌پرداخت</label>
+                      <label className="block text-[hsl(var(--muted-foreground))] text-xs mb-2">درصد پیش‌پرداخت</label>
                       <input type="number" min={10} max={100} value={payPercent} onChange={(e) => setPayPercent(e.target.value)}
-                        className="w-full bg-white border border-border rounded-xl px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-emerald-600 transition-colors" />
+                        className="w-full bg-[--surface] border border-[hsl(var(--border))] rounded-xl px-3 py-2.5 text-sm text-[hsl(var(--foreground))] outline-none focus:border-[--violet] transition-colors" />
                     </div>
                   </div>
                   {payAmount && (
-                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 flex justify-between items-center">
-                      <p className="text-slate-500 text-xs">مبلغ قابل پرداخت توسط مشتری</p>
-                      <p className="text-emerald-700 font-bold">{payAmount.toLocaleString("fa-IR")} ریال</p>
+                    <div className="bg-[--violet-glow] border border-[--violet-border] rounded-xl px-4 py-3 flex justify-between items-center">
+                      <p className="text-[hsl(var(--muted-foreground))] text-xs">مبلغ قابل پرداخت توسط مشتری</p>
+                      <p className="text-violet-300 font-bold">{payAmount.toLocaleString("fa-IR")} ریال</p>
                     </div>
                   )}
                   <div>
-                    <label className="block text-slate-500 text-xs mb-2">یادداشت برای مشتری (اختیاری)</label>
+                    <label className="block text-[hsl(var(--muted-foreground))] text-xs mb-2">یادداشت برای مشتری (اختیاری)</label>
                     <textarea value={adminNote} onChange={(e) => setAdminNote(e.target.value)} rows={2}
-                      className="w-full bg-white border border-border rounded-xl px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-emerald-600 transition-colors resize-none" />
+                      className="w-full bg-[--surface] border border-[hsl(var(--border))] rounded-xl px-3 py-2.5 text-sm text-[hsl(var(--foreground))] outline-none focus:border-[--violet] transition-colors resize-none" />
                   </div>
                   {error && <p className="text-red-400 text-sm">{error}</p>}
                   <button onClick={handleApprove} disabled={approving || !finalPrice}
-                    className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold rounded-xl py-3 text-sm transition-colors">
+                    className="w-full bg-[--violet] hover:bg-violet-700 disabled:opacity-60 text-white font-bold rounded-xl py-3 text-sm transition-colors">
                     {approving ? "در حال ثبت..." : selected.status === "awaiting_payment" ? "به‌روزرسانی" : "تایید و ارسال به مشتری"}
                   </button>
                 </div>
               )}
 
               {/* Upload Proposal */}
-              <div className="border-t border-border pt-5">
-                <p className="text-slate-900 text-sm font-medium mb-3">آپلود پروپوزال PDF</p>
+              <div className="border-t border-[hsl(var(--border))] pt-5">
+                <p className="text-[hsl(var(--foreground))] text-sm font-medium mb-3">آپلود پروپوزال PDF</p>
                 {selected.proposal_file && (
-                  <p className="text-emerald-700 text-xs mb-2">✓ فایل آپلود شده: {selected.proposal_file.split("/").pop()}</p>
+                  <p className="text-violet-300 text-xs mb-2">✓ فایل آپلود شده: {selected.proposal_file.split("/").pop()}</p>
                 )}
                 <input ref={fileRef} type="file" accept=".pdf,.doc,.docx" onChange={handleUpload}
                   className="hidden" />
                 <button onClick={() => fileRef.current?.click()} disabled={uploading}
-                  className="w-full border border-border hover:border-emerald-300 text-slate-600 hover:text-slate-900 rounded-xl py-3 text-sm transition-colors disabled:opacity-60">
+                  className="w-full border border-[hsl(var(--border))] hover:border-[--violet-border] text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] rounded-xl py-3 text-sm transition-colors disabled:opacity-60">
                   {uploading ? "در حال آپلود..." : selected.proposal_file ? "جایگزینی فایل" : "انتخاب و آپلود فایل"}
                 </button>
               </div>
@@ -523,9 +526,9 @@ export default function AdminDashboard() {
 
 function StatCard({ label, value, accent, warn }: { label: string; value: string; accent?: boolean; warn?: boolean }) {
   return (
-    <div className="bg-white border border-border rounded-xl p-5 text-center">
-      <p className="text-slate-500 text-xs mb-2">{label}</p>
-      <p className={`font-bold text-xl ${accent ? "text-emerald-700" : warn ? "text-amber-600" : "text-slate-900"}`}>{value}</p>
+    <div className="bg-[--surface] border border-[hsl(var(--border))] rounded-xl p-5 text-center">
+      <p className="text-[hsl(var(--muted-foreground))] text-xs mb-2">{label}</p>
+      <p className={`font-bold text-xl ${accent ? "text-violet-300" : warn ? "text-amber-600" : "text-[hsl(var(--foreground))]"}`}>{value}</p>
     </div>
   );
 }
@@ -533,7 +536,7 @@ function StatCard({ label, value, accent, warn }: { label: string; value: string
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="block text-slate-500 text-xs mb-2">{label}</span>
+      <span className="block text-[hsl(var(--muted-foreground))] text-xs mb-2">{label}</span>
       {children}
     </label>
   );
@@ -553,16 +556,16 @@ function EditableList({
   onRemove: (index: number) => void;
 }) {
   return (
-    <section className="bg-white border border-border rounded-2xl p-5 space-y-4">
+    <section className="bg-[--surface] border border-[hsl(var(--border))] rounded-2xl p-5 space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-slate-900 font-semibold">{title}</h3>
-        <button onClick={onAdd} className="border border-border hover:border-emerald-300 text-slate-800 rounded-xl px-4 py-2 text-xs transition-colors">
+        <h3 className="text-[hsl(var(--foreground))] font-semibold">{title}</h3>
+        <button onClick={onAdd} className="border border-[hsl(var(--border))] hover:border-[--violet-border] text-[hsl(var(--foreground))] rounded-xl px-4 py-2 text-xs transition-colors">
           افزودن
         </button>
       </div>
       <div className="space-y-3">
         {items.map((item, index) => (
-          <div key={index} className="bg-white border border-border rounded-xl p-4">
+          <div key={index} className="bg-[--surface] border border-[hsl(var(--border))] rounded-xl p-4">
             <div className="flex items-start gap-3">
               <div className="flex-1">{renderItem(item, index)}</div>
               <button onClick={() => onRemove(index)} className="text-red-400 hover:text-red-300 text-xs px-2 py-2">
@@ -578,10 +581,10 @@ function EditableList({
 
 function SettingsTextarea({ title, value, onChange }: { title: string; value: string; onChange: (value: string) => void }) {
   return (
-    <section className="bg-white border border-border rounded-2xl p-5 space-y-4">
+    <section className="bg-[--surface] border border-[hsl(var(--border))] rounded-2xl p-5 space-y-4">
       <div>
-        <h3 className="text-slate-900 font-semibold">{title}</h3>
-        <p className="text-slate-500 text-xs mt-1">هر خط یک مورد جداگانه است.</p>
+        <h3 className="text-[hsl(var(--foreground))] font-semibold">{title}</h3>
+        <p className="text-[hsl(var(--muted-foreground))] text-xs mt-1">هر خط یک مورد جداگانه است.</p>
       </div>
       <textarea value={value} onChange={(e) => onChange(e.target.value)} className="admin-textarea min-h-[180px]" />
     </section>
