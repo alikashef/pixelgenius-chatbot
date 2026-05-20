@@ -264,7 +264,8 @@ import { cn } from "@/lib/utils"
 
 - فقط دو برنچ داریم: **`main`** و **`dev`**
 - هیچ برنچ دیگه‌ای نساز — feature branch، hotfix branch، یا هر چیز دیگه‌ای
-- کار روزمره روی `dev`، وقتی آماده شد merge به `main`
+- **همه تغییرات فقط روی `dev` push می‌شن** — هرگز مستقیم به `main` push نکن
+- merge به `main` فقط وقتی کاربر صریح بگوید: "بریز روی main" یا "merge کن به main"
 
 ---
 
