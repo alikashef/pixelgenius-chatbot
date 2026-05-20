@@ -144,19 +144,31 @@ function parsePriceEstimate(priceRange: string) {
   return Math.max(...numbers) * 1000000;
 }
 
+const BUDGET_FIT_LABEL: Record<string, string> = {
+  fit:   "بودجه شما با پروژه تناسب دارد",
+  low:   "بودجه درنظر گرفته‌شده ممکن است کم باشد",
+  high:  "بودجه شما از میانگین بالاتر است",
+};
+
+const RISK_LABEL: Record<string, string> = {
+  low:    "احتمال موفقیت پروژه: بالا",
+  medium: "احتمال موفقیت پروژه: متوسط — نیاز به شفاف‌سازی بیشتر",
+  high:   "این پروژه نیاز به بررسی دقیق‌تر دارد",
+};
+
 function leadToProposal(lead: LeadAnalysis): Proposal {
+  const features = [
+    `هدف: ${lead.project_goal}`,
+    `راهکار پیشنهادی: ${lead.recommended_solution}`,
+    BUDGET_FIT_LABEL[lead.budget_fit] ?? `تناسب بودجه: ${lead.budget_fit}`,
+    RISK_LABEL[lead.client_risk_level] ?? `سطح ریسک: ${lead.client_risk_level}`,
+    ...lead.missing_questions.map((q) => `نیاز به اطلاعات بیشتر: ${q}`),
+  ];
   return {
     type: "proposal",
     projectName: lead.project_type || "درخواست پروژه",
     summary: `${lead.client_message}\n\nخلاصه ادمین: ${lead.admin_summary}`,
-    features: [
-      `هدف: ${lead.project_goal}`,
-      `راهکار پیشنهادی: ${lead.recommended_solution}`,
-      `تناسب بودجه: ${lead.budget_fit}`,
-      `سطح ریسک: ${lead.client_risk_level}`,
-      `امتیاز لید: ${lead.lead_score}`,
-      ...lead.missing_questions.map((q) => `ابهام: ${q}`),
-    ],
+    features,
     tech: lead.recommended_stack,
     days: parseDays(lead.estimated_timeline),
     price: parsePriceEstimate(lead.estimated_price_range),
