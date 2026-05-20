@@ -1,5 +1,7 @@
 import os
 import shutil
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +16,8 @@ router = APIRouter()
 
 UPLOAD_DIR = Path("/app/uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+ORDER_FILES_DIR = UPLOAD_DIR / "order-files"
+ORDER_FILES_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @router.get("/orders", response_model=list[OrderOut])
@@ -101,6 +105,40 @@ async def upload_proposal(
         shutil.copyfileobj(file.file, f)
 
     order.proposal_file = f"/uploads/{order_id}{ext}"
+    await db.commit()
+    await db.refresh(order)
+    return order
+
+
+@router.post("/orders/{order_id}/files", response_model=OrderOut)
+async def upload_admin_order_file(
+    order_id: str,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_admin),
+):
+    result = await db.execute(select(Order).where(Order.id == order_id))
+    order = result.scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    file_id = str(uuid.uuid4())
+    original_name = Path(file.filename or "file").name
+    ext = Path(original_name).suffix
+    dest = ORDER_FILES_DIR / f"{order_id}-{file_id}{ext}"
+    with dest.open("wb") as f:
+        shutil.copyfileobj(file.file, f)
+
+    item = {
+        "id": file_id,
+        "name": original_name,
+        "url": f"/uploads/order-files/{dest.name}",
+        "size": dest.stat().st_size,
+        "content_type": file.content_type,
+        "uploaded_by": "admin",
+        "uploaded_at": datetime.now(timezone.utc).isoformat(),
+    }
+    order.order_files = [*(order.order_files or []), item]
     await db.commit()
     await db.refresh(order)
     return order

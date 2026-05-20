@@ -94,6 +94,16 @@ class AdminApproveIn(BaseModel):
     admin_note: Optional[str] = None
 
 
+class OrderFileOut(BaseModel):
+    id: str
+    name: str
+    url: str
+    size: int
+    content_type: Optional[str] = None
+    uploaded_by: str
+    uploaded_at: datetime
+
+
 class OrderOut(BaseModel):
     id: str
     customer_id: Optional[str] = None
@@ -105,6 +115,7 @@ class OrderOut(BaseModel):
     delivery_days: int
     price_estimate: int
     price_label: str
+    order_files: list[OrderFileOut] = Field(default_factory=list)
     final_price: Optional[int] = None
     payment_percentage: Optional[int] = None
     payment_amount: Optional[int] = None

@@ -259,7 +259,7 @@ export default function AdminDashboard() {
                       </td>
                       <td className="px-5 py-4 text-xs text-[hsl(var(--muted-foreground))]">{formatDate(order.created_at)}</td>
                       <td className="px-5 py-4">
-                        <button onClick={() => openOrder(order)} className="text-violet-300 hover:text-violet-200 text-xs transition-colors">
+                        <button onClick={() => router.push(`/admin/orders/${order.id}`)} className="text-violet-300 hover:text-violet-200 text-xs transition-colors">
                           مدیریت
                         </button>
                       </td>

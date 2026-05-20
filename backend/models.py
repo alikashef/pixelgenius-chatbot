@@ -55,6 +55,7 @@ class Order(Base):
     delivery_days: Mapped[int] = mapped_column(Integer)
     price_estimate: Mapped[int] = mapped_column(Integer)
     price_label: Mapped[str] = mapped_column(String(100))
+    order_files: Mapped[list] = mapped_column(JSON, default=list)
 
     # set by admin after review
     final_price: Mapped[int | None] = mapped_column(Integer, nullable=True)

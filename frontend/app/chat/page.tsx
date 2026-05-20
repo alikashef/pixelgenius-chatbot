@@ -335,9 +335,9 @@ function ChatPageInner() {
   const isLoading = loading || sendingOtp;
 
   return (
-    <div className="flex h-screen flex-col bg-[hsl(var(--background))]">
+    <div className="flex h-[100dvh] min-h-[100dvh] flex-col overflow-hidden bg-[hsl(var(--background))]">
       {/* header */}
-      <header className="flex items-center gap-3 border-b border-[hsl(var(--border))] bg-[hsl(var(--background))]/80 px-5 py-3.5 backdrop-blur-xl">
+      <header className="z-10 flex shrink-0 items-center gap-2 border-b border-[hsl(var(--border))] bg-[hsl(var(--background))]/95 px-3 py-3 backdrop-blur-xl sm:gap-3 sm:px-5 sm:py-3.5">
         <Link href="/" className="flex items-center gap-2 font-black text-white">
           <span className="grid h-8 w-8 place-items-center rounded-xl bg-[--violet] shadow-md shadow-[--violet-glow]">
             <IconSparkles size={16} stroke={2.2} />
@@ -350,11 +350,11 @@ function ChatPageInner() {
           <span className="text-xs text-[hsl(var(--muted-foreground))]">آنلاین</span>
         </div>
 
-        <div className="mr-auto flex items-center gap-2">
+        <div className="mr-auto flex items-center gap-1.5 sm:gap-2">
           {messages.length > 1 && (
             <button
               onClick={resetChat}
-              className="flex items-center gap-1.5 rounded-lg border border-[hsl(var(--border))] bg-[--surface] px-3 py-1.5 text-xs text-[hsl(var(--muted-foreground))] transition-colors hover:text-white"
+              className="flex items-center gap-1.5 rounded-lg border border-[hsl(var(--border))] bg-[--surface] px-2.5 py-1.5 text-xs text-[hsl(var(--muted-foreground))] transition-colors hover:text-white sm:px-3"
             >
               <IconPlus size={13} stroke={2.5} />
               چت جدید
@@ -362,7 +362,7 @@ function ChatPageInner() {
           )}
           <Link
             href={customerToken ? "/panel" : "/login?redirect=/panel"}
-            className="flex items-center gap-1.5 rounded-lg border border-[--violet-border] bg-[--violet-glow] px-3 py-1.5 text-xs font-semibold text-violet-300 transition-colors hover:text-white"
+            className="flex items-center gap-1.5 rounded-lg border border-[--violet-border] bg-[--violet-glow] px-2.5 py-1.5 text-xs font-semibold text-violet-300 transition-colors hover:text-white sm:px-3"
           >
             <IconUser size={13} stroke={2} />
             حساب کاربری
@@ -371,7 +371,7 @@ function ChatPageInner() {
       </header>
 
       {/* messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-6 md:px-8">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5 md:px-8">
         <div className="mx-auto max-w-2xl">
           {!customerToken && (
             <div className="mb-5 rounded-xl border border-yellow-500/20 bg-yellow-500/8 px-4 py-3 text-xs leading-6 text-yellow-400">
@@ -409,7 +409,7 @@ function ChatPageInner() {
       </div>
 
       {/* input */}
-      <div className="border-t border-[hsl(var(--border))] px-4 py-4 md:px-8">
+      <div className="shrink-0 border-t border-[hsl(var(--border))] bg-[hsl(var(--background))]/95 px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3 backdrop-blur md:px-8">
         <form onSubmit={handleSubmit} className="mx-auto max-w-2xl">
           <div className="flex items-center gap-2 rounded-2xl border border-[hsl(var(--border))] bg-[--surface] px-4 py-2 transition-colors focus-within:border-[--violet-border]">
             <input
@@ -420,7 +420,7 @@ function ChatPageInner() {
               placeholder={placeholder}
               disabled={isLoading}
               dir={phoneStep ? "ltr" : "rtl"}
-              className="flex-1 bg-transparent py-1.5 text-sm text-[hsl(var(--foreground))] placeholder-[hsl(var(--muted-foreground))] outline-none disabled:opacity-50"
+              className="min-w-0 flex-1 bg-transparent py-1.5 text-[16px] text-[hsl(var(--foreground))] placeholder-[hsl(var(--muted-foreground))] outline-none disabled:opacity-50 sm:text-sm"
             />
             <button
               type="submit"

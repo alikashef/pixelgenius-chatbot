@@ -1,4 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException
+import shutil
+import uuid
+from datetime import datetime, timezone
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -8,6 +13,8 @@ from schemas import CustomerProfileOut, CustomerProfileUpdateIn, OrderCreateIn, 
 from auth import get_current_customer
 
 router = APIRouter()
+UPLOAD_DIR = Path("/app/uploads/order-files")
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @router.get("/customer/profile", response_model=CustomerProfileOut)
@@ -87,4 +94,40 @@ async def get_order(
     order = result.scalar_one_or_none()
     if not order:
         raise HTTPException(status_code=404, detail="سفارش یافت نشد")
+    return order
+
+
+@router.post("/customer/orders/{order_id}/files", response_model=OrderOut)
+async def upload_customer_order_file(
+    order_id: str,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    payload: dict = Depends(get_current_customer),
+):
+    result = await db.execute(
+        select(Order).where(Order.id == order_id, Order.customer_id == payload["sub"])
+    )
+    order = result.scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="سفارش یافت نشد")
+
+    file_id = str(uuid.uuid4())
+    original_name = Path(file.filename or "file").name
+    ext = Path(original_name).suffix
+    dest = UPLOAD_DIR / f"{order_id}-{file_id}{ext}"
+    with dest.open("wb") as f:
+        shutil.copyfileobj(file.file, f)
+
+    item = {
+        "id": file_id,
+        "name": original_name,
+        "url": f"/uploads/order-files/{dest.name}",
+        "size": dest.stat().st_size,
+        "content_type": file.content_type,
+        "uploaded_by": "customer",
+        "uploaded_at": datetime.now(timezone.utc).isoformat(),
+    }
+    order.order_files = [*(order.order_files or []), item]
+    await db.commit()
+    await db.refresh(order)
     return order

@@ -31,6 +31,8 @@ async def create_tables():
         await conn.execute(text("ALTER TABLE customers ADD COLUMN IF NOT EXISTS business_type VARCHAR(120)"))
         await conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS chat_history JSON"))
         await conn.execute(text("UPDATE orders SET chat_history = '[]'::json WHERE chat_history IS NULL"))
+        await conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS order_files JSON"))
+        await conn.execute(text("UPDATE orders SET order_files = '[]'::json WHERE order_files IS NULL"))
         for key, value in DEFAULT_AI_SETTINGS.items():
             await conn.execute(
                 text(

@@ -47,6 +47,7 @@ export interface Order {
   delivery_days: number;
   price_estimate: number;
   price_label: string;
+  order_files: OrderFile[];
   final_price: number | null;
   payment_percentage: number | null;
   payment_amount: number | null;
@@ -55,6 +56,16 @@ export interface Order {
   status: "pending_review" | "approved" | "awaiting_payment" | "paid" | "cancelled";
   paid_at: string | null;
   created_at: string;
+}
+
+export interface OrderFile {
+  id: string;
+  name: string;
+  url: string;
+  size: number;
+  content_type: string | null;
+  uploaded_by: "admin" | "customer" | string;
+  uploaded_at: string;
 }
 
 export interface CustomerProfile {
@@ -72,7 +83,10 @@ export async function sendChat(messages: Message[]): Promise<string> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ messages }),
   });
-  if (!res.ok) throw new Error("خطا در ارتباط با سرور");
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "خطا در ارتباط با سرور");
+  }
   const data = await res.json();
   return data.content;
 }
@@ -202,6 +216,15 @@ export async function fetchOrders(token: string): Promise<Order[]> {
   return res.json();
 }
 
+export async function fetchOrder(token: string, id: string): Promise<Order> {
+  const res = await fetch(`${API_URL}/api/orders/${id}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (res.status === 401 || res.status === 403) throw new Error("UNAUTHORIZED");
+  if (!res.ok) throw new Error("خطا در دریافت سفارش");
+  return res.json();
+}
+
 export async function fetchStats(token: string) {
   const res = await fetch(`${API_URL}/api/orders/stats`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -231,6 +254,30 @@ export async function uploadProposal(token: string, orderId: string, file: File)
   const form = new FormData();
   form.append("file", file);
   const res = await fetch(`${API_URL}/api/orders/${orderId}/proposal`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+  if (!res.ok) throw new Error("خطا در آپلود فایل");
+  return res.json();
+}
+
+export async function uploadAdminOrderFile(token: string, orderId: string, file: File) {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${API_URL}/api/orders/${orderId}/files`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+  if (!res.ok) throw new Error("خطا در آپلود فایل");
+  return res.json();
+}
+
+export async function uploadCustomerOrderFile(token: string, orderId: string, file: File) {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${API_URL}/api/customer/orders/${orderId}/files`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
     body: form,
