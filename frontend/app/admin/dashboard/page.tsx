@@ -70,6 +70,7 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<"orders" | "settings">("orders");
   const [settings, setSettings] = useState<Record<string, unknown>>({});
   const [savingSettings, setSavingSettings] = useState(false);
+  const [savedToast, setSavedToast] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -151,6 +152,8 @@ export default function AdminDashboard() {
     try {
       const data = await updateAISettings(getToken(), settings);
       setSettings(data.settings);
+      setSavedToast(true);
+      setTimeout(() => setSavedToast(false), 3000);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "خطا در ذخیره تنظیمات");
     } finally {
@@ -190,6 +193,12 @@ export default function AdminDashboard() {
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[hsl(var(--background))]">
+      {savedToast && (
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 flex items-center gap-2.5 rounded-2xl border border-emerald-500/30 bg-emerald-500/15 px-5 py-3 text-sm font-semibold text-emerald-400 shadow-xl backdrop-blur-xl animate-in fade-in slide-in-from-bottom-3 duration-300">
+          <span className="text-base">✓</span>
+          تنظیمات با موفقیت ذخیره شد
+        </div>
+      )}
       <div className="pointer-events-none fixed inset-0 bg-grid opacity-60" />
       <div className="pointer-events-none fixed inset-x-0 top-0 h-72 bg-[radial-gradient(ellipse_60%_50%_at_50%_0%,rgba(124,58,237,0.18),transparent)]" />
 
@@ -288,6 +297,37 @@ export default function AdminDashboard() {
                 {savingSettings ? "در حال ذخیره..." : "ذخیره همه تنظیمات"}
               </button>
             </div>
+
+            <section className="bg-[--surface] border border-[hsl(var(--border))] rounded-2xl p-5 space-y-4">
+              <div>
+                <h3 className="text-[hsl(var(--foreground))] font-semibold">مدل هوش مصنوعی</h3>
+                <p className="text-[hsl(var(--muted-foreground))] text-xs mt-1">مدلی که چت‌بات برای پاسخ به مشتریان استفاده می‌کند.</p>
+              </div>
+              <div className="grid gap-3 md:grid-cols-3">
+                {[
+                  { key: "gapgpt-qwen-3.6", label: "GapGPT Qwen 3.6", desc: "سریع و اقتصادی" },
+                  { key: "claude-opus-4-6", label: "Claude Opus 4.6", desc: "قدرتمند و دقیق برای متن و تصویر" },
+                ].map((model) => {
+                  const isSelected = (settings.ai_model || "gapgpt-qwen-3.6") === model.key;
+                  return (
+                    <button
+                      key={model.key}
+                      type="button"
+                      onClick={() => setSettingValue("ai_model", model.key)}
+                      className={`flex flex-col items-start gap-1 rounded-xl border px-4 py-3 text-right transition-all ${
+                        isSelected
+                          ? "border-[--violet-border] bg-[--violet-glow] text-white"
+                          : "border-[hsl(var(--border))] bg-[hsl(var(--background))] text-[hsl(var(--muted-foreground))] hover:border-[--violet-border] hover:text-white"
+                      }`}
+                    >
+                      <span className="text-sm font-semibold">{model.label}</span>
+                      <span className="text-xs opacity-70">{model.desc}</span>
+                      {isSelected && <span className="mt-1 text-[10px] font-bold text-violet-400">● فعال</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
 
             <section className="bg-[--surface] border border-[hsl(var(--border))] rounded-2xl p-5 space-y-4">
               <h3 className="text-[hsl(var(--foreground))] font-semibold">واحد پول و شرایط پرداخت</h3>

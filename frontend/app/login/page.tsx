@@ -20,6 +20,10 @@ function LoginContent() {
   const [error, setError] = useState("");
   const [countdown, setCountdown] = useState(phoneParam ? 120 : 0);
 
+  function collectMessageAttachments(messages: Message[]) {
+    return messages.flatMap((message) => message.attachments || []);
+  }
+
   function readHandoff(): { proposal: Proposal; chatHistory: Message[]; attachments: OrderFile[] } | null {
     if (!handoffParam) return null;
     try {
@@ -34,7 +38,10 @@ function LoginContent() {
       return {
         proposal: parsed.proposal,
         chatHistory: parsed.chatHistory.filter((message) => message.role === "user" || message.role === "assistant"),
-        attachments: Array.isArray(parsed.attachments) ? parsed.attachments : [],
+        attachments: [
+          ...(Array.isArray(parsed.attachments) ? parsed.attachments : []),
+          ...collectMessageAttachments(parsed.chatHistory),
+        ],
       };
     } catch {
       return null;
@@ -123,7 +130,10 @@ function LoginContent() {
           const rawDraft = customerDraft || anonymousDraft;
           const parsedDraft = rawDraft ? JSON.parse(rawDraft) : null;
           const draftMessages: Message[] = parsedDraft ? (parsedDraft.messages as Message[] || []) : [];
-          const attachments: OrderFile[] = Array.isArray(parsedDraft?.attachments) ? parsedDraft.attachments : [];
+          const attachments: OrderFile[] = [
+            ...(Array.isArray(parsedDraft?.attachments) ? parsedDraft.attachments : []),
+            ...collectMessageAttachments(draftMessages),
+          ];
           const chatHistory = draftMessages.filter((message) => message.role === "user" || message.role === "assistant").slice(1);
           await submitOrder(token, proposal, chatHistory, attachments);
           localStorage.removeItem("proposal");

@@ -3,6 +3,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 export interface Message {
   role: "user" | "assistant";
   content: string;
+  attachments?: OrderFile[];
 }
 
 export interface Proposal {
