@@ -10,8 +10,16 @@ class MessageIn(BaseModel):
     content: str
 
 
+class ChatAttachmentIn(BaseModel):
+    name: str
+    url: str
+    size: int | None = None
+    content_type: Optional[str] = None
+
+
 class ChatRequest(BaseModel):
     messages: list[MessageIn]
+    attachments: list[ChatAttachmentIn] = Field(default_factory=list)
 
 
 class ChatResponse(BaseModel):

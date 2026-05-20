@@ -311,7 +311,7 @@ function ChatPageInner() {
 
     try {
       const apiMessages = newMessages.slice(1);
-      const reply = await sendChat(apiMessages);
+      const reply = await sendChat(apiMessages, attachments);
       const lead = parseLeadAnalysis(reply);
 
       if (lead) {

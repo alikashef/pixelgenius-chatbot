@@ -77,11 +77,11 @@ export interface CustomerProfile {
 }
 
 // ── Chat ─────────────────────────────────────────────────────────────────────
-export async function sendChat(messages: Message[]): Promise<string> {
+export async function sendChat(messages: Message[], attachments: OrderFile[] = []): Promise<string> {
   const res = await fetch(`${API_URL}/api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages }),
+    body: JSON.stringify({ messages, attachments }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
