@@ -16,7 +16,6 @@ from auth import get_current_customer
 from sms import send_notification
 
 FREELANCER_PHONE = os.getenv("FREELANCER_PHONE", "")
-FREELANCER_NAME = os.getenv("FREELANCER_NAME", "فریلنسر")
 
 router = APIRouter()
 UPLOAD_DIR = Path("/app/uploads/order-files")
@@ -76,7 +75,7 @@ async def create_order(
 
     if FREELANCER_PHONE:
         asyncio.create_task(
-            send_notification(FREELANCER_PHONE, FREELANCER_NAME, order.project_name)
+            send_notification(FREELANCER_PHONE, order.project_name)
         )
 
     return order

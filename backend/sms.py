@@ -10,15 +10,15 @@ class SmsSendError(Exception):
     pass
 
 
-async def send_notification(phone: str, freelancer_name: str, project_name: str) -> bool:
+async def send_notification(phone: str, project_name: str) -> bool:
     if not MELIPAYAMAK_SHARED_URL:
-        print(f"[NOTIFY] {phone} → {freelancer_name} / {project_name}")
+        print(f"[NOTIFY] {phone} → {project_name}")
         return True
 
     payload = {
         "bodyId": NOTIFY_BODY_ID,
         "to": phone,
-        "args": [freelancer_name, project_name],
+        "args": [project_name],
     }
 
     async with httpx.AsyncClient(timeout=10) as client:
