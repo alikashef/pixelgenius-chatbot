@@ -59,6 +59,37 @@
 
 ---
 
+### 💡 Custom Domain — سایت فریلنسر با دامنه خودش
+
+**خلاصه:**
+فریلنسر دامنه خودش (`ali-rezaei.com`) رو به سرور FreelioAI point می‌کنه. مشتریان فریلنسر فقط دامنه او رو می‌بینن و هیچ ردی از FreelioAI نیست. پرداخت هم مستقیم با Merchant ID خود فریلنسر انجام می‌شه.
+
+**چطور کار می‌کنه:**
+```
+فریلنسر یه A record ست می‌کنه:
+  ali-rezaei.com → A → IP سرور FreelioAI
+
+مشتری وارد ali-rezaei.com می‌شه
+  → Caddy از Host header workspace رو تشخیص می‌ده
+  → سایت با برند فریلنسر لود می‌شه
+  → پرداخت با Merchant ID خود فریلنسر → پول مستقیم به او می‌ره
+```
+
+**مزیت استراتژیک:**
+- FreelioAI زیرساخت نامرئیه — مثل Shopify
+- تو هیچ دخالتی در پول نداری → بدون مسئولیت مالی
+- درآمد فقط از اشتراک ماهانه فریلنسر
+
+**اقدام فنی موردنیاز:**
+- [ ] Caddy config پویا — اضافه کردن دامنه جدید بدون restart
+- [ ] Multi-tenant routing بر اساس `Host` header
+- [ ] فیلد `custom_domain` و `zarinpal_merchant_id` روی جدول Workspace
+- [ ] پنل ادمین فریلنسر برای وارد کردن دامنه و Merchant ID
+
+**وابستگی:** بعد از Multi-tenant SaaS پیاده می‌شه
+
+---
+
 ## یادداشت‌های فنی
 
 - `chat_history` الان روی جدول `orders` ذخیره می‌شه (JSON field)
