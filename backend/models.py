@@ -64,6 +64,9 @@ class Order(Base):
     proposal_file: Mapped[str | None] = mapped_column(String(500), nullable=True)
     admin_note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    ai_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    milestones: Mapped[list] = mapped_column(JSON, default=list)
+
     status: Mapped[OrderStatus] = mapped_column(Enum(OrderStatus), default=OrderStatus.pending_review)
     zarinpal_authority: Mapped[str | None] = mapped_column(String(100), nullable=True)
     paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

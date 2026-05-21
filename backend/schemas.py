@@ -107,10 +107,16 @@ class OrderCreateIn(BaseModel):
     order_files: list[OrderFileOut] = Field(default_factory=list)
 
 
+class MilestoneIn(BaseModel):
+    title: str
+    amount: int
+
+
 class AdminApproveIn(BaseModel):
     final_price: int
     payment_percentage: int
     admin_note: Optional[str] = None
+    milestones: list[MilestoneIn] = []
 
 
 class OrderOut(BaseModel):
@@ -130,6 +136,8 @@ class OrderOut(BaseModel):
     payment_amount: Optional[int] = None
     proposal_file: Optional[str] = None
     admin_note: Optional[str] = None
+    ai_summary: Optional[str] = None
+    milestones: list = []
     status: OrderStatus
     zarinpal_authority: Optional[str] = None
     paid_at: Optional[datetime] = None

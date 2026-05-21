@@ -54,6 +54,8 @@ export interface Order {
   payment_amount: number | null;
   proposal_file: string | null;
   admin_note: string | null;
+  ai_summary: string | null;
+  milestones: { id: string; title: string; amount: number; status: "pending" | "paid" }[];
   status: "pending_review" | "approved" | "awaiting_payment" | "paid" | "cancelled";
   paid_at: string | null;
   created_at: string;
@@ -272,6 +274,16 @@ export async function uploadProposal(token: string, orderId: string, file: File)
     body: form,
   });
   if (!res.ok) throw new Error("خطا در آپلود فایل");
+  return res.json();
+}
+
+export async function summarizeOrder(token: string, orderId: string): Promise<Order> {
+  const res = await fetch(`${API_URL}/api/orders/${orderId}/summarize`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (res.status === 401 || res.status === 403) throw new Error("UNAUTHORIZED");
+  if (!res.ok) throw new Error("خطا در تولید خلاصه");
   return res.json();
 }
 

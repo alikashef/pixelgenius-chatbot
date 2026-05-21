@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { approveOrder, fetchOrder, Order, uploadAdminOrderFile, uploadProposal } from "@/lib/api";
+import { approveOrder, fetchOrder, Order, summarizeOrder, uploadAdminOrderFile, uploadProposal } from "@/lib/api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -38,6 +38,7 @@ export default function AdminOrderPage() {
   const [adminNote, setAdminNote] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [summarizing, setSummarizing] = useState(false);
   const [uploading, setUploading] = useState("");
   const [error, setError] = useState("");
 
@@ -93,6 +94,19 @@ export default function AdminOrderPage() {
     }
   }
 
+  async function handleSummarize() {
+    if (!order) return;
+    setSummarizing(true);
+    setError("");
+    try {
+      setOrder(await summarizeOrder(getToken(), order.id));
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "خطا در تولید خلاصه");
+    } finally {
+      setSummarizing(false);
+    }
+  }
+
   async function handleFileUpload(file?: File) {
     if (!order || !file) return;
     setUploading("file");
@@ -132,7 +146,22 @@ export default function AdminOrderPage() {
           </div>
 
           <div className="rounded-2xl border border-[hsl(var(--border))] bg-[--surface] p-5">
-            <p className="mb-3 font-semibold text-white">تاریخچه چت</p>
+            <div className="mb-3 flex items-center justify-between">
+              <p className="font-semibold text-white">تاریخچه چت</p>
+              <button
+                onClick={handleSummarize}
+                disabled={summarizing}
+                className="flex items-center gap-1.5 rounded-xl border border-[--violet-border] bg-[--violet-glow] px-3 py-1.5 text-xs font-semibold text-violet-300 transition-colors hover:text-white disabled:opacity-50"
+              >
+                {summarizing ? "در حال تحلیل..." : "خلاصه AI"}
+              </button>
+            </div>
+            {order.ai_summary && (
+              <div className="mb-4 rounded-xl border border-[--violet-border] bg-[--violet-glow] px-4 py-3 text-sm leading-7 text-violet-100">
+                <p className="mb-1 text-xs text-violet-400">خلاصه هوش مصنوعی</p>
+                <p className="whitespace-pre-wrap">{order.ai_summary}</p>
+              </div>
+            )}
             <div className="space-y-3">
               {(order.chat_history || []).map((message, index) => (
                 <div key={`${message.role}-${index}`} className={`rounded-xl border px-4 py-3 text-sm leading-7 ${message.role === "user" ? "border-[--violet-border] bg-[--violet-glow] text-white" : "border-[hsl(var(--border))] bg-[hsl(var(--background))] text-[hsl(var(--secondary-foreground))]"}`}>
