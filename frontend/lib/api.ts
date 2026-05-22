@@ -84,11 +84,16 @@ export interface FreelancerSession {
   freelancer_id: string;
   name: string | null;
   onboarding_completed: boolean;
+  bot_token: string;
 }
 
 // ── Chat ─────────────────────────────────────────────────────────────────────
-export async function createChatSession(): Promise<string> {
-  const res = await fetch(`${API_URL}/api/chat/session`, { method: "POST" });
+export async function createChatSession(botToken?: string): Promise<string> {
+  const res = await fetch(`${API_URL}/api/chat/session`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ bot_token: botToken || null }),
+  });
   if (!res.ok) throw new Error("خطا در ساخت session");
   const data = await res.json();
   return data.id;
@@ -132,11 +137,11 @@ export async function freelancerLogin(email: string, password: string): Promise<
   return res.json();
 }
 
-export async function sendChat(messages: Message[], attachments: OrderFile[] = []): Promise<string> {
+export async function sendChat(messages: Message[], attachments: OrderFile[] = [], botToken?: string): Promise<string> {
   const res = await fetch(`${API_URL}/api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages, attachments }),
+    body: JSON.stringify({ messages, attachments, bot_token: botToken || null }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -197,7 +202,7 @@ export async function updateCustomerProfile(
   return res.json();
 }
 
-export async function submitOrder(token: string, proposal: Proposal, chatHistory: Message[], orderFiles: OrderFile[] = []): Promise<Order> {
+export async function submitOrder(token: string, proposal: Proposal, chatHistory: Message[], orderFiles: OrderFile[] = [], sessionId?: string): Promise<Order> {
   const res = await fetch(`${API_URL}/api/customer/orders`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -211,6 +216,7 @@ export async function submitOrder(token: string, proposal: Proposal, chatHistory
       price_estimate: proposal.price,
       price_label: proposal.priceLabel,
       order_files: orderFiles,
+      session_id: sessionId || null,
     }),
   });
   if (!res.ok) throw new Error("خطا در ثبت درخواست");
@@ -325,6 +331,15 @@ export interface FreelancerOnboardingData {
   price_range: string;
   timeline: string;
   note?: string;
+}
+
+export async function fetchFreelancerOrders(token: string): Promise<Order[]> {
+  const res = await fetch(`${API_URL}/api/freelancer/orders`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (res.status === 401 || res.status === 403) throw new Error("UNAUTHORIZED");
+  if (!res.ok) throw new Error("خطا در دریافت سفارشات");
+  return res.json();
 }
 
 export async function fetchFreelancerSettings(token: string): Promise<FreelancerOnboardingData> {

@@ -21,6 +21,7 @@ export default function FreelancerLoginPage() {
       const data = await freelancerLogin(email, password);
       localStorage.setItem("freelancer_token", data.access_token);
       localStorage.setItem("freelancer_id", data.freelancer_id);
+      localStorage.setItem("freelancer_bot_token", data.bot_token);
       if (data.name) localStorage.setItem("freelancer_name", data.name);
       router.push(data.onboarding_completed ? "/freelancer/dashboard" : "/freelancer/onboarding");
     } catch (err: unknown) {

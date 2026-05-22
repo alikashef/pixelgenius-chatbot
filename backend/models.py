@@ -35,10 +35,17 @@ class Freelancer(Base):
     email: Mapped[str] = mapped_column(String(120), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255))
     name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    position: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    services: Mapped[str | None] = mapped_column(Text, nullable=True)
+    price_range: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    timeline: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    bot_token: Mapped[str] = mapped_column(String(36), unique=True, index=True, default=lambda: str(uuid.uuid4()))
     onboarding_completed: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
+    orders: Mapped[list["Order"]] = relationship("Order", back_populates="freelancer")
 
 
 class ChatSession(Base):
@@ -49,6 +56,7 @@ class ChatSession(Base):
     messages: Mapped[list] = mapped_column(JSON, default=list)
     converted: Mapped[bool] = mapped_column(Boolean, default=False)
     order_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    freelancer_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("freelancers.id"), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
@@ -77,6 +85,8 @@ class Order(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     customer_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("customers.id"), nullable=True)
     customer: Mapped["Customer | None"] = relationship("Customer", back_populates="orders")
+    freelancer_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("freelancers.id"), nullable=True, index=True)
+    freelancer: Mapped["Freelancer | None"] = relationship("Freelancer", back_populates="orders")
 
     project_name: Mapped[str] = mapped_column(String(255))
     summary: Mapped[str] = mapped_column(Text)

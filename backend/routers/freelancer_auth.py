@@ -4,10 +4,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from database import get_db
-from models import Freelancer
-from schemas import FreelancerRegisterIn, FreelancerLoginIn, FreelancerOnboardingIn, FreelancerTokenOut
+from models import Freelancer, Order
+from schemas import (
+    FreelancerRegisterIn, FreelancerLoginIn, FreelancerOnboardingIn,
+    FreelancerTokenOut, OrderOut,
+)
 from auth import create_access_token, get_current_freelancer
-from services.ai_settings import update_ai_settings
 
 router = APIRouter()
 
@@ -18,6 +20,17 @@ def _hash_password(plain: str) -> str:
 
 def _verify_password(plain: str, hashed: str) -> bool:
     return _bcrypt.checkpw(plain.encode(), hashed.encode())
+
+
+def _token_out(freelancer: Freelancer, token: str) -> FreelancerTokenOut:
+    return FreelancerTokenOut(
+        access_token=token,
+        token_type="bearer",
+        freelancer_id=freelancer.id,
+        name=freelancer.name,
+        onboarding_completed=freelancer.onboarding_completed,
+        bot_token=freelancer.bot_token,
+    )
 
 
 @router.post("/freelancer/register", response_model=FreelancerTokenOut, status_code=201)
@@ -36,13 +49,7 @@ async def register(body: FreelancerRegisterIn, db: AsyncSession = Depends(get_db
     await db.refresh(freelancer)
 
     token = create_access_token({"sub": freelancer.id, "role": "freelancer"})
-    return FreelancerTokenOut(
-        access_token=token,
-        token_type="bearer",
-        freelancer_id=freelancer.id,
-        name=freelancer.name,
-        onboarding_completed=freelancer.onboarding_completed,
-    )
+    return _token_out(freelancer, token)
 
 
 @router.post("/freelancer/login", response_model=FreelancerTokenOut)
@@ -53,13 +60,7 @@ async def login(body: FreelancerLoginIn, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="ایمیل یا رمز اشتباه است")
 
     token = create_access_token({"sub": freelancer.id, "role": "freelancer"})
-    return FreelancerTokenOut(
-        access_token=token,
-        token_type="bearer",
-        freelancer_id=freelancer.id,
-        name=freelancer.name,
-        onboarding_completed=freelancer.onboarding_completed,
-    )
+    return _token_out(freelancer, token)
 
 
 @router.get("/freelancer/settings")
@@ -67,16 +68,21 @@ async def get_settings(
     db: AsyncSession = Depends(get_db),
     payload: dict = Depends(get_current_freelancer),
 ):
-    from services.ai_settings import get_ai_settings
-    all_settings = await get_ai_settings(db)
+    freelancer = await db.get(Freelancer, payload["sub"])
+    if not freelancer:
+        raise HTTPException(status_code=404, detail="Freelancer not found")
     return {
-        "name": all_settings.get("freelancer_name", ""),
-        "position": all_settings.get("freelancer_position", ""),
-        "services": all_settings.get("freelancer_services", ""),
-        "price_range": all_settings.get("freelancer_price_range", ""),
-        "timeline": all_settings.get("freelancer_timeline", ""),
-        "note": all_settings.get("freelancer_note", ""),
+        "name": freelancer.name or "",
+        "position": freelancer.position or "",
+        "services": freelancer.services or "",
+        "price_range": freelancer.price_range or "",
+        "timeline": freelancer.timeline or "",
+        "note": freelancer.note or "",
+        "bot_token": freelancer.bot_token,
     }
+
+
+@router.put("/freelancer/onboarding", response_model=FreelancerTokenOut)
 async def complete_onboarding(
     body: FreelancerOnboardingIn,
     db: AsyncSession = Depends(get_db),
@@ -87,25 +93,28 @@ async def complete_onboarding(
         raise HTTPException(status_code=404, detail="Freelancer not found")
 
     freelancer.name = body.name
+    freelancer.position = body.position
+    freelancer.services = body.services
+    freelancer.price_range = body.price_range
+    freelancer.timeline = body.timeline
+    freelancer.note = body.note or None
     freelancer.onboarding_completed = True
-
-    await update_ai_settings(db, {
-        "freelancer_name": body.name,
-        "freelancer_position": body.position,
-        "freelancer_services": body.services,
-        "freelancer_price_range": body.price_range,
-        "freelancer_timeline": body.timeline,
-        "freelancer_note": body.note or "",
-    })
 
     await db.commit()
     await db.refresh(freelancer)
 
     token = create_access_token({"sub": freelancer.id, "role": "freelancer"})
-    return FreelancerTokenOut(
-        access_token=token,
-        token_type="bearer",
-        freelancer_id=freelancer.id,
-        name=freelancer.name,
-        onboarding_completed=True,
+    return _token_out(freelancer, token)
+
+
+@router.get("/freelancer/orders", response_model=list[OrderOut])
+async def get_freelancer_orders(
+    db: AsyncSession = Depends(get_db),
+    payload: dict = Depends(get_current_freelancer),
+):
+    result = await db.execute(
+        select(Order)
+        .where(Order.freelancer_id == payload["sub"])
+        .order_by(Order.created_at.desc())
     )
+    return result.scalars().all()

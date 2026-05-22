@@ -7,13 +7,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from zipfile import ZipFile
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Body, Depends, HTTPException, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
 from lib.ai.analyze_lead import analyze_lead
-from models import ChatSession
-from schemas import ChatAttachmentIn, ChatRequest, ChatResponse, ChatSessionCreateOut, ChatSessionUpdateIn, OrderFileOut
+from models import ChatSession, Freelancer
+from schemas import ChatAttachmentIn, ChatRequest, ChatResponse, ChatSessionCreateIn, ChatSessionCreateOut, ChatSessionUpdateIn, OrderFileOut
 from services.ai_settings import get_ai_settings
 
 router = APIRouter()
@@ -136,6 +136,18 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
 
     try:
         settings = await get_ai_settings(db)
+        if request.bot_token:
+            result = await db.execute(select(Freelancer).where(Freelancer.bot_token == request.bot_token))
+            freelancer = result.scalar_one_or_none()
+            if freelancer:
+                settings.update({
+                    "freelancer_name": freelancer.name or "",
+                    "freelancer_position": freelancer.position or "",
+                    "freelancer_services": freelancer.services or "",
+                    "freelancer_price_range": freelancer.price_range or "",
+                    "freelancer_timeline": freelancer.timeline or "",
+                    "freelancer_note": freelancer.note or "",
+                })
         content = await analyze_lead(settings, _merge_attachments(messages, request.attachments))
         return ChatResponse(content=content)
     except HTTPException:
@@ -146,8 +158,17 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/chat/session", response_model=ChatSessionCreateOut, status_code=201)
-async def create_session(db: AsyncSession = Depends(get_db)):
-    session = ChatSession()
+async def create_session(
+    body: ChatSessionCreateIn | None = Body(default=None),
+    db: AsyncSession = Depends(get_db),
+):
+    freelancer_id = None
+    if body and body.bot_token:
+        result = await db.execute(select(Freelancer).where(Freelancer.bot_token == body.bot_token))
+        f = result.scalar_one_or_none()
+        if f:
+            freelancer_id = f.id
+    session = ChatSession(freelancer_id=freelancer_id)
     db.add(session)
     await db.commit()
     await db.refresh(session)

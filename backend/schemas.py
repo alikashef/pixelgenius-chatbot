@@ -17,9 +17,14 @@ class ChatAttachmentIn(BaseModel):
     content_type: Optional[str] = None
 
 
+class ChatSessionCreateIn(BaseModel):
+    bot_token: Optional[str] = None
+
+
 class ChatRequest(BaseModel):
     messages: list[MessageIn]
     attachments: list[ChatAttachmentIn] = Field(default_factory=list)
+    bot_token: Optional[str] = None
 
 
 class ChatResponse(BaseModel):
@@ -105,6 +110,7 @@ class OrderCreateIn(BaseModel):
     price_estimate: int
     price_label: str
     order_files: list[OrderFileOut] = Field(default_factory=list)
+    session_id: Optional[str] = None
 
 
 class MilestoneIn(BaseModel):
@@ -138,6 +144,7 @@ class OrderOut(BaseModel):
     admin_note: Optional[str] = None
     ai_summary: Optional[str] = None
     milestones: list = []
+    freelancer_id: Optional[str] = None
     status: OrderStatus
     zarinpal_authority: Optional[str] = None
     paid_at: Optional[datetime] = None
@@ -200,6 +207,7 @@ class FreelancerTokenOut(BaseModel):
     freelancer_id: str
     name: Optional[str] = None
     onboarding_completed: bool
+    bot_token: str
 
 
 # ── Freelancer Onboarding ─────────────────────────────────────────────────────
