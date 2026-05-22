@@ -161,6 +161,28 @@ export default function OrderDetailPage() {
           </div>
         </div>
 
+        {(order.milestones || []).length > 0 && (
+          <div className="bg-[--surface] border border-[hsl(var(--border))] rounded-2xl p-6 space-y-3">
+            <p className="font-semibold text-white">مراحل پروژه</p>
+            <div className="space-y-2">
+              {order.milestones.map((m, i) => (
+                <div key={m.id || i} className="flex items-center justify-between rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <span className={`h-2 w-2 rounded-full flex-shrink-0 ${m.status === "paid" ? "bg-emerald-400" : "bg-orange-400"}`} />
+                    <span className="text-sm text-white">{m.title}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-[hsl(var(--muted-foreground))]">{m.amount.toLocaleString("fa-IR")} ریال</span>
+                    <span className={`text-xs rounded-full px-2 py-0.5 ${m.status === "paid" ? "bg-emerald-500/10 text-emerald-400" : "bg-orange-500/10 text-orange-400"}`}>
+                      {m.status === "paid" ? "پرداخت شده" : "در انتظار"}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="bg-[--surface] border border-[hsl(var(--border))] rounded-2xl p-6 space-y-4">
           <p className="text-[hsl(var(--muted-foreground))] text-xs">تاریخچه مکالمه همین پروژه</p>
           {(order.chat_history || []).length === 0 ? (

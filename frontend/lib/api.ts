@@ -306,14 +306,34 @@ export async function approveOrder(
   orderId: string,
   finalPrice: number,
   paymentPercentage: number,
-  adminNote?: string
+  adminNote?: string,
+  milestones: { title: string; amount: number }[] = []
 ) {
   const res = await fetch(`${API_URL}/api/orders/${orderId}/approve`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ final_price: finalPrice, payment_percentage: paymentPercentage, admin_note: adminNote }),
+    body: JSON.stringify({ final_price: finalPrice, payment_percentage: paymentPercentage, admin_note: adminNote, milestones }),
   });
   if (!res.ok) throw new Error("خطا در تایید سفارش");
+  return res.json();
+}
+
+export interface FreelancerOnboardingData {
+  name: string;
+  position: string;
+  services: string;
+  price_range: string;
+  timeline: string;
+  note?: string;
+}
+
+export async function freelancerOnboarding(token: string, data: FreelancerOnboardingData): Promise<FreelancerSession> {
+  const res = await fetch(`${API_URL}/api/freelancer/onboarding`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error("خطا در ذخیره اطلاعات");
   return res.json();
 }
 

@@ -202,6 +202,16 @@ class FreelancerTokenOut(BaseModel):
     onboarding_completed: bool
 
 
+# ── Freelancer Onboarding ─────────────────────────────────────────────────────
+class FreelancerOnboardingIn(BaseModel):
+    name: str
+    position: str
+    services: str
+    price_range: str
+    timeline: str
+    note: Optional[str] = None
+
+
 # ── Chat Session ──────────────────────────────────────────────────────────────
 class ChatSessionCreateOut(BaseModel):
     id: str
