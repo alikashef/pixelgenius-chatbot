@@ -1,7 +1,7 @@
+import bcrypt as _bcrypt
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from passlib.context import CryptContext
 
 from database import get_db
 from models import Freelancer
@@ -10,7 +10,14 @@ from auth import create_access_token, get_current_freelancer
 from services.ai_settings import update_ai_settings
 
 router = APIRouter()
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+def _hash_password(plain: str) -> str:
+    return _bcrypt.hashpw(plain.encode(), _bcrypt.gensalt()).decode()
+
+
+def _verify_password(plain: str, hashed: str) -> bool:
+    return _bcrypt.checkpw(plain.encode(), hashed.encode())
 
 
 @router.post("/freelancer/register", response_model=FreelancerTokenOut, status_code=201)
@@ -21,7 +28,7 @@ async def register(body: FreelancerRegisterIn, db: AsyncSession = Depends(get_db
 
     freelancer = Freelancer(
         email=body.email,
-        password_hash=pwd_context.hash(body.password),
+        password_hash=_hash_password(body.password),
         name=body.name,
     )
     db.add(freelancer)
@@ -42,7 +49,7 @@ async def register(body: FreelancerRegisterIn, db: AsyncSession = Depends(get_db
 async def login(body: FreelancerLoginIn, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Freelancer).where(Freelancer.email == body.email))
     freelancer = result.scalar_one_or_none()
-    if not freelancer or not pwd_context.verify(body.password, freelancer.password_hash):
+    if not freelancer or not _verify_password(body.password, freelancer.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="ایمیل یا رمز اشتباه است")
 
     token = create_access_token({"sub": freelancer.id, "role": "freelancer"})
