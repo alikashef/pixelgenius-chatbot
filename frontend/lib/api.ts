@@ -327,6 +327,14 @@ export interface FreelancerOnboardingData {
   note?: string;
 }
 
+export async function fetchFreelancerSettings(token: string): Promise<FreelancerOnboardingData> {
+  const res = await fetch(`${API_URL}/api/freelancer/settings`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("خطا در دریافت اطلاعات");
+  return res.json();
+}
+
 export async function freelancerOnboarding(token: string, data: FreelancerOnboardingData): Promise<FreelancerSession> {
   const res = await fetch(`${API_URL}/api/freelancer/onboarding`, {
     method: "PUT",

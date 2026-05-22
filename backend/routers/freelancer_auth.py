@@ -62,7 +62,21 @@ async def login(body: FreelancerLoginIn, db: AsyncSession = Depends(get_db)):
     )
 
 
-@router.put("/freelancer/onboarding", response_model=FreelancerTokenOut)
+@router.get("/freelancer/settings")
+async def get_settings(
+    db: AsyncSession = Depends(get_db),
+    payload: dict = Depends(get_current_freelancer),
+):
+    from services.ai_settings import get_ai_settings
+    all_settings = await get_ai_settings(db)
+    return {
+        "name": all_settings.get("freelancer_name", ""),
+        "position": all_settings.get("freelancer_position", ""),
+        "services": all_settings.get("freelancer_services", ""),
+        "price_range": all_settings.get("freelancer_price_range", ""),
+        "timeline": all_settings.get("freelancer_timeline", ""),
+        "note": all_settings.get("freelancer_note", ""),
+    }
 async def complete_onboarding(
     body: FreelancerOnboardingIn,
     db: AsyncSession = Depends(get_db),

@@ -54,7 +54,7 @@ export default function FreelancerDashboardPage() {
             </div>
           </Link>
 
-          <Link href="/admin/settings" className="group flex items-start gap-4 rounded-2xl border border-[hsl(var(--border))] bg-[--surface] p-6 transition-all hover:-translate-y-0.5 hover:border-[--violet-border]">
+          <Link href="/freelancer/settings" className="group flex items-start gap-4 rounded-2xl border border-[hsl(var(--border))] bg-[--surface] p-6 transition-all hover:-translate-y-0.5 hover:border-[--violet-border]">
             <span className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-xl bg-[--violet-glow] text-violet-300">
               <IconSettings size={20} />
             </span>
