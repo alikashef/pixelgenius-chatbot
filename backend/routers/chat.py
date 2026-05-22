@@ -12,7 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
 from lib.ai.analyze_lead import analyze_lead
-from schemas import ChatAttachmentIn, ChatRequest, ChatResponse, OrderFileOut
+from models import ChatSession
+from schemas import ChatAttachmentIn, ChatRequest, ChatResponse, ChatSessionCreateOut, ChatSessionUpdateIn, OrderFileOut
 from services.ai_settings import get_ai_settings
 
 router = APIRouter()
@@ -142,6 +143,34 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
     except Exception as e:
         logger.error("Chat error: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/chat/session", response_model=ChatSessionCreateOut, status_code=201)
+async def create_session(db: AsyncSession = Depends(get_db)):
+    session = ChatSession()
+    db.add(session)
+    await db.commit()
+    await db.refresh(session)
+    return ChatSessionCreateOut(id=session.id)
+
+
+@router.patch("/chat/session/{session_id}", status_code=204)
+async def update_session(
+    session_id: str,
+    body: ChatSessionUpdateIn,
+    db: AsyncSession = Depends(get_db),
+):
+    session = await db.get(ChatSession, session_id)
+    if not session:
+        return
+    session.messages = [m.model_dump() for m in body.messages]
+    if body.phone is not None:
+        session.phone = body.phone
+    if body.converted is not None:
+        session.converted = body.converted
+    if body.order_id is not None:
+        session.order_id = body.order_id
+    await db.commit()
 
 
 @router.post("/chat/files", response_model=OrderFileOut)

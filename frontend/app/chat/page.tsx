@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { IconArrowUp, IconPaperclip, IconPlus, IconSparkles, IconUser, IconX } from "@tabler/icons-react";
 import ChatBubble from "@/components/ChatBubble";
-import { sendChat, sendOtp, submitOrder, uploadChatFile, Message, Proposal, LeadAnalysis, OrderFile } from "@/lib/api";
+import { sendChat, sendOtp, submitOrder, uploadChatFile, createChatSession, updateChatSession, Message, Proposal, LeadAnalysis, OrderFile } from "@/lib/api";
 
 const WELCOME: Message = {
   role: "assistant",
@@ -187,6 +187,7 @@ function ChatPageInner() {
   const [customerName, setCustomerName] = useState("");
   const [chatKey, setChatKey] = useState(ANON_CHAT_KEY);
   const [sessionId, setSessionId] = useState("");
+  const [dbSessionId, setDbSessionId] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -330,9 +331,21 @@ function ChatPageInner() {
     setError("");
 
     try {
+      let currentDbSession = dbSessionId;
+      if (!currentDbSession) {
+        try { currentDbSession = await createChatSession(); setDbSessionId(currentDbSession); } catch { /* silent */ }
+      }
+
       const apiMessages = newMessages.slice(1);
       const reply = await sendChat(apiMessages, currentAttachments);
       const lead = parseLeadAnalysis(reply);
+      const allMessages = lead
+        ? [...newMessages, { role: "assistant" as const, content: lead.client_message || "" }]
+        : [...newMessages, { role: "assistant" as const, content: reply }];
+
+      if (currentDbSession) {
+        updateChatSession(currentDbSession, allMessages).catch(() => {});
+      }
 
       if (lead) {
         const proposal = leadToProposal(lead);
@@ -340,6 +353,7 @@ function ChatPageInner() {
         const orderFiles = collectMessageAttachments(newMessages);
         if (customerToken) {
           const order = await submitOrder(customerToken, proposal, newMessages, orderFiles);
+          if (currentDbSession) updateChatSession(currentDbSession, allMessages, { converted: true, orderId: order.id }).catch(() => {});
           localStorage.removeItem("proposal");
           localStorage.removeItem(chatKey);
           if (customerId && sessionId) {

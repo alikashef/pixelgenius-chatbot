@@ -38,3 +38,10 @@ def get_current_customer(credentials: HTTPAuthorizationCredentials = Depends(bea
     if payload.get("role") != "customer":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not customer")
     return payload
+
+
+def get_current_freelancer(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)) -> dict:
+    payload = _decode(credentials.credentials)
+    if payload.get("role") != "freelancer":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not freelancer")
+    return payload

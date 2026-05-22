@@ -79,7 +79,59 @@ export interface CustomerProfile {
   business_type: string | null;
 }
 
+export interface FreelancerSession {
+  access_token: string;
+  freelancer_id: string;
+  name: string | null;
+  onboarding_completed: boolean;
+}
+
 // ── Chat ─────────────────────────────────────────────────────────────────────
+export async function createChatSession(): Promise<string> {
+  const res = await fetch(`${API_URL}/api/chat/session`, { method: "POST" });
+  if (!res.ok) throw new Error("خطا در ساخت session");
+  const data = await res.json();
+  return data.id;
+}
+
+export async function updateChatSession(
+  sessionId: string,
+  messages: Message[],
+  opts: { phone?: string; converted?: boolean; orderId?: string } = {}
+): Promise<void> {
+  await fetch(`${API_URL}/api/chat/session/${sessionId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      messages: messages.map(({ role, content }) => ({ role, content })),
+      phone: opts.phone,
+      converted: opts.converted,
+      order_id: opts.orderId,
+    }),
+  });
+}
+
+export async function freelancerRegister(email: string, password: string, name?: string): Promise<FreelancerSession> {
+  const res = await fetch(`${API_URL}/api/freelancer/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password, name }),
+  });
+  if (res.status === 409) throw new Error("این ایمیل قبلاً ثبت شده");
+  if (!res.ok) throw new Error("خطا در ثبت‌نام");
+  return res.json();
+}
+
+export async function freelancerLogin(email: string, password: string): Promise<FreelancerSession> {
+  const res = await fetch(`${API_URL}/api/freelancer/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) throw new Error("ایمیل یا رمز اشتباه است");
+  return res.json();
+}
+
 export async function sendChat(messages: Message[], attachments: OrderFile[] = []): Promise<string> {
   const res = await fetch(`${API_URL}/api/chat`, {
     method: "POST",

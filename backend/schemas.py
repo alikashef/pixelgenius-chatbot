@@ -180,3 +180,35 @@ class LoginRequest(BaseModel):
 class TokenOut(BaseModel):
     access_token: str
     token_type: str
+
+
+# ── Freelancer Auth ───────────────────────────────────────────────────────────
+class FreelancerRegisterIn(BaseModel):
+    email: str
+    password: str
+    name: Optional[str] = None
+
+
+class FreelancerLoginIn(BaseModel):
+    email: str
+    password: str
+
+
+class FreelancerTokenOut(BaseModel):
+    access_token: str
+    token_type: str
+    freelancer_id: str
+    name: Optional[str] = None
+    onboarding_completed: bool
+
+
+# ── Chat Session ──────────────────────────────────────────────────────────────
+class ChatSessionCreateOut(BaseModel):
+    id: str
+
+
+class ChatSessionUpdateIn(BaseModel):
+    messages: list[MessageIn]
+    phone: Optional[str] = None
+    converted: Optional[bool] = None
+    order_id: Optional[str] = None
