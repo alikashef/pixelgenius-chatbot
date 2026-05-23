@@ -78,15 +78,34 @@
     ".pg-msg{max-width:82%;white-space:pre-wrap;border-radius:16px;padding:11px 13px;font-size:13px;line-height:1.8;word-break:break-word}",
     ".pg-msg.user{background:#fff;border:1px solid #dbe5e1;color:#0f172a;box-shadow:0 1px 2px rgba(15,23,42,.04)}",
     ".pg-msg.assistant{background:var(--pg-primary);color:#fff;font-weight:500}",
+    ".pg-attachments{display:grid;gap:8px;margin-bottom:8px;white-space:normal}",
+    ".pg-attachment{display:flex;align-items:center;gap:8px;min-width:0;border:1px solid rgba(15,23,42,.1);border-radius:10px;background:rgba(255,255,255,.78);padding:7px 8px;color:#0f172a;text-decoration:none}",
+    ".pg-msg.assistant .pg-attachment{border-color:rgba(255,255,255,.24);background:rgba(255,255,255,.12);color:#fff}",
+    ".pg-attachment img{width:86px;height:64px;object-fit:cover;border-radius:8px;background:#e2e8f0}",
+    ".pg-file-icon{display:grid;place-items:center;flex:0 0 auto;width:34px;height:34px;border-radius:9px;background:color-mix(in srgb,var(--pg-primary) 15%,#fff);color:var(--pg-primary);font-weight:800}",
+    ".pg-file-meta{min-width:0;display:grid;gap:2px}",
+    ".pg-file-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:700}",
+    ".pg-file-size{font-size:11px;color:#64748b}",
+    ".pg-msg.assistant .pg-file-size{color:rgba(255,255,255,.72)}",
     ".pg-typing{display:inline-flex;gap:4px;align-items:center}",
     ".pg-typing span{width:6px;height:6px;border-radius:50%;background:#fff;opacity:.8;animation:pg-bounce .9s infinite ease-in-out}",
     ".pg-typing span:nth-child(2){animation-delay:.12s}.pg-typing span:nth-child(3){animation-delay:.24s}",
     "@keyframes pg-bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-5px)}}",
     ".pg-error{margin:0 0 12px;text-align:center;color:#dc2626;font-size:12px;line-height:1.7}",
-    ".pg-form{border-top:1px solid #dbe5e1;background:rgba(255,255,255,.94);padding:12px;display:flex;gap:8px}",
-    ".pg-input{min-width:0;flex:1;border:1px solid #dbe5e1;background:#fff;border-radius:12px;padding:11px 12px;font:400 13px/1.4 var(--pg-font);color:#0f172a;outline:none}",
+    ".pg-form{border-top:1px solid #dbe5e1;background:rgba(255,255,255,.94);padding:12px;display:grid;gap:8px}",
+    ".pg-pending{display:flex;gap:8px;overflow:auto;padding-bottom:2px}",
+    ".pg-pending:empty{display:none}",
+    ".pg-pending-item{position:relative;flex:0 0 auto;width:86px;min-height:64px;border:1px solid #dbe5e1;border-radius:12px;background:#fff;padding:6px;display:grid;place-items:center;color:#0f172a}",
+    ".pg-pending-item img{width:100%;height:52px;object-fit:cover;border-radius:8px}",
+    ".pg-pending-file{max-width:74px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;font-weight:700;text-align:center}",
+    ".pg-remove{position:absolute;top:-7px;left:-7px;width:22px;height:22px;border:0;border-radius:50%;background:#0f172a;color:#fff;cursor:pointer;font:700 14px/1 var(--pg-font)}",
+    ".pg-composer{display:flex;gap:8px;align-items:flex-end}",
+    ".pg-file-button{width:42px;height:42px;border:1px solid #dbe5e1;background:#fff;color:#0f172a;border-radius:12px;cursor:pointer;font:700 24px/1 var(--pg-font);display:grid;place-items:center}",
+    ".pg-file-button:disabled{opacity:.55;cursor:not-allowed}",
+    ".pg-file-input{display:none}",
+    ".pg-input{min-width:0;flex:1;min-height:42px;max-height:130px;resize:none;border:1px solid #dbe5e1;background:#fff;border-radius:12px;padding:11px 12px;font:400 16px/1.65 var(--pg-font);color:#0f172a;outline:none}",
     ".pg-input:focus{border-color:var(--pg-primary);box-shadow:0 0 0 2px color-mix(in srgb,var(--pg-primary) 16%,transparent)}",
-    ".pg-send{border:0;border-radius:12px;background:var(--pg-primary);color:#fff;font:700 13px/1 var(--pg-font);padding:0 15px;cursor:pointer;min-width:62px}",
+    ".pg-send{border:0;border-radius:12px;background:var(--pg-primary);color:#fff;font:700 13px/1 var(--pg-font);padding:0 15px;cursor:pointer;min-width:62px;height:42px}",
     ".pg-send:disabled{opacity:.55;cursor:not-allowed}",
     "@media (max-width:520px){.pg-wrap{inset:auto 16px 16px 16px}.pg-wrap[data-position='bottom-right']{inset:auto 16px 16px 16px}.pg-panel{position:fixed;left:16px;right:16px;bottom:88px;width:auto;height:min(620px,calc(100vh - 112px))}.pg-wrap[data-position='bottom-right'] .pg-panel{left:16px;right:16px}.pg-wrap[data-mode='inline']{inset:auto;height:var(--pg-height)}.pg-wrap[data-mode='inline'] .pg-panel{position:relative;left:auto;right:auto;bottom:auto;width:100%;height:100%}}",
     "</style>",
@@ -101,8 +120,13 @@
     "    </header>",
     "    <main class='pg-body'></main>",
     "    <form class='pg-form'>",
-    "      <input class='pg-input' autocomplete='off' />",
-    "      <button class='pg-send' type='submit'>ارسال</button>",
+    "      <div class='pg-pending'></div>",
+    "      <div class='pg-composer'>",
+    "        <button class='pg-file-button' type='button' title='افزودن فایل' aria-label='افزودن فایل'>+</button>",
+    "        <input class='pg-file-input' type='file' multiple accept='image/*,.pdf,.doc,.docx,.txt,.md,.csv,.json' />",
+    "        <textarea class='pg-input' autocomplete='off' rows='1'></textarea>",
+    "        <button class='pg-send' type='submit'>ارسال</button>",
+    "      </div>",
     "    </form>",
     "  </section>",
     "  <button class='pg-button' type='button' aria-label='باز کردن چت'>",
@@ -122,6 +146,9 @@
   var form = shadow.querySelector(".pg-form");
   var input = shadow.querySelector(".pg-input");
   var sendButton = shadow.querySelector(".pg-send");
+  var fileButton = shadow.querySelector(".pg-file-button");
+  var fileInput = shadow.querySelector(".pg-file-input");
+  var pendingList = shadow.querySelector(".pg-pending");
 
   title.textContent = config.title;
   subtitle.textContent = config.subtitle;
@@ -139,6 +166,15 @@
     input.focus();
   });
   form.addEventListener("submit", onSubmit);
+  input.addEventListener("keydown", onInputKeydown);
+  input.addEventListener("input", function () {
+    autoSizeInput();
+    renderButtonState();
+  });
+  fileButton.addEventListener("click", function () {
+    if (!state.loading && !state.phoneStep) fileInput.click();
+  });
+  fileInput.addEventListener("change", onFilesSelected);
 
   render();
   if (config.autoOpen || config.mode === "inline") input.focus();
@@ -189,6 +225,7 @@
   function defaultState() {
     return {
       messages: [{ role: "assistant", content: WELCOME }],
+      attachments: [],
       phoneStep: false,
       loading: false,
       error: "",
@@ -201,6 +238,7 @@
       if (parsed && Array.isArray(parsed.messages) && typeof parsed.phoneStep === "boolean") {
         return {
           messages: parsed.messages.filter(isMessage),
+          attachments: Array.isArray(parsed.attachments) ? parsed.attachments.filter(isAttachment) : [],
           phoneStep: parsed.phoneStep,
           loading: false,
           error: "",
@@ -213,14 +251,28 @@
   }
 
   function isMessage(message) {
-    return message && (message.role === "user" || message.role === "assistant") && typeof message.content === "string";
+    return (
+      message &&
+      (message.role === "user" || message.role === "assistant") &&
+      typeof message.content === "string" &&
+      (!message.attachments || Array.isArray(message.attachments))
+    );
+  }
+
+  function isAttachment(attachment) {
+    return (
+      attachment &&
+      typeof attachment.name === "string" &&
+      typeof attachment.url === "string" &&
+      (typeof attachment.size === "number" || typeof attachment.size === "undefined" || attachment.size === null)
+    );
   }
 
   function saveState() {
     try {
       window.localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ messages: state.messages, phoneStep: state.phoneStep })
+        JSON.stringify({ messages: state.messages, attachments: state.attachments || [], phoneStep: state.phoneStep })
       );
     } catch (error) {
       // Storage can be unavailable in restricted embeds; the chat still works for the current page.
@@ -241,10 +293,13 @@
   async function onSubmit(event) {
     event.preventDefault();
     var text = input.value.trim();
-    if (!text || state.loading) return;
+    var attachments = (state.attachments || []).slice();
+    if ((!text && !attachments.length) || state.loading) return;
 
-    state.messages.push({ role: "user", content: text });
+    state.messages.push({ role: "user", content: text, attachments: attachments });
+    state.attachments = [];
     input.value = "";
+    autoSizeInput();
     state.error = "";
     render();
 
@@ -257,7 +312,7 @@
     render();
 
     try {
-      var reply = await sendChat(state.messages.slice(1).slice(-10));
+      var reply = await sendChat(state.messages.slice(1).slice(-10), attachments);
       var lead = parseLead(reply);
       if (lead) {
         var clientReply = lead.client_message || "پیشنهاد اولیه پروژه آماده شد.";
@@ -270,17 +325,70 @@
       saveState();
     } catch (error) {
       state.error = error.message || "خطا در ارتباط با سرور";
+      state.attachments = attachments.concat(state.attachments || []);
     } finally {
       state.loading = false;
       render();
     }
   }
 
-  async function sendChat(messages) {
+  function onInputKeydown(event) {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      form.requestSubmit();
+    }
+  }
+
+  function autoSizeInput() {
+    input.style.height = "auto";
+    input.style.height = Math.min(input.scrollHeight, 130) + "px";
+  }
+
+  async function onFilesSelected(event) {
+    var files = Array.prototype.slice.call(event.target.files || []);
+    event.target.value = "";
+    if (!files.length || state.loading || state.phoneStep) return;
+
+    state.loading = true;
+    state.error = "";
+    render();
+
+    try {
+      var uploaded = [];
+      for (var index = 0; index < files.length; index += 1) {
+        uploaded.push(await uploadFile(files[index]));
+      }
+      state.attachments = (state.attachments || []).concat(uploaded);
+      saveState();
+    } catch (error) {
+      state.error = error.message || "خطا در آپلود فایل";
+    } finally {
+      state.loading = false;
+      render();
+    }
+  }
+
+  async function uploadFile(file) {
+    var formData = new FormData();
+    formData.append("file", file);
+    var response = await fetch(joinUrl(config.apiUrl, "/api/chat/files"), {
+      method: "POST",
+      body: formData,
+    });
+    if (!response.ok) throw new Error(await readError(response, "خطا در آپلود فایل"));
+    return response.json();
+  }
+
+  async function sendChat(messages, attachments) {
     var response = await fetch(joinUrl(config.apiUrl, "/api/chat"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages: messages }),
+      body: JSON.stringify({
+        messages: messages.map(function (message) {
+          return { role: message.role, content: message.content };
+        }),
+        attachments: attachments || [],
+      }),
     });
     if (!response.ok) throw new Error(await readError(response, "خطا در ارتباط با سرور"));
     var data = await response.json();
@@ -347,6 +455,7 @@
       version: 1,
       proposal: proposal,
       chatHistory: state.messages.filter(isMessage).slice(-20),
+      attachments: collectMessageAttachments(state.messages),
     };
   }
 
@@ -405,7 +514,8 @@
       var bubble = document.createElement("div");
       row.className = "pg-msg-row " + message.role;
       bubble.className = "pg-msg " + message.role;
-      bubble.textContent = message.content;
+      renderAttachments(bubble, message.attachments || []);
+      if (message.content) bubble.appendChild(document.createTextNode(message.content));
       row.appendChild(bubble);
       body.appendChild(row);
     });
@@ -427,13 +537,111 @@
       body.appendChild(error);
     }
 
+    renderPendingAttachments();
     input.placeholder = state.phoneStep ? "09xxxxxxxxx" : "پیام خود را بنویسید...";
-    input.type = state.phoneStep ? "tel" : "text";
+    input.inputMode = state.phoneStep ? "tel" : "text";
     input.dir = state.phoneStep ? "ltr" : "rtl";
     input.disabled = state.loading;
-    sendButton.disabled = state.loading;
+    fileButton.disabled = state.loading || state.phoneStep;
+    renderButtonState();
     panel.setAttribute("aria-busy", String(state.loading));
+    autoSizeInput();
     body.scrollTop = body.scrollHeight;
+  }
+
+  function renderButtonState() {
+    sendButton.disabled = state.loading || (!input.value.trim() && !(state.attachments || []).length);
+  }
+
+  function renderAttachments(container, attachments) {
+    if (!attachments.length) return;
+    var list = document.createElement("div");
+    list.className = "pg-attachments";
+    attachments.forEach(function (attachment) {
+      var link = document.createElement("a");
+      link.className = "pg-attachment";
+      link.href = attachmentHref(attachment);
+      link.target = "_blank";
+      link.rel = "noreferrer";
+      if (isImageAttachment(attachment)) {
+        var img = document.createElement("img");
+        img.src = attachmentHref(attachment);
+        img.alt = attachment.name;
+        link.appendChild(img);
+      } else {
+        var icon = document.createElement("span");
+        icon.className = "pg-file-icon";
+        icon.textContent = "F";
+        link.appendChild(icon);
+      }
+      var meta = document.createElement("span");
+      meta.className = "pg-file-meta";
+      var name = document.createElement("span");
+      name.className = "pg-file-name";
+      name.textContent = attachment.name;
+      var size = document.createElement("span");
+      size.className = "pg-file-size";
+      size.textContent = formatFileSize(attachment.size);
+      meta.appendChild(name);
+      meta.appendChild(size);
+      link.appendChild(meta);
+      list.appendChild(link);
+    });
+    container.appendChild(list);
+  }
+
+  function renderPendingAttachments() {
+    pendingList.innerHTML = "";
+    (state.attachments || []).forEach(function (attachment, index) {
+      var item = document.createElement("div");
+      item.className = "pg-pending-item";
+      if (isImageAttachment(attachment)) {
+        var img = document.createElement("img");
+        img.src = attachmentHref(attachment);
+        img.alt = attachment.name;
+        item.appendChild(img);
+      } else {
+        var file = document.createElement("span");
+        file.className = "pg-pending-file";
+        file.textContent = attachment.name;
+        item.appendChild(file);
+      }
+      var remove = document.createElement("button");
+      remove.className = "pg-remove";
+      remove.type = "button";
+      remove.textContent = "×";
+      remove.setAttribute("aria-label", "حذف فایل");
+      remove.addEventListener("click", function () {
+        state.attachments.splice(index, 1);
+        saveState();
+        render();
+      });
+      item.appendChild(remove);
+      pendingList.appendChild(item);
+    });
+  }
+
+  function collectMessageAttachments(messages) {
+    return messages.reduce(function (files, message) {
+      return files.concat(Array.isArray(message.attachments) ? message.attachments.filter(isAttachment) : []);
+    }, []);
+  }
+
+  function isImageAttachment(attachment) {
+    return String(attachment.content_type || "").indexOf("image/") === 0;
+  }
+
+  function attachmentHref(attachment) {
+    var url = attachment.url || "";
+    if (/^https?:\/\//i.test(url) || /^data:/i.test(url)) return url;
+    return joinUrl(config.apiUrl, url.charAt(0) === "/" ? url : "/" + url);
+  }
+
+  function formatFileSize(size) {
+    if (!size) return "فایل";
+    if (size < 1024) return size + " B";
+    if (size < 1024 * 1024) return Math.round(size / 1024) + " KB";
+    return (size / (1024 * 1024)).toFixed(1) + " MB";
   }
 
   function joinUrl(base, path) {
