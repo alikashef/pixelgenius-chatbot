@@ -13,7 +13,7 @@ PRIMARY_URL = "https://api.gapgpt.app/v1"
 FALLBACK_URL = "https://api.gapapi.com/v1"
 DEFAULT_MODEL = "gapgpt-qwen-3.6"
 VISION_MODEL = "claude-opus-4-6"
-AI_TIMEOUT_SECONDS = 12.0
+AI_TIMEOUT_SECONDS = 4.0
 
 AVAILABLE_MODELS = [
     DEFAULT_MODEL,
@@ -43,6 +43,13 @@ def _base_urls() -> list[str]:
     urls = [url.strip().rstrip("/") for url in configured.split(",") if url.strip()]
     urls.extend([PRIMARY_URL, FALLBACK_URL])
     return list(dict.fromkeys(urls))
+
+
+def _request_timeout() -> float:
+    try:
+        return max(1.0, float(os.getenv("GAPGPT_TIMEOUT_SECONDS", AI_TIMEOUT_SECONDS)))
+    except ValueError:
+        return AI_TIMEOUT_SECONDS
 
 
 def _latest_user_text(messages: list[dict]) -> str:
@@ -102,7 +109,7 @@ async def analyze_lead(settings: dict, messages: list[dict]) -> str:
 
     for model in _model_order(selected_model, ai_messages):
         for base_url in _base_urls():
-            client = AsyncOpenAI(base_url=base_url, api_key=api_key, timeout=AI_TIMEOUT_SECONDS)
+            client = AsyncOpenAI(base_url=base_url, api_key=api_key, timeout=_request_timeout())
             try:
                 response = await client.chat.completions.create(
                     model=model,

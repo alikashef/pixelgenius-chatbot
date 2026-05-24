@@ -45,6 +45,8 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/freelance_intake
       GAPGPT_API_KEY: ${GAPGPT_API_KEY}
+      GAPGPT_BASE_URLS: ${GAPGPT_BASE_URLS:-}
+      GAPGPT_TIMEOUT_SECONDS: ${GAPGPT_TIMEOUT_SECONDS:-4}
       ZARINPAL_MERCHANT_ID: ${ZARINPAL_MERCHANT_ID}
       JWT_SECRET: ${JWT_SECRET}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
