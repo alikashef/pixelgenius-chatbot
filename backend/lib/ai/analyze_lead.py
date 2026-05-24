@@ -13,7 +13,7 @@ PRIMARY_URL = "https://api.gapgpt.app/v1"
 FALLBACK_URL = "https://api.gapapi.com/v1"
 DEFAULT_MODEL = "gapgpt-qwen-3.6"
 VISION_MODEL = "claude-opus-4-6"
-AI_TIMEOUT_SECONDS = 4.0
+AI_TIMEOUT_SECONDS = 3.0
 
 AVAILABLE_MODELS = [
     DEFAULT_MODEL,
@@ -30,12 +30,11 @@ def _has_image_content(messages: list[dict]) -> bool:
 
 
 def _model_order(selected_model: str, messages: list[dict]) -> list[str]:
-    models: list[str] = []
     if _has_image_content(messages):
-        models.append(VISION_MODEL)
-    models.append(selected_model)
-    models.append(DEFAULT_MODEL)
-    return list(dict.fromkeys(models))
+        return [VISION_MODEL]
+    if selected_model == VISION_MODEL:
+        return [DEFAULT_MODEL]
+    return [selected_model or DEFAULT_MODEL]
 
 
 def _base_urls() -> list[str]:
