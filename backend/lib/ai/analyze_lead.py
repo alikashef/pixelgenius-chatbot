@@ -13,6 +13,7 @@ PRIMARY_URL = "https://api.gapgpt.app/v1"
 FALLBACK_URL = "https://api.gapapi.com/v1"
 DEFAULT_MODEL = "gapgpt-qwen-3.6"
 VISION_MODEL = "claude-opus-4-6"
+AI_TIMEOUT_SECONDS = 12.0
 
 AVAILABLE_MODELS = [
     DEFAULT_MODEL,
@@ -37,10 +38,61 @@ def _model_order(selected_model: str, messages: list[dict]) -> list[str]:
     return list(dict.fromkeys(models))
 
 
+def _base_urls() -> list[str]:
+    configured = os.getenv("GAPGPT_BASE_URLS") or os.getenv("GAPGPT_BASE_URL") or ""
+    urls = [url.strip().rstrip("/") for url in configured.split(",") if url.strip()]
+    urls.extend([PRIMARY_URL, FALLBACK_URL])
+    return list(dict.fromkeys(urls))
+
+
+def _latest_user_text(messages: list[dict]) -> str:
+    for message in reversed(messages):
+        if message.get("role") != "user":
+            continue
+        content = message.get("content")
+        if isinstance(content, str):
+            return content.strip()
+        if isinstance(content, list):
+            text_parts = [
+                str(part.get("text", "")).strip()
+                for part in content
+                if isinstance(part, dict) and part.get("type") == "text"
+            ]
+            return "\n".join(part for part in text_parts if part).strip()
+    return ""
+
+
+def _offline_reply(messages: list[dict]) -> str:
+    user_text = _latest_user_text(messages)
+    has_attachment = "کاربر همراه این پیام فایل فرستاده است" in user_text or "محتوای فایل" in user_text
+    attachment_note = (
+        "فایل پیوست را هم دریافت کردم و در ادامه گفتگو بر اساس همان بررسی می‌کنم.\n\n"
+        if has_attachment
+        else ""
+    )
+
+    if not user_text:
+        return (
+            "سلام، من آماده‌ام نیاز پروژه‌تون رو جمع‌بندی کنم.\n"
+            "برای شروع بفرمایید چه نوع سایت یا اپلیکیشنی می‌خواهید و هدف اصلی پروژه چیست؟"
+        )
+
+    return (
+        f"{attachment_note}"
+        "پیامتون رو گرفتم. برای اینکه سریع‌تر به جمع‌بندی درست برسیم، لطفا این چند مورد کلیدی رو بفرمایید:\n\n"
+        "1. نوع پروژه دقیقاً چیه؟ مثلا لندینگ، فروشگاه، پنل، سایت شرکتی یا بک‌اند/API.\n"
+        "2. مهم‌ترین خروجی‌ای که از پروژه می‌خواهید چیه؟\n"
+        "3. حدود بودجه و زمان مدنظرتون چقدره؟\n"
+        "4. اگر نمونه سایت یا فایل توضیحات دارید، همین‌جا بفرستید.\n\n"
+        "بعد از این اطلاعات، می‌تونم محدوده قیمت، زمان و مسیر پیشنهادی رو جمع‌بندی کنم."
+    )
+
+
 async def analyze_lead(settings: dict, messages: list[dict]) -> str:
     api_key = os.getenv("GAPGPT_API_KEY", "")
     if not api_key:
-        raise HTTPException(status_code=500, detail="GAPGPT_API_KEY not configured")
+        logger.error("GAPGPT_API_KEY not configured; using offline chat fallback")
+        return _offline_reply(messages)
 
     selected_model = settings.get("ai_model", DEFAULT_MODEL)
     if selected_model not in AVAILABLE_MODELS:
@@ -49,8 +101,8 @@ async def analyze_lead(settings: dict, messages: list[dict]) -> str:
     ai_messages = build_messages(settings, messages)
 
     for model in _model_order(selected_model, ai_messages):
-        for base_url in (PRIMARY_URL, FALLBACK_URL):
-            client = AsyncOpenAI(base_url=base_url, api_key=api_key)
+        for base_url in _base_urls():
+            client = AsyncOpenAI(base_url=base_url, api_key=api_key, timeout=AI_TIMEOUT_SECONDS)
             try:
                 response = await client.chat.completions.create(
                     model=model,
@@ -67,4 +119,5 @@ async def analyze_lead(settings: dict, messages: list[dict]) -> str:
                 logger.error("Unexpected AI error for %s using %s: %s", base_url, model, e, exc_info=True)
                 continue
 
-    raise HTTPException(status_code=503, detail="سرویس هوش مصنوعی در دسترس نیست")
+    logger.error("All AI providers failed; using offline chat fallback")
+    return _offline_reply(messages)
