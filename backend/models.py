@@ -1,7 +1,7 @@
 import uuid
 import enum
 from datetime import datetime, timezone
-from sqlalchemy import String, Text, Integer, Enum, DateTime, JSON, ForeignKey
+from sqlalchemy import String, Text, Integer, Enum, DateTime, JSON, ForeignKey, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from database import Base
 
@@ -28,6 +28,45 @@ class Customer(Base):
     orders: Mapped[list["Order"]] = relationship("Order", back_populates="customer")
 
 
+class Freelancer(Base):
+    __tablename__ = "freelancers"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    email: Mapped[str] = mapped_column(String(120), unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String(255))
+    name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    position: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    services: Mapped[str | None] = mapped_column(Text, nullable=True)
+    price_range: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    timeline: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    bot_token: Mapped[str] = mapped_column(String(36), unique=True, index=True, default=lambda: str(uuid.uuid4()))
+    onboarding_completed: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    orders: Mapped[list["Order"]] = relationship("Order", back_populates="freelancer")
+
+
+class ChatSession(Base):
+    __tablename__ = "chat_sessions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    phone: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
+    messages: Mapped[list] = mapped_column(JSON, default=list)
+    converted: Mapped[bool] = mapped_column(Boolean, default=False)
+    order_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    freelancer_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("freelancers.id"), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+
 class AIConfig(Base):
     __tablename__ = "ai_configs"
 
@@ -46,6 +85,8 @@ class Order(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     customer_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("customers.id"), nullable=True)
     customer: Mapped["Customer | None"] = relationship("Customer", back_populates="orders")
+    freelancer_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("freelancers.id"), nullable=True, index=True)
+    freelancer: Mapped["Freelancer | None"] = relationship("Freelancer", back_populates="orders")
 
     project_name: Mapped[str] = mapped_column(String(255))
     summary: Mapped[str] = mapped_column(Text)
@@ -63,6 +104,9 @@ class Order(Base):
     payment_amount: Mapped[int | None] = mapped_column(Integer, nullable=True)
     proposal_file: Mapped[str | None] = mapped_column(String(500), nullable=True)
     admin_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    ai_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    milestones: Mapped[list] = mapped_column(JSON, default=list)
 
     status: Mapped[OrderStatus] = mapped_column(Enum(OrderStatus), default=OrderStatus.pending_review)
     zarinpal_authority: Mapped[str | None] = mapped_column(String(100), nullable=True)

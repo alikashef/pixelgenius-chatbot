@@ -17,9 +17,14 @@ class ChatAttachmentIn(BaseModel):
     content_type: Optional[str] = None
 
 
+class ChatSessionCreateIn(BaseModel):
+    bot_token: Optional[str] = None
+
+
 class ChatRequest(BaseModel):
     messages: list[MessageIn]
     attachments: list[ChatAttachmentIn] = Field(default_factory=list)
+    bot_token: Optional[str] = None
 
 
 class ChatResponse(BaseModel):
@@ -105,12 +110,19 @@ class OrderCreateIn(BaseModel):
     price_estimate: int
     price_label: str
     order_files: list[OrderFileOut] = Field(default_factory=list)
+    session_id: Optional[str] = None
+
+
+class MilestoneIn(BaseModel):
+    title: str
+    amount: int
 
 
 class AdminApproveIn(BaseModel):
     final_price: int
     payment_percentage: int
     admin_note: Optional[str] = None
+    milestones: list[MilestoneIn] = []
 
 
 class OrderOut(BaseModel):
@@ -130,6 +142,9 @@ class OrderOut(BaseModel):
     payment_amount: Optional[int] = None
     proposal_file: Optional[str] = None
     admin_note: Optional[str] = None
+    ai_summary: Optional[str] = None
+    milestones: list = []
+    freelancer_id: Optional[str] = None
     status: OrderStatus
     zarinpal_authority: Optional[str] = None
     paid_at: Optional[datetime] = None
@@ -172,3 +187,46 @@ class LoginRequest(BaseModel):
 class TokenOut(BaseModel):
     access_token: str
     token_type: str
+
+
+# ── Freelancer Auth ───────────────────────────────────────────────────────────
+class FreelancerRegisterIn(BaseModel):
+    email: str
+    password: str
+    name: Optional[str] = None
+
+
+class FreelancerLoginIn(BaseModel):
+    email: str
+    password: str
+
+
+class FreelancerTokenOut(BaseModel):
+    access_token: str
+    token_type: str
+    freelancer_id: str
+    name: Optional[str] = None
+    onboarding_completed: bool
+    bot_token: str
+
+
+# ── Freelancer Onboarding ─────────────────────────────────────────────────────
+class FreelancerOnboardingIn(BaseModel):
+    name: str
+    position: str
+    services: str
+    price_range: str
+    timeline: str
+    note: Optional[str] = None
+
+
+# ── Chat Session ──────────────────────────────────────────────────────────────
+class ChatSessionCreateOut(BaseModel):
+    id: str
+
+
+class ChatSessionUpdateIn(BaseModel):
+    messages: list[MessageIn]
+    phone: Optional[str] = None
+    converted: Optional[bool] = None
+    order_id: Optional[str] = None

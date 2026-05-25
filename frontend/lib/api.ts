@@ -54,6 +54,8 @@ export interface Order {
   payment_amount: number | null;
   proposal_file: string | null;
   admin_note: string | null;
+  ai_summary: string | null;
+  milestones: { id: string; title: string; amount: number; status: "pending" | "paid" }[];
   status: "pending_review" | "approved" | "awaiting_payment" | "paid" | "cancelled";
   paid_at: string | null;
   created_at: string;
@@ -77,12 +79,69 @@ export interface CustomerProfile {
   business_type: string | null;
 }
 
+export interface FreelancerSession {
+  access_token: string;
+  freelancer_id: string;
+  name: string | null;
+  onboarding_completed: boolean;
+  bot_token: string;
+}
+
 // ── Chat ─────────────────────────────────────────────────────────────────────
-export async function sendChat(messages: Message[], attachments: OrderFile[] = []): Promise<string> {
+export async function createChatSession(botToken?: string): Promise<string> {
+  const res = await fetch(`${API_URL}/api/chat/session`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ bot_token: botToken || null }),
+  });
+  if (!res.ok) throw new Error("خطا در ساخت session");
+  const data = await res.json();
+  return data.id;
+}
+
+export async function updateChatSession(
+  sessionId: string,
+  messages: Message[],
+  opts: { phone?: string; converted?: boolean; orderId?: string } = {}
+): Promise<void> {
+  await fetch(`${API_URL}/api/chat/session/${sessionId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      messages: messages.map(({ role, content }) => ({ role, content })),
+      phone: opts.phone,
+      converted: opts.converted,
+      order_id: opts.orderId,
+    }),
+  });
+}
+
+export async function freelancerRegister(email: string, password: string, name?: string): Promise<FreelancerSession> {
+  const res = await fetch(`${API_URL}/api/freelancer/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password, name }),
+  });
+  if (res.status === 409) throw new Error("این ایمیل قبلاً ثبت شده");
+  if (!res.ok) throw new Error("خطا در ثبت‌نام");
+  return res.json();
+}
+
+export async function freelancerLogin(email: string, password: string): Promise<FreelancerSession> {
+  const res = await fetch(`${API_URL}/api/freelancer/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) throw new Error("ایمیل یا رمز اشتباه است");
+  return res.json();
+}
+
+export async function sendChat(messages: Message[], attachments: OrderFile[] = [], botToken?: string): Promise<string> {
   const res = await fetch(`${API_URL}/api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages, attachments }),
+    body: JSON.stringify({ messages, attachments, bot_token: botToken || null }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -143,7 +202,7 @@ export async function updateCustomerProfile(
   return res.json();
 }
 
-export async function submitOrder(token: string, proposal: Proposal, chatHistory: Message[], orderFiles: OrderFile[] = []): Promise<Order> {
+export async function submitOrder(token: string, proposal: Proposal, chatHistory: Message[], orderFiles: OrderFile[] = [], sessionId?: string): Promise<Order> {
   const res = await fetch(`${API_URL}/api/customer/orders`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -157,6 +216,7 @@ export async function submitOrder(token: string, proposal: Proposal, chatHistory
       price_estimate: proposal.price,
       price_label: proposal.priceLabel,
       order_files: orderFiles,
+      session_id: sessionId || null,
     }),
   });
   if (!res.ok) throw new Error("خطا در ثبت درخواست");
@@ -252,14 +312,51 @@ export async function approveOrder(
   orderId: string,
   finalPrice: number,
   paymentPercentage: number,
-  adminNote?: string
+  adminNote?: string,
+  milestones: { title: string; amount: number }[] = []
 ) {
   const res = await fetch(`${API_URL}/api/orders/${orderId}/approve`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ final_price: finalPrice, payment_percentage: paymentPercentage, admin_note: adminNote }),
+    body: JSON.stringify({ final_price: finalPrice, payment_percentage: paymentPercentage, admin_note: adminNote, milestones }),
   });
   if (!res.ok) throw new Error("خطا در تایید سفارش");
+  return res.json();
+}
+
+export interface FreelancerOnboardingData {
+  name: string;
+  position: string;
+  services: string;
+  price_range: string;
+  timeline: string;
+  note?: string;
+}
+
+export async function fetchFreelancerOrders(token: string): Promise<Order[]> {
+  const res = await fetch(`${API_URL}/api/freelancer/orders`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (res.status === 401 || res.status === 403) throw new Error("UNAUTHORIZED");
+  if (!res.ok) throw new Error("خطا در دریافت سفارشات");
+  return res.json();
+}
+
+export async function fetchFreelancerSettings(token: string): Promise<FreelancerOnboardingData> {
+  const res = await fetch(`${API_URL}/api/freelancer/settings`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("خطا در دریافت اطلاعات");
+  return res.json();
+}
+
+export async function freelancerOnboarding(token: string, data: FreelancerOnboardingData): Promise<FreelancerSession> {
+  const res = await fetch(`${API_URL}/api/freelancer/onboarding`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error("خطا در ذخیره اطلاعات");
   return res.json();
 }
 
@@ -272,6 +369,16 @@ export async function uploadProposal(token: string, orderId: string, file: File)
     body: form,
   });
   if (!res.ok) throw new Error("خطا در آپلود فایل");
+  return res.json();
+}
+
+export async function summarizeOrder(token: string, orderId: string): Promise<Order> {
+  const res = await fetch(`${API_URL}/api/orders/${orderId}/summarize`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (res.status === 401 || res.status === 403) throw new Error("UNAUTHORIZED");
+  if (!res.ok) throw new Error("خطا در تولید خلاصه");
   return res.json();
 }
 

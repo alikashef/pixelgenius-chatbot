@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { IconArrowUp, IconPaperclip, IconPlus, IconSparkles, IconUser, IconX } from "@tabler/icons-react";
 import ChatBubble from "@/components/ChatBubble";
-import { sendChat, sendOtp, submitOrder, uploadChatFile, Message, Proposal, LeadAnalysis, OrderFile } from "@/lib/api";
+import { sendChat, sendOtp, submitOrder, uploadChatFile, createChatSession, updateChatSession, Message, Proposal, LeadAnalysis, OrderFile } from "@/lib/api";
 
 const WELCOME: Message = {
   role: "assistant",
@@ -187,6 +187,8 @@ function ChatPageInner() {
   const [customerName, setCustomerName] = useState("");
   const [chatKey, setChatKey] = useState(ANON_CHAT_KEY);
   const [sessionId, setSessionId] = useState("");
+  const [dbSessionId, setDbSessionId] = useState<string | null>(null);
+  const [botToken, setBotToken] = useState<string | undefined>();
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -207,6 +209,8 @@ function ChatPageInner() {
     const firstName = localStorage.getItem("customer_first_name") || "";
     const requestedSessionId = searchParams.get("session");
     const forceNew = searchParams.get("new") === "1";
+    const bot = searchParams.get("bot") || undefined;
+    if (bot) setBotToken(bot);
     const nextChatKey = token && currentCustomerId ? getCustomerChatKey(currentCustomerId) : ANON_CHAT_KEY;
     const customerDraft = readDraft(nextChatKey);
     const anonymousDraft = readDraft(ANON_CHAT_KEY);
@@ -330,16 +334,29 @@ function ChatPageInner() {
     setError("");
 
     try {
+      let currentDbSession = dbSessionId;
+      if (!currentDbSession) {
+        try { currentDbSession = await createChatSession(botToken); setDbSessionId(currentDbSession); } catch { /* silent */ }
+      }
+
       const apiMessages = newMessages.slice(1);
-      const reply = await sendChat(apiMessages, currentAttachments);
+      const reply = await sendChat(apiMessages, currentAttachments, botToken);
       const lead = parseLeadAnalysis(reply);
+      const allMessages = lead
+        ? [...newMessages, { role: "assistant" as const, content: lead.client_message || "" }]
+        : [...newMessages, { role: "assistant" as const, content: reply }];
+
+      if (currentDbSession) {
+        updateChatSession(currentDbSession, allMessages).catch(() => {});
+      }
 
       if (lead) {
         const proposal = leadToProposal(lead);
         const clientReply = lead.client_message || "پیشنهاد اولیه پروژه آماده شد.";
         const orderFiles = collectMessageAttachments(newMessages);
         if (customerToken) {
-          const order = await submitOrder(customerToken, proposal, newMessages, orderFiles);
+          const order = await submitOrder(customerToken, proposal, newMessages, orderFiles, currentDbSession || undefined);
+          if (currentDbSession) updateChatSession(currentDbSession, allMessages, { converted: true, orderId: order.id }).catch(() => {});
           localStorage.removeItem("proposal");
           localStorage.removeItem(chatKey);
           if (customerId && sessionId) {

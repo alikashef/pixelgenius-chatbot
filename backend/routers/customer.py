@@ -1,3 +1,5 @@
+import asyncio
+import os
 import shutil
 import uuid
 from datetime import datetime, timezone
@@ -8,9 +10,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from database import get_db
-from models import Customer, Order
+from models import Customer, Order, ChatSession
 from schemas import CustomerProfileOut, CustomerProfileUpdateIn, OrderCreateIn, OrderOut
 from auth import get_current_customer
+from sms import send_notification
+
+FREELANCER_PHONE = os.getenv("FREELANCER_PHONE", "")
 
 router = APIRouter()
 UPLOAD_DIR = Path("/app/uploads/order-files")
@@ -52,8 +57,15 @@ async def create_order(
     db: AsyncSession = Depends(get_db),
     payload: dict = Depends(get_current_customer),
 ):
+    freelancer_id = None
+    if body.session_id:
+        session = await db.get(ChatSession, body.session_id)
+        if session and session.freelancer_id:
+            freelancer_id = session.freelancer_id
+
     order = Order(
         customer_id=payload["sub"],
+        freelancer_id=freelancer_id,
         project_name=body.project_name,
         summary=body.summary,
         chat_history=[{"role": message.role, "content": message.content} for message in body.chat_history],
@@ -67,6 +79,12 @@ async def create_order(
     db.add(order)
     await db.commit()
     await db.refresh(order)
+
+    if FREELANCER_PHONE:
+        asyncio.create_task(
+            send_notification(FREELANCER_PHONE, order.project_name)
+        )
+
     return order
 
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { approveOrder, fetchOrder, Order, uploadAdminOrderFile, uploadProposal } from "@/lib/api";
+import { approveOrder, fetchOrder, Order, summarizeOrder, uploadAdminOrderFile, uploadProposal } from "@/lib/api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -36,8 +36,10 @@ export default function AdminOrderPage() {
   const [finalPrice, setFinalPrice] = useState("");
   const [payPercent, setPayPercent] = useState("50");
   const [adminNote, setAdminNote] = useState("");
+  const [milestones, setMilestones] = useState<{ title: string; amount: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [summarizing, setSummarizing] = useState(false);
   const [uploading, setUploading] = useState("");
   const [error, setError] = useState("");
 
@@ -54,6 +56,9 @@ export default function AdminOrderPage() {
         setFinalPrice(data.final_price?.toString() || "");
         setPayPercent(data.payment_percentage?.toString() || "50");
         setAdminNote(data.admin_note || "");
+        if (data.milestones?.length) {
+          setMilestones(data.milestones.map((m: { title: string; amount: number }) => ({ title: m.title, amount: m.amount.toString() })));
+        }
       })
       .catch((err) => {
         if (err.message === "UNAUTHORIZED") {
@@ -71,7 +76,13 @@ export default function AdminOrderPage() {
     setSaving(true);
     setError("");
     try {
-      const updated = await approveOrder(getToken(), order.id, parseInt(finalPrice), parseInt(payPercent), adminNote || undefined);
+      const parsedMilestones = milestones
+        .filter((m) => m.title.trim() && m.amount)
+        .map((m) => ({ title: m.title.trim(), amount: parseInt(m.amount) }));
+      const updated = await approveOrder(
+        getToken(), order.id, parseInt(finalPrice), parseInt(payPercent),
+        adminNote || undefined, parsedMilestones
+      );
       setOrder(updated);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "خطا در ثبت");
@@ -90,6 +101,19 @@ export default function AdminOrderPage() {
       setError(err instanceof Error ? err.message : "خطا در آپلود پروپوزال");
     } finally {
       setUploading("");
+    }
+  }
+
+  async function handleSummarize() {
+    if (!order) return;
+    setSummarizing(true);
+    setError("");
+    try {
+      setOrder(await summarizeOrder(getToken(), order.id));
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "خطا در تولید خلاصه");
+    } finally {
+      setSummarizing(false);
     }
   }
 
@@ -132,7 +156,22 @@ export default function AdminOrderPage() {
           </div>
 
           <div className="rounded-2xl border border-[hsl(var(--border))] bg-[--surface] p-5">
-            <p className="mb-3 font-semibold text-white">تاریخچه چت</p>
+            <div className="mb-3 flex items-center justify-between">
+              <p className="font-semibold text-white">تاریخچه چت</p>
+              <button
+                onClick={handleSummarize}
+                disabled={summarizing}
+                className="flex items-center gap-1.5 rounded-xl border border-[--violet-border] bg-[--violet-glow] px-3 py-1.5 text-xs font-semibold text-violet-300 transition-colors hover:text-white disabled:opacity-50"
+              >
+                {summarizing ? "در حال تحلیل..." : "خلاصه AI"}
+              </button>
+            </div>
+            {order.ai_summary && (
+              <div className="mb-4 rounded-xl border border-[--violet-border] bg-[--violet-glow] px-4 py-3 text-sm leading-7 text-violet-100">
+                <p className="mb-1 text-xs text-violet-400">خلاصه هوش مصنوعی</p>
+                <p className="whitespace-pre-wrap">{order.ai_summary}</p>
+              </div>
+            )}
             <div className="space-y-3">
               {(order.chat_history || []).map((message, index) => (
                 <div key={`${message.role}-${index}`} className={`rounded-xl border px-4 py-3 text-sm leading-7 ${message.role === "user" ? "border-[--violet-border] bg-[--violet-glow] text-white" : "border-[hsl(var(--border))] bg-[hsl(var(--background))] text-[hsl(var(--secondary-foreground))]"}`}>
@@ -171,6 +210,58 @@ export default function AdminOrderPage() {
               <input value={finalPrice} onChange={(e) => setFinalPrice(e.target.value)} type="number" placeholder="قیمت نهایی (ریال)" className="admin-input" />
               <input value={payPercent} onChange={(e) => setPayPercent(e.target.value)} type="number" min={10} max={100} placeholder="درصد پیش‌پرداخت" className="admin-input" />
               {payAmount && <p className="rounded-xl border border-[--violet-border] bg-[--violet-glow] px-4 py-3 text-sm text-violet-200">مبلغ قابل پرداخت: {payAmount.toLocaleString("fa-IR")} ریال</p>}
+
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-xs text-[hsl(var(--muted-foreground))]">مایلستون‌ها</p>
+                  <button
+                    type="button"
+                    onClick={() => setMilestones((prev) => [...prev, { title: "", amount: "" }])}
+                    className="text-xs text-violet-400 hover:text-white"
+                  >
+                    + اضافه کردن
+                  </button>
+                </div>
+                {milestones.length > 0 && (
+                  <div className="space-y-2">
+                    {milestones.map((m, i) => (
+                      <div key={i} className="flex gap-2">
+                        <input
+                          value={m.title}
+                          onChange={(e) => setMilestones((prev) => prev.map((x, j) => j === i ? { ...x, title: e.target.value } : x))}
+                          placeholder="عنوان مرحله"
+                          className="admin-input flex-1"
+                        />
+                        <input
+                          value={m.amount}
+                          onChange={(e) => setMilestones((prev) => prev.map((x, j) => j === i ? { ...x, amount: e.target.value } : x))}
+                          type="number"
+                          placeholder="مبلغ (ریال)"
+                          className="admin-input w-32"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setMilestones((prev) => prev.filter((_, j) => j !== i))}
+                          className="text-red-400 hover:text-red-300 text-lg leading-none"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                    {(() => {
+                      const total = milestones.reduce((sum, m) => sum + (parseInt(m.amount) || 0), 0);
+                      const fp = parseInt(finalPrice) || 0;
+                      return total > 0 && (
+                        <p className={`text-xs ${total === fp ? "text-emerald-400" : "text-orange-400"}`}>
+                          جمع مایلستون‌ها: {total.toLocaleString("fa-IR")} ریال
+                          {total !== fp && fp > 0 && ` (تفاوت: ${(fp - total).toLocaleString("fa-IR")} ریال)`}
+                        </p>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+
               <textarea value={adminNote} onChange={(e) => setAdminNote(e.target.value)} rows={3} placeholder="یادداشت برای مشتری" className="admin-textarea" />
               {error && <p className="text-sm text-red-400">{error}</p>}
               <button onClick={handleApprove} disabled={saving || !finalPrice} className="w-full rounded-xl bg-[--violet] py-3 text-sm font-bold text-white transition-colors hover:bg-violet-700 disabled:opacity-50">{saving ? "در حال ثبت..." : "تایید و ارسال به مشتری"}</button>
