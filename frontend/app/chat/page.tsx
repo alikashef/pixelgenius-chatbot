@@ -570,9 +570,13 @@ function ChatPageInner() {
     try {
       const cached = localStorage.getItem(`project_brief_${orderId}`);
       if (cached) {
-        setBrief(JSON.parse(cached));
-        setBriefState("ready");
-        return;
+        const data = JSON.parse(cached);
+        if (data?.version === 1 && data.project && data.deploy) {
+          setBrief(data);
+          setBriefState("ready");
+          return;
+        }
+        localStorage.removeItem(`project_brief_${orderId}`);
       }
     } catch {
       // ignore unreadable cache
