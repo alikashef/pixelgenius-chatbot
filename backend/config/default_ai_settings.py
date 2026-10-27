@@ -16,6 +16,7 @@ DEFAULT_AI_SETTINGS = {
     ],
     "skills_enabled": True,
     "skills_top_k": 2,
+    "skills_brief_top_k": 3,
     "image_generation": {
         "enabled": True,
         "model": "gapgpt/qwen-image-2.1",

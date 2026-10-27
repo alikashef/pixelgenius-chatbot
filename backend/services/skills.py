@@ -23,6 +23,8 @@ CHUNK_CHARS = 1100
 CHUNK_OVERLAP = 150
 MAX_CONTEXT_CHARS = 6000
 DEFAULT_TOP_K = 2
+DEFAULT_BRIEF_TOP_K = 3
+BRIEF_SPEC_KEYS = ("project", "pages", "features", "tech", "user_roles", "data_models", "integrations", "design")
 EMBED_BATCH = 32
 
 _query_vectors: dict[str, list[float]] = {}
@@ -182,28 +184,13 @@ async def retrieve_skills(
         return ""
     top_k = int(settings.get("skills_top_k") or DEFAULT_TOP_K)
 
-    async with SessionLocal() as db:
-        rows = (
-            await db.execute(select(AISkill).where(AISkill.enabled.is_(True)).options(selectinload(AISkill.chunks)))
-        ).scalars().all()
+    rows = await _load_enabled()
     if not rows:
         return ""
 
     query_text = _normalize(" ".join(_user_texts(messages)[-6:]))
     query_tokens = _tokens(query_text)
-    query_vector = None
-    idea = _idea_text(messages)
-    if idea and api_key:
-        key = hashlib.sha1(_normalize(idea).encode()).hexdigest()
-        query_vector = _query_vectors.get(key)
-        if query_vector is None:
-            task = _pending.get(key)
-            if task is None:
-                task = asyncio.create_task(_fill_query_vector(key, idea, base_urls, api_key))
-                _pending[key] = task
-            if wait:
-                await asyncio.shield(task)
-                query_vector = _query_vectors.get(key)
+    query_vector = await _get_query_vector(messages, base_urls, api_key, wait)
 
     picked: dict[str, list[tuple[AISkill, AISkillChunk]]] = {}
     for category in CATEGORY_KEYS:
@@ -212,12 +199,104 @@ async def retrieve_skills(
             if skill.category != category:
                 continue
             for chunk in skill.chunks:
-                score = _keyword_score(query_text, query_tokens, skill, chunk)
-                if query_vector is not None and chunk.embedding:
-                    score += 10.0 * max(_cosine(query_vector, chunk.embedding) - 0.55, 0.0)
-                if category == "general" and chunk.position == 0:
-                    score += 1.0
-                scored.append((score, skill, chunk))
+                scored.append((_chunk_score(query_text, query_tokens, query_vector, skill, chunk), skill, chunk))
         scored.sort(key=lambda item: -item[0])
         picked[category] = [(s, c) for score, s, c in scored[:top_k] if score >= 1.0]
     return _format(picked)
+
+
+async def _load_enabled() -> list[AISkill]:
+    async with SessionLocal() as db:
+        return list(
+            (await db.execute(select(AISkill).where(AISkill.enabled.is_(True)).options(selectinload(AISkill.chunks))))
+            .scalars()
+            .all()
+        )
+
+
+async def _get_query_vector(messages: list[dict], base_urls: list[str], api_key: str, wait: bool) -> list[float] | None:
+    idea = _idea_text(messages)
+    if not idea or not api_key:
+        return None
+    key = hashlib.sha1(_normalize(idea).encode()).hexdigest()
+    vector = _query_vectors.get(key)
+    if vector is None:
+        task = _pending.get(key)
+        if task is None:
+            task = asyncio.create_task(_fill_query_vector(key, idea, base_urls, api_key))
+            _pending[key] = task
+        if wait:
+            await asyncio.shield(task)
+            vector = _query_vectors.get(key)
+    return vector
+
+
+def _chunk_score(query_text: str, query_tokens: set[str], query_vector, skill: AISkill, chunk: AISkillChunk) -> float:
+    score = _keyword_score(query_text, query_tokens, skill, chunk)
+    if query_vector is not None and chunk.embedding:
+        score += 10.0 * max(_cosine(query_vector, chunk.embedding) - 0.55, 0.0)
+    if skill.category == "general" and chunk.position == 0:
+        score += 1.0
+    return score
+
+
+_FRONTMATTER = re.compile(r"\A---\s*\n.*?\n---\s*\n", re.DOTALL)
+BRIEF_SKILL_CHARS = 14000
+BRIEF_TOTAL_CHARS = 70000
+
+
+def _skill_body(skill: AISkill) -> str:
+    body = _FRONTMATTER.sub("", skill.content).strip()
+    if len(body) <= BRIEF_SKILL_CHARS:
+        return body
+    cut = body.rfind("\n\n", 0, BRIEF_SKILL_CHARS)
+    return body[: cut if cut > BRIEF_SKILL_CHARS // 2 else BRIEF_SKILL_CHARS].rstrip() + "\n\n[...]"
+
+
+async def select_skills_for_brief(
+    settings: dict, history: list[dict], spec: dict, base_urls: list[str], api_key: str
+) -> list[dict]:
+    """Whole skills relevant to this project, ranked against the conversation and the generated spec.
+
+    The result is embedded in the brief so the building AI (ChatGPT, Claude, Cursor, Codex) can read the guidance.
+    """
+    if settings.get("skills_enabled", True) is False:
+        return []
+    top_k = int(settings.get("skills_brief_top_k") or DEFAULT_BRIEF_TOP_K)
+    rows = await _load_enabled()
+    if not rows:
+        return []
+
+    spec_text = json.dumps({k: spec.get(k) for k in BRIEF_SPEC_KEYS if spec.get(k)}, ensure_ascii=False)
+    query_text = _normalize(" ".join(_user_texts(history)) + " " + spec_text)
+    query_tokens = _tokens(query_text)
+    query_vector = await _get_query_vector(history, base_urls, api_key, wait=True)
+
+    selected: list[dict] = []
+    used = 0
+    for category in CATEGORY_KEYS:
+        ranked = sorted(
+            (
+                (max(_chunk_score(query_text, query_tokens, query_vector, skill, c) for c in skill.chunks), skill)
+                for skill in rows
+                if skill.category == category and skill.chunks
+            ),
+            key=lambda item: -item[0],
+        )
+        for score, skill in ranked[:top_k]:
+            if score < 1.0:
+                continue
+            body = _skill_body(skill)
+            if used + len(body) > BRIEF_TOTAL_CHARS:
+                continue
+            used += len(body)
+            selected.append(
+                {
+                    "category": category,
+                    "category_label": CATEGORY_LABELS[category],
+                    "title": skill.title,
+                    "source": skill.source_name or "admin",
+                    "guidance": body,
+                }
+            )
+    return selected

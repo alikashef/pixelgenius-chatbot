@@ -49,6 +49,7 @@ export default function SkillsManager({ getToken: getTokenProp, settings, onSett
 
   const skillsEnabled = settings.skills_enabled !== false;
   const topK = Number(settings.skills_top_k) || 2;
+  const briefTopK = Number(settings.skills_brief_top_k) || 3;
   const activeCategory = categories.find((c) => c.key === active);
 
   const run = useCallback(
@@ -171,6 +172,18 @@ export default function SkillsManager({ getToken: getTokenProp, settings, onSett
                 className="admin-input !w-16 !py-1.5"
               >
                 {[1, 2, 3, 4].map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+            </label>
+            <label className="flex items-center gap-2 text-xs text-[hsl(var(--muted-foreground))]">
+              مهارت در JSON هر دسته
+              <select
+                value={briefTopK}
+                onChange={(e) => saveGlobal({ skills_brief_top_k: Number(e.target.value) })}
+                className="admin-input !w-16 !py-1.5"
+              >
+                {[1, 2, 3, 4, 5].map((n) => (
                   <option key={n} value={n}>{n}</option>
                 ))}
               </select>

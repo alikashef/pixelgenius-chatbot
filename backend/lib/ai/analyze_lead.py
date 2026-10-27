@@ -8,7 +8,7 @@ from openai import APIConnectionError, APIStatusError, APITimeoutError, AsyncOpe
 
 from lib.ai.build_messages import build_messages
 from prompts.knowledge_base import retrieve_knowledge_async
-from services.skills import retrieve_skills
+from services.skills import retrieve_skills, select_skills_for_brief
 from services.images import fill_brief_images
 from prompts.stack_tiers import render_stack_tiers
 from lib.ai.parse_ai_response import parse_ai_response
@@ -200,16 +200,23 @@ BRIEF_INSTRUCTIONS = (
     "Never use placeholders like '...' or 'rest of the code'. Include seed data, `.env.example`, and a README with exact "
     "install and run commands. If the answer is too long, stop at a clean file boundary and continue when the user says 'continue'.\n"
     "5. For anything in `open_questions` or missing, choose a sensible default and list your assumptions at the end.\n"
-    "6. Images: `assets.images` lists AI-generated images, each with a `url`. Use those exact URLs for the matching spots "
+    "6. Skills: `skills` holds expert guidance (design, frontend, backend, database, architecture, AI/RAG, product) selected for THIS "
+    "project. Read every item before writing code and follow it as your engineering standard; if it conflicts with an explicit "
+    "value in `tech`, `pages` or `features`, the explicit value wins. Mention in your final notes which skills shaped which decisions.\n"
+    "7. Tools: if you have MCP tools or plugins for design systems/Figma, browsing and screenshots, documentation, or databases, use "
+    "them: look up current docs for the chosen stack, render the UI and check it visually (desktop and mobile, RTL) and fix what is off "
+    "before declaring it done.\n"
+    "8. Quality bar: professional, production-grade work: a consistent design system (tokens for color/type/spacing), accessible "
+    "semantics and contrast, responsive layouts, input validation, secure auth, error handling, indexes on queried columns, no dead "
+    "code or TODOs. Hashed passwords, CORS, no secrets in code, SEO basics and good performance.\n"
+    "9. Images: `assets.images` lists AI-generated images, each with a `url`. Use those exact URLs for the matching spots "
     "(use `id`/`purpose` to place them) instead of stock photos or placeholder services. If an entry has no `url`, use a neutral CSS gradient.\n"
-    "7. Deployment: if a tool named `deploy_project` from the FreelioAI server is available, finish by calling it with "
+    "10. Deployment: if a tool named `deploy_project` from the FreelioAI server is available, finish by calling it with "
     "`deploy.token` from this file, the right `platform`, the `port` your app listens on, ALL source files (no node_modules, "
     "no .env; the server installs dependencies) and secrets in `env`. Then call `get_deploy_status` every 15 seconds until "
     "READY. If it FAILED, read `build_errors`, `hint` and `build_log_tail`, fix the code and call `deploy_project` again with "
     "all files. When READY, open the URL, confirm it works and give the user the address. For a purely static site you may "
-    "use `publish_site` instead. If no deploy tool is available, give the user exact commands to run the project locally.\n"
-    "7. Quality bar: production-ready structure, secure defaults (hashed passwords, input validation, CORS, no secrets in code), "
-    "SEO basics and good performance."
+    "use `publish_site` instead. If no deploy tool is available, give the user exact commands to run the project locally."
 )
 
 BRIEF_SYSTEM_PROMPT = """
@@ -307,6 +314,7 @@ async def generate_project_brief(settings: dict, order: dict) -> dict:
                 logger.error("Unexpected brief error for %s: %s", base_url, e, exc_info=True)
 
     await fill_brief_images(spec, settings, _base_urls(), api_key)
+    skills = await select_skills_for_brief(settings, history_messages, spec, _base_urls(), api_key)
     project = spec.get("project") if isinstance(spec.get("project"), dict) else {}
     project.setdefault("name", order.get("project_name", ""))
     project.setdefault("language", "fa")
@@ -318,4 +326,4 @@ async def generate_project_brief(settings: dict, order: dict) -> dict:
     tech.setdefault("stack", order.get("tech_stack", ""))
     spec["tech"] = tech
 
-    return {"version": 1, "instructions_for_ai": BRIEF_INSTRUCTIONS, **spec}
+    return {"version": 1, "instructions_for_ai": BRIEF_INSTRUCTIONS, **spec, "skills": skills}
