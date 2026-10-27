@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, Literal
 from datetime import datetime
+from uuid import UUID
 from models import OrderStatus
 
 
@@ -22,6 +23,11 @@ class ChatSessionCreateIn(BaseModel):
 
 
 class ChatRequest(BaseModel):
+    progress_id: UUID | None = None
+    project_path: Literal["design", "direct", "source"] | None = None
+    source_url: str = Field(default="", max_length=2000)
+    source_type: Literal["github", "zip"] | None = None
+    source_file: ChatAttachmentIn | None = None
     messages: list[MessageIn]
     attachments: list[ChatAttachmentIn] = Field(default_factory=list)
     bot_token: Optional[str] = None
@@ -103,6 +109,10 @@ class OrderFileOut(BaseModel):
 
 
 class HandoffProposalIn(BaseModel):
+    project_path: Literal["design", "direct", "source"] | None = None
+    source_url: str = Field(default="", max_length=2000)
+    source_type: Literal["github", "zip"] | None = None
+    source_file: OrderFileOut | None = None
     type: str
     projectName: str
     summary: str
@@ -130,6 +140,10 @@ class HandoffOut(HandoffCreateIn):
 
 
 class OrderCreateIn(BaseModel):
+    project_path: Literal["design", "direct", "source"] | None = None
+    source_url: str = Field(default="", max_length=2000)
+    source_type: Literal["github", "zip"] | None = None
+    source_file: OrderFileOut | None = None
     project_name: str
     summary: str
     chat_history: list[MessageIn] = Field(default_factory=list)
@@ -146,6 +160,35 @@ class OrderCreateIn(BaseModel):
 class MilestoneIn(BaseModel):
     title: str
     amount: int
+
+
+class WorkspaceOutputIn(BaseModel):
+    stage: Literal["design", "development"]
+    title: str = Field(min_length=1, max_length=200)
+    url: str = Field(default="", max_length=2000)
+    html: str = Field(default="", max_length=500000)
+    notes: str = Field(default="", max_length=10000)
+
+
+class WorkspaceCommentIn(BaseModel):
+    version_id: str
+    page: str = Field(default="/", max_length=2000)
+    selector: str = Field(min_length=1, max_length=1000)
+    text: str = Field(min_length=1, max_length=5000)
+
+
+class WorkspaceCommentStatusIn(BaseModel):
+    status: Literal["open", "in_progress", "review", "approved"]
+
+
+class WorkspaceApproveIn(BaseModel):
+    version_id: str
+
+
+class WorkspaceCredentialsIn(BaseModel):
+    admin_url: str = Field(default="", max_length=2000)
+    username: str = Field(default="", max_length=500)
+    password: str = Field(default="", max_length=2000)
 
 
 class AdminApproveIn(BaseModel):

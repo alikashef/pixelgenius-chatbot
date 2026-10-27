@@ -154,7 +154,7 @@ function ProjectCard({ order }: { order: Order }) {
           href={`/panel/${order.id}`}
           className="inline-flex items-center gap-0.5 rounded text-xs font-semibold text-violet-300 outline-none transition-colors hover:text-white focus-visible:ring-2 focus-visible:ring-[--violet-light]"
         >
-          جزئیات
+          {isDesigner ? "فضای پروژه" : "جزئیات"}
           <IconChevronLeft size={14} stroke={2.5} />
         </Link>
       </div>

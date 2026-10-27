@@ -6,7 +6,13 @@ export interface Message {
   attachments?: OrderFile[];
 }
 
+export type ProjectPath = "design" | "direct" | "source";
+
 export interface Proposal {
+  project_path?: ProjectPath;
+  source_url?: string;
+  source_type?: "github" | "zip";
+  source_file?: OrderFile;
   type: "proposal";
   projectName: string;
   summary: string;
@@ -154,11 +160,16 @@ export async function sendChat(
   mode: ChatMode = "designer",
   botToken?: string,
   finalize = false,
+  projectPath?: ProjectPath,
+  sourceUrl = "",
+  sourceType?: "github" | "zip",
+  sourceFile?: OrderFile,
+  progressId?: string,
 ): Promise<string> {
   const res = await fetch(`${API_URL}/api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages, attachments, mode, bot_token: botToken || null, finalize }),
+    body: JSON.stringify({ messages, attachments, mode, bot_token: botToken || null, finalize, project_path: projectPath || null, source_url: sourceUrl, source_type: sourceType || null, source_file: sourceFile || null, progress_id: progressId || null }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -244,6 +255,10 @@ export async function submitOrder(token: string, proposal: Proposal, chatHistory
       order_files: orderFiles,
       session_id: sessionId || null,
       mode: proposal.mode ?? "sales",
+      project_path: proposal.project_path || null,
+      source_url: proposal.source_url || "",
+      source_type: proposal.source_type || null,
+      source_file: proposal.source_file || null,
     }),
   });
   if (!res.ok) throw new Error("خطا در ثبت درخواست");
@@ -547,4 +562,83 @@ export async function testImageGeneration(token: string, prompt: string): Promis
     throw new Error(typeof data?.detail === "string" ? data.detail : "خطا در تولید تصویر");
   }
   return res.json();
+}
+
+export interface WorkspaceVersion {
+  id: string;
+  number: number;
+  stage: "design" | "development";
+  title: string;
+  url: string;
+  html: string;
+  notes: string;
+  created_at: string;
+}
+export interface WorkspaceComment {
+  id: string;
+  version_id: string;
+  stage: string;
+  page: string;
+  selector: string;
+  text: string;
+  status: "open" | "in_progress" | "review" | "approved";
+  created_at: string;
+}
+export interface WorkspaceDeployment {
+  id: string;
+  state: string;
+  url?: string;
+  created_at: string;
+  expires_at?: number;
+}
+export interface ProjectWorkspaceData {
+  path: "design" | "direct" | "source" | null;
+  source_url: string;
+  source_type?: "github" | "zip";
+  source_file?: OrderFile;
+  versions: WorkspaceVersion[];
+  comments: WorkspaceComment[];
+  approvals: Partial<Record<"design" | "development", { version_id: string; approved_at: string }>>;
+  activity: { id: string; text: string; actor: string; created_at: string }[];
+  deployments: WorkspaceDeployment[];
+  configuration?: Record<string, unknown> | null;
+  has_credentials?: boolean;
+}
+export interface DeploymentStatus {
+  state: string;
+  url?: string;
+  release_id?: string;
+  platform?: string;
+  expires_at?: number;
+  fail_reason?: string;
+  build_log_tail?: string[];
+  build_errors?: string[];
+  history: WorkspaceDeployment[];
+}
+export interface AdminCredentials { admin_url: string; username: string; password: string }
+
+export async function workspaceRequest<T>(token: string, id: string, path = "", body?: unknown, method = "POST"): Promise<T> {
+  const res = await fetch(`${API_URL}/api/customer/orders/${encodeURIComponent(id)}/workspace${path}`, {
+    method: body === undefined ? "GET" : method,
+    headers: { Authorization: `Bearer ${token}`, ...(body === undefined ? {} : { "Content-Type": "application/json" }) },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    cache: "no-store",
+    signal: AbortSignal.timeout(25000),
+  });
+  if (res.status === 401 || res.status === 403) throw new Error("UNAUTHORIZED");
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(typeof data.detail === "string" ? data.detail : "درخواست انجام نشد؛ دوباره تلاش کنید");
+  }
+  return res.json();
+}
+
+
+export type ChatProgressStage = "thinking" | "searching" | "working" | "done" | "error";
+
+export async function fetchChatProgress(id: string, signal: AbortSignal): Promise<ChatProgressStage | null> {
+  const res = await fetch(`${API_URL}/api/chat/progress/${encodeURIComponent(id)}`, { cache: "no-store", signal });
+  if (!res.ok) return null;
+  const result = await res.json();
+  return result.stage;
 }

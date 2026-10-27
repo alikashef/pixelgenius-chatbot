@@ -40,7 +40,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-PREVIEW_BASE_DOMAIN = (os.getenv("PREVIEW_BASE_DOMAIN") or "localhost").lower()
+PREVIEW_BASE_DOMAIN = site_mcp.PREVIEW_BASE_DOMAIN
 
 
 @app.middleware("http")

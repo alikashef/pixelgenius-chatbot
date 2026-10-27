@@ -38,12 +38,50 @@
 	import app_routes
 }
 
+(preview_routes) {
+	route {
+		request_header -X-Preview-Upstream
+		request_header -X-Preview-Kind
+		forward_auth backend:8000 {
+			uri /api/preview/route?domain={host}
+			header_up -Upgrade
+			header_up -Connection
+			header_up -Sec-WebSocket-*
+			header_up Host backend:8000
+			copy_headers X-Preview-Upstream X-Preview-Kind
+		}
+		@dynamic header X-Preview-Kind dynamic
+		handle @dynamic {
+			reverse_proxy {http.request.header.X-Preview-Upstream}:443 {
+				header_up Host {http.request.header.X-Preview-Upstream}
+				header_up X-Forwarded-Host {hostport}
+				header_up -X-Preview-Upstream
+				header_up -X-Preview-Kind
+				header_down Location `(?i)^https?://(?:[a-z0-9-]+\.)+liara\.(?:run|space)(?::[0-9]+)?(.*)$` "{scheme}://{hostport}$1"
+				header_down Set-Cookie `(?i);\s*Domain=\.?(?:[a-z0-9-]+\.)*liara\.(?:run|space)(;|$)` "$1"
+				flush_interval -1
+				transport http {
+					tls
+					tls_server_name {http.request.header.X-Preview-Upstream}
+				}
+			}
+		}
+		handle {
+			reverse_proxy backend:8000
+		}
+	}
+}
+
 *.{$PREVIEW_DOMAIN:preview.localhost} {
 	tls {
 		on_demand
 	}
 	encode gzip zstd
-	reverse_proxy backend:8000
+	import preview_routes
+}
+
+http://*.{$PREVIEW_DOMAIN:preview.localhost} {
+	redir https://{host}{uri} permanent
 }
 
 http://:80 {

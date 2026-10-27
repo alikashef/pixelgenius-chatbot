@@ -3,9 +3,12 @@ import base64
 import re
 import shutil
 import uuid
+import stat
+import time
 from datetime import datetime, timezone
-from pathlib import Path
-from zipfile import ZipFile
+from pathlib import Path, PurePosixPath
+from zipfile import ZipFile, BadZipFile
+from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Body, Depends, HTTPException, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 from lib.ai.analyze_lead import analyze_lead
 from models import ChatSession, Freelancer
+from services import workspace
 from schemas import ChatAttachmentIn, ChatRequest, ChatResponse, ChatSessionCreateIn, ChatSessionCreateOut, ChatSessionUpdateIn, OrderFileOut
 from services.ai_settings import get_ai_settings
 
@@ -26,6 +30,30 @@ MAX_IMAGE_BYTES = 5 * 1024 * 1024
 TEXT_EXTENSIONS = {".txt", ".md", ".csv", ".json", ".log", ".xml", ".html", ".css", ".js", ".ts", ".tsx", ".py", ".svg"}
 VISION_IMAGE_TYPES = {"image/png", "image/jpeg", "image/webp", "image/gif"}
 
+
+
+_chat_progress: dict[str, tuple[str, float]] = {}
+PROGRESS_TTL_SECONDS = 600
+
+
+def _set_progress(progress_id: str | None, stage: str) -> None:
+    if not progress_id:
+        return
+    now = time.monotonic()
+    for key in [key for key, (_, updated) in _chat_progress.items() if now - updated > PROGRESS_TTL_SECONDS]:
+        _chat_progress.pop(key, None)
+    if progress_id not in _chat_progress and len(_chat_progress) >= 1000:
+        _chat_progress.pop(next(iter(_chat_progress)))
+    _chat_progress[progress_id] = (stage, now)
+
+
+@router.get("/chat/progress/{progress_id}")
+async def chat_progress(progress_id: uuid.UUID):
+    entry = _chat_progress.get(str(progress_id))
+    if not entry or time.monotonic() - entry[1] > PROGRESS_TTL_SECONDS:
+        raise HTTPException(404, "وضعیت درخواست در دسترس نیست")
+    from fastapi.responses import JSONResponse
+    return JSONResponse({"stage": entry[0]}, headers={"Cache-Control": "no-store"})
 
 def _attachment_path(attachment: ChatAttachmentIn) -> Path | None:
     if not attachment.url.startswith("/uploads/"):
@@ -60,11 +88,75 @@ def _extract_docx_text(path: Path) -> str:
         return ""
 
 
+
+MAX_SOURCE_ZIP_BYTES = 12 * 1024 * 1024
+
+
+def _source_zip_entries(archive: ZipFile):
+    entries = archive.infolist()
+    if not any(not entry.is_dir() for entry in entries) or len(entries) > 400:
+        raise ValueError("فایل ZIP باید حداکثر ۴۰۰ فایل و پوشه داشته باشد")
+    if sum(entry.file_size for entry in entries) > MAX_SOURCE_ZIP_BYTES:
+        raise ValueError("حجم سورس پس از بازشدن ZIP باید حداکثر ۱۲ مگابایت باشد")
+    for entry in entries:
+        path = PurePosixPath(entry.filename)
+        if path.is_absolute() or ".." in path.parts or "\\" in entry.filename or stat.S_ISLNK(entry.external_attr >> 16) or entry.flag_bits & 1:
+            raise ValueError("ZIP باید بدون رمز و شامل فایل‌های سورس با مسیرهای معتبر باشد")
+    return entries
+
+
+def _source_zip_context(path: Path) -> str:
+    with ZipFile(path) as archive:
+        entries = _source_zip_entries(archive)
+        names = [entry.filename for entry in entries if not entry.is_dir()]
+        blocks = ["فهرست فایل‌های سورس ZIP:\n" + "\n".join(names)[:5000]]
+        priority = {"package.json", "requirements.txt", "pyproject.toml", "Dockerfile", "README.md", "compose.yml", "docker-compose.yml"}
+        remaining = MAX_TEXT_CHARS
+        for entry in sorted(entries, key=lambda e: (PurePosixPath(e.filename).name not in priority, e.filename)):
+            parts = PurePosixPath(entry.filename).parts
+            name = parts[-1] if parts else ""
+            if entry.is_dir() or any(part in {"node_modules", ".git", ".next", "__MACOSX"} for part in parts) or name == ".env" or name.startswith(".env."):
+                continue
+            if name not in priority and PurePosixPath(name).suffix.lower() not in TEXT_EXTENSIONS:
+                continue
+            if remaining <= 0:
+                break
+            with archive.open(entry) as source:
+                text = source.read(min(remaining, 6000)).decode("utf-8", errors="replace")
+            blocks.append(f"فایل {entry.filename}:\n{text}")
+            remaining -= len(text)
+        return "\n\n".join(blocks)
+
+
+def validate_project_source(source_type: str | None, source_url: str, source_file: ChatAttachmentIn | None) -> str:
+    kind = source_type or ("github" if source_url else "zip" if source_file else None)
+    if kind == "github":
+        workspace.url(source_url)
+        parsed = urlsplit(source_url)
+        if parsed.scheme != "https" or parsed.hostname not in ("github.com", "www.github.com") or len(parsed.path.strip("/").split("/")) < 2:
+            raise HTTPException(422, "لینک معتبر مخزن GitHub را وارد کنید")
+    elif kind == "zip":
+        if not source_file or not source_file.name.lower().endswith(".zip"):
+            raise HTTPException(422, "فایل ZIP سورس را بارگذاری کنید")
+        path = _attachment_path(source_file)
+        if not path or path.stat().st_size > MAX_SOURCE_ZIP_BYTES:
+            raise HTTPException(422, "فایل ZIP معتبر و حداکثر ۱۲ مگابایت لازم است")
+        try:
+            with ZipFile(path) as archive:
+                _source_zip_entries(archive)
+        except (BadZipFile, ValueError, OSError) as exc:
+            raise HTTPException(422, str(exc) if isinstance(exc, ValueError) else "فایل ZIP معتبر نیست") from exc
+    else:
+        raise HTTPException(422, "لینک GitHub یا فایل ZIP سورس را مشخص کنید")
+    return kind
+
 def _extract_attachment_text(path: Path, attachment: ChatAttachmentIn) -> str:
     ext = path.suffix.lower()
     content_type = attachment.content_type or ""
     if ext in TEXT_EXTENSIONS or content_type.startswith("text/"):
         return path.read_text(encoding="utf-8", errors="ignore").strip()
+    if ext == ".zip":
+        return _source_zip_context(path)
     if ext == ".pdf" or content_type == "application/pdf":
         return _extract_pdf_text(path)
     if ext == ".docx" or content_type.endswith("wordprocessingml.document"):
@@ -132,10 +224,25 @@ def _merge_attachments(messages: list[dict], attachments: list[ChatAttachmentIn]
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
+    if request.mode == "designer" and not request.bot_token and not request.project_path:
+        raise HTTPException(422, "ابتدا مسیر پروژه را انتخاب کنید")
+    workspace.url(request.source_url)
+    source_kind = None
+    source_attachments = list(request.attachments)
+    if request.mode == "designer" and request.project_path == "source" and not request.bot_token:
+        source_kind = validate_project_source(request.source_type, request.source_url, request.source_file)
+        if source_kind == "zip":
+            source_attachments = [request.source_file, *[item for item in source_attachments if item.url != request.source_file.url]]
     messages = [{"role": m.role, "content": m.content} for m in request.messages]
 
+    progress_id = str(request.progress_id) if request.progress_id else None
+    _set_progress(progress_id, "thinking")
     try:
         settings = await get_ai_settings(db)
+        if request.mode == "designer" and not request.bot_token:
+            settings["project_path"] = request.project_path
+            settings["project_source_url"] = request.source_url if source_kind == "github" else ""
+            settings["project_source_type"] = source_kind
         if request.bot_token:
             result = await db.execute(select(Freelancer).where(Freelancer.bot_token == request.bot_token))
             freelancer = result.scalar_one_or_none()
@@ -148,11 +255,16 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
                     "freelancer_timeline": freelancer.timeline or "",
                     "freelancer_note": freelancer.note or "",
                 })
-        content = await analyze_lead(settings, _merge_attachments(messages, request.attachments), request.mode, request.finalize)
+        if source_attachments:
+            _set_progress(progress_id, "working")
+        content = await analyze_lead(settings, _merge_attachments(messages, source_attachments), request.mode, request.finalize, on_stage=lambda stage: _set_progress(progress_id, stage))
+        _set_progress(progress_id, "done")
         return ChatResponse(content=content)
     except HTTPException:
+        _set_progress(progress_id, "error")
         raise
     except Exception as e:
+        _set_progress(progress_id, "error")
         logger.error("Chat error: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -200,8 +312,27 @@ async def upload_chat_file(file: UploadFile = File(...)):
     original_name = Path(file.filename or "file").name
     ext = Path(original_name).suffix
     dest = CHAT_UPLOAD_DIR / f"{file_id}{ext}"
-    with dest.open("wb") as f:
-        shutil.copyfileobj(file.file, f)
+    try:
+        with dest.open("wb") as f:
+            if ext.lower() == ".zip":
+                total = 0
+                while chunk := file.file.read(1024 * 1024):
+                    total += len(chunk)
+                    if total > MAX_SOURCE_ZIP_BYTES:
+                        raise HTTPException(413, "حجم فایل ZIP باید حداکثر ۱۲ مگابایت باشد")
+                    f.write(chunk)
+            else:
+                shutil.copyfileobj(file.file, f)
+        if ext.lower() == ".zip":
+            with ZipFile(dest) as archive:
+                _source_zip_entries(archive)
+                if archive.testzip():
+                    raise ValueError("فایل ZIP خراب است")
+    except (BadZipFile, ValueError, OSError, RuntimeError, HTTPException) as exc:
+        dest.unlink(missing_ok=True)
+        if isinstance(exc, HTTPException):
+            raise
+        raise HTTPException(422, str(exc) if isinstance(exc, ValueError) else "فایل ZIP معتبر نیست") from exc
 
     return OrderFileOut(
         id=file_id,

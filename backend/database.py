@@ -40,6 +40,8 @@ async def create_tables():
         await conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS milestones JSON"))
         await conn.execute(text("UPDATE orders SET milestones = '[]'::json WHERE milestones IS NULL"))
         await conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS project_brief JSON"))
+        await conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS workspace JSON"))
+        await conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS workspace_credentials TEXT"))
         for key, value in DEFAULT_AI_SETTINGS.items():
             await conn.execute(
                 text(

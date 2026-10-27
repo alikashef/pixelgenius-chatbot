@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import ProjectWorkspace from "@/components/ProjectWorkspace";
 import { IconWand, IconCoin, IconCheck, IconDownload, IconChevronRight, IconCalendar, IconClock, IconStack2, IconMessage } from "@tabler/icons-react";
 import { fetchMyOrder, requestPayment, Order, uploadCustomerOrderFile } from "@/lib/api";
 
@@ -106,6 +107,8 @@ export default function OrderDetailPage() {
       </div>
     );
   }
+
+  if (isDesigner) return <ProjectWorkspace key={order.id} order={order} />;
 
   return (
     <div className="min-h-screen bg-[hsl(var(--background))]">

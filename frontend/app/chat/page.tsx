@@ -3,9 +3,10 @@
 import { useState, useRef, useEffect, FormEvent, KeyboardEvent, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { IconArrowUp, IconCheck, IconCoin, IconCopy, IconDownload, IconPaperclip, IconPlus, IconRefresh, IconSparkles, IconUser, IconWand, IconX } from "@tabler/icons-react";
+import { IconArrowUp, IconCode, IconCloudUpload, IconLayout, IconCheck, IconCoin, IconCopy, IconDownload, IconPaperclip, IconPlus, IconRefresh, IconSparkles, IconUser, IconWand, IconX } from "@tabler/icons-react";
 import ChatBubble from "@/components/ChatBubble";
-import { fetchOrderBrief, sendChat, sendOtp, submitOrder, uploadChatFile, createChatSession, updateChatSession, ChatMode, Message, Proposal, LeadAnalysis, OrderFile } from "@/lib/api";
+import ChatRobot, { ROBOT_INTRODUCTIONS } from "@/components/ChatRobot";
+import { fetchOrderBrief, fetchChatProgress, ChatProgressStage, sendChat, sendOtp, submitOrder, uploadChatFile, createChatSession, updateChatSession, ChatMode, ProjectPath, Message, Proposal, LeadAnalysis, OrderFile } from "@/lib/api";
 
 const WELCOME: Message = {
   role: "assistant",
@@ -64,6 +65,13 @@ const MODE_CARDS: Record<
   },
 };
 
+const PROJECT_PATHS: { id: ProjectPath; title: string; description: string; icon: typeof IconLayout }[] = [
+  { id: "design", title: "ساخت همراه طراحی", description: "ابتدا طراحی را بازبینی و تأیید می‌کنی، سپس توسعه شروع می‌شود.", icon: IconLayout },
+  { id: "direct", title: "ساخت مستقیم", description: "بعد از نیازسنجی، توسعه بدون مرحله طراحی مستقل انجام می‌شود.", icon: IconCode },
+  { id: "source", title: "انتشار سورس آماده", description: "سورس موجود را بررسی می‌کنیم و پیش‌نیازهای انتشار را مشخص می‌کنیم.", icon: IconCloudUpload },
+];
+const isProjectPath = (value: unknown): value is ProjectPath => value === "design" || value === "direct" || value === "source";
+
 const SUBMITTED: Message = {
   role: "assistant",
   content: "پروپوزال پروژه‌تون آماده‌ست و درخواست ثبت شد. الان می‌تونید وضعیتش رو توی پنل کاربری ببینید.",
@@ -78,6 +86,11 @@ interface ChatDraft {
   input: string;
   phoneStep: boolean;
   attachments?: OrderFile[];
+  mode?: ChatMode;
+  projectPath?: ProjectPath;
+  sourceUrl?: string;
+  sourceType?: "github" | "zip";
+  sourceArchive?: OrderFile;
 }
 
 interface ChatSession {
@@ -87,7 +100,10 @@ interface ChatSession {
   draft: ChatDraft;
 }
 
-function getWelcome(firstName?: string, mode: ChatMode = "designer"): Message {
+function getWelcome(firstName?: string, mode: ChatMode = "designer", projectPath?: ProjectPath): Message {
+  if (mode === "designer" && projectPath === "source") return {
+    role: "assistant", content: "سلام! سورس آماده‌ات رو بررسی می‌کنیم تا برای انتشار آماده بشه. پروژه با چه استکی ساخته شده و سورسش رو کجا نگه می‌داری؟",
+  };
   if (mode === "sales") {
     return {
       role: "assistant",
@@ -441,11 +457,18 @@ function ChatPageInner() {
   const [dbSessionId, setDbSessionId] = useState<string | null>(null);
   const [botToken, setBotToken] = useState<string | undefined>();
   const [mode, setMode] = useState<ChatMode>("designer");
+  const [projectPath, setProjectPath] = useState<ProjectPath | undefined>();
+  const [sourceUrl, setSourceUrl] = useState("");
+  const [sourceType, setSourceType] = useState<"github" | "zip" | undefined>();
+  const [sourceArchive, setSourceArchive] = useState<OrderFile | undefined>();
+  const [hydrated, setHydrated] = useState(false);
   const [briefOrderId, setBriefOrderId] = useState("");
   const [brief, setBrief] = useState<Record<string, unknown> | null>(null);
   const [briefState, setBriefState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [progressId, setProgressId] = useState<string | null>(null);
+  const [progressStage, setProgressStage] = useState<ChatProgressStage | null>(null);
   const [error, setError] = useState("");
   const [phoneStep, setPhoneStep] = useState(false);
   const [sendingOtp, setSendingOtp] = useState(false);
@@ -454,7 +477,7 @@ function ChatPageInner() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const hydratedRef = useRef(false);
+  const sourceFileRef = useRef<HTMLInputElement>(null);
   const lastAttemptRef = useRef<{ messages: Message[]; attachments: OrderFile[]; finalize: boolean } | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -466,11 +489,11 @@ function ChatPageInner() {
     const requestedSessionId = searchParams.get("session");
     const forceNew = searchParams.get("new") === "1";
     const bot = searchParams.get("bot") || undefined;
-    if (bot) setBotToken(bot);
+    setBotToken(bot);
     const nextChatKey = token && currentCustomerId ? getCustomerChatKey(currentCustomerId) : ANON_CHAT_KEY;
     const customerDraft = readDraft(nextChatKey);
     const anonymousDraft = readDraft(ANON_CHAT_KEY);
-    let draft = customerDraft || anonymousDraft;
+    let draft = forceNew ? null : customerDraft || anonymousDraft;
     let nextSessionId = createSessionId();
 
     setCustomerToken(token);
@@ -478,7 +501,7 @@ function ChatPageInner() {
     setCustomerName(firstName);
     setChatKey(nextChatKey);
 
-    if (token && currentCustomerId && anonymousDraft && !customerDraft) {
+    if (!forceNew && token && currentCustomerId && anonymousDraft && !customerDraft) {
       localStorage.setItem(nextChatKey, JSON.stringify(anonymousDraft));
       localStorage.removeItem(ANON_CHAT_KEY);
     }
@@ -496,7 +519,13 @@ function ChatPageInner() {
       }
     }
 
-    const storedMode: ChatMode = localStorage.getItem("chat_mode") === "sales" ? "sales" : "designer";
+    const storedMode: ChatMode = bot ? "sales" : draft?.mode || (localStorage.getItem("chat_mode") === "sales" ? "sales" : "designer");
+    const restoredPath = !bot && storedMode === "designer" && isProjectPath(draft?.projectPath) ? draft.projectPath : undefined;
+    setProjectPath(restoredPath);
+    setSourceUrl(restoredPath === "source" ? draft?.sourceUrl || "" : "");
+    setSourceType(restoredPath === "source" ? (draft?.sourceType || (draft?.sourceUrl ? "github" : draft?.sourceArchive ? "zip" : undefined)) : undefined);
+    setSourceArchive(restoredPath === "source" ? draft?.sourceArchive : undefined);
+    setDbSessionId(null);
     setMode(storedMode);
     setSessionId(nextSessionId);
     if (draft) {
@@ -510,7 +539,7 @@ function ChatPageInner() {
       setPhoneStep(false);
       setAttachments([]);
     }
-    hydratedRef.current = true;
+    setHydrated(true);
   }, [searchParams]);
 
   useEffect(() => {
@@ -521,7 +550,7 @@ function ChatPageInner() {
   }, [searchParams]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messages.length > 1 || briefOrderId) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading, phoneStep, briefOrderId, briefState]);
 
   useEffect(() => {
@@ -531,15 +560,15 @@ function ChatPageInner() {
   }, [input]);
 
   useEffect(() => {
-    if (!hydratedRef.current) return;
-    const draft: ChatDraft = { version: CHAT_VERSION, messages, input, phoneStep, attachments };
+    if (!hydrated) return;
+    const draft: ChatDraft = { version: CHAT_VERSION, messages, input, phoneStep, attachments, mode, projectPath, sourceUrl, sourceType, sourceArchive };
     localStorage.setItem(chatKey, JSON.stringify(draft));
     if (customerToken && customerId && sessionId) {
       const sessions = readCustomerSessions(customerId).filter((s) => s.id !== sessionId);
       sessions.unshift({ id: sessionId, title: getSessionTitle(messages), updated_at: new Date().toISOString(), draft });
       writeCustomerSessions(customerId, sessions.slice(0, 25));
     }
-  }, [attachments, chatKey, customerId, customerToken, input, messages, phoneStep, sessionId]);
+  }, [attachments, chatKey, customerId, customerToken, input, messages, phoneStep, sessionId, hydrated, mode, projectPath, sourceUrl, sourceType, sourceArchive]);
 
   useEffect(() => {
     if (customerToken || messages.length <= 1) return;
@@ -558,6 +587,17 @@ function ChatPageInner() {
     } else {
       localStorage.removeItem(chatKey);
     }
+    setProjectPath(undefined);
+    setSourceUrl("");
+    setSourceType(undefined);
+    setSourceArchive(undefined);
+    setDbSessionId(null);
+    lastAttemptRef.current = null;
+    setProgressId(null);
+    setProgressStage(null);
+    setBriefOrderId("");
+    setBrief(null);
+    setBriefState("idle");
     setMessages([getWelcome(customerName, mode)]);
     setInput("");
     setPhoneStep(false);
@@ -613,6 +653,10 @@ function ChatPageInner() {
     const next: ChatMode = mode === "designer" ? "sales" : "designer";
     setMode(next);
     localStorage.setItem("chat_mode", next);
+    setProjectPath(undefined);
+    setSourceUrl("");
+    setSourceType(undefined);
+    setSourceArchive(undefined);
     setMessages([getWelcome(customerName, next)]);
   }
 
@@ -641,10 +685,16 @@ function ChatPageInner() {
   }
 
   async function submit(text: string) {
+    if (activeMode === "designer" && !projectPath) { setError("ابتدا مسیر پروژه را انتخاب کن"); return; }
+    if (activeMode === "designer" && projectPath === "source" && !sourceReady) { setError("لینک مخزن GitHub یا فایل ZIP سورس را اضافه کن"); return; }
+    if (activeMode === "designer" && projectPath === "source" && sourceType === "github") {
+      try { const source = new URL(sourceUrl); if (source.protocol !== "https:" || !["github.com", "www.github.com"].includes(source.hostname) || source.pathname.split("/").filter(Boolean).length < 2 || source.username) throw new Error(); }
+      catch { setError("لینک معتبر مخزن GitHub را وارد کن؛ مثل https://github.com/owner/repo"); return; }
+    }
     if ((phoneStep ? !text : (!text && attachments.length === 0)) || loading || uploadingFile) return;
     if (phoneStep) { await handlePhoneSubmit(text); return; }
 
-    const currentAttachments = attachments;
+    const currentAttachments = [...attachments, ...(activeMode === "designer" && projectPath === "source" && sourceType === "zip" && sourceArchive && !collectMessageAttachments(messages).some(file => file.id === sourceArchive.id) && !attachments.some(file => file.id === sourceArchive.id) ? [sourceArchive] : [])];
     const newMessages: Message[] = [...messages, { role: "user", content: text, attachments: currentAttachments }];
     setMessages(newMessages);
     setInput("");
@@ -652,8 +702,30 @@ function ChatPageInner() {
     await runReply(newMessages, currentAttachments);
   }
 
+  useEffect(() => {
+    if (!progressId || !loading) return;
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout>;
+    let stopped = false;
+    async function poll() {
+      try {
+        if (!document.hidden) {
+          const stage = await fetchChatProgress(progressId!, controller.signal);
+          if (!stopped && stage) setProgressStage(stage);
+          if (stage === "done" || stage === "error") return;
+        }
+      } catch { /* The main request owns user-facing errors. */ }
+      if (!stopped) timer = setTimeout(poll, 1000);
+    }
+    timer = setTimeout(poll, 300);
+    return () => { stopped = true; clearTimeout(timer); controller.abort(); };
+  }, [progressId, loading]);
+
   async function runReply(newMessages: Message[], currentAttachments: OrderFile[], finalize = false) {
     lastAttemptRef.current = { messages: newMessages, attachments: currentAttachments, finalize };
+    const requestProgressId = crypto.randomUUID();
+    setProgressId(requestProgressId);
+    setProgressStage("thinking");
     setLoading(true);
     setError("");
 
@@ -664,7 +736,7 @@ function ChatPageInner() {
       }
 
       const apiMessages = newMessages.slice(1);
-      const reply = await sendChat(apiMessages, currentAttachments, activeMode, botToken, finalize);
+      const reply = await sendChat(apiMessages, currentAttachments, activeMode, botToken, finalize, activeMode === "designer" ? projectPath : undefined, activeMode === "designer" && projectPath === "source" && sourceType === "github" ? sourceUrl : "", activeMode === "designer" && projectPath === "source" ? sourceType : undefined, activeMode === "designer" && projectPath === "source" && sourceType === "zip" ? sourceArchive : undefined, requestProgressId);
       const lead = parseLeadAnalysis(reply);
       const allMessages = lead
         ? [...newMessages, { role: "assistant" as const, content: lead.client_message || "" }]
@@ -675,7 +747,8 @@ function ChatPageInner() {
       }
 
       if (lead) {
-        const proposal = leadToProposal(lead, activeMode);
+        setProgressStage("working");
+        const proposal: Proposal = { ...leadToProposal(lead, activeMode), ...(activeMode === "designer" ? { project_path: projectPath, source_url: projectPath === "source" && sourceType === "github" ? sourceUrl : "", source_type: projectPath === "source" ? sourceType : undefined, source_file: projectPath === "source" && sourceType === "zip" ? sourceArchive : undefined } : {}) };
         const clientReply = lead.client_message || "پیشنهاد اولیه پروژه آماده شد.";
         const orderFiles = collectMessageAttachments(newMessages);
         if (customerToken) {
@@ -707,6 +780,7 @@ function ChatPageInner() {
       setError(err instanceof Error ? err.message : "خطای ناشناخته");
     } finally {
       setLoading(false);
+      setProgressId(null);
       inputRef.current?.focus();
     }
   }
@@ -728,9 +802,12 @@ function ChatPageInner() {
     }
   }
 
-  const placeholder = phoneStep ? "09xxxxxxxxx" : mode === "designer" ? "ایده‌ات رو بنویس..." : "پیام بنویسید...";
+  const needsProjectPath = !botToken && mode === "designer" && !projectPath && !briefOrderId;
+  const sourceReady = projectPath !== "source" || (sourceType === "github" ? Boolean(sourceUrl.trim()) : sourceType === "zip" && Boolean(sourceArchive));
+  const chatBlocked = !hydrated || needsProjectPath || (!botToken && mode === "designer" && !briefOrderId && !sourceReady);
+  const placeholder = needsProjectPath ? "اول مسیر پروژه را انتخاب کن" : mode === "designer" && projectPath === "source" && !sourceReady ? "لینک GitHub یا ZIP سورس را اضافه کن" : phoneStep ? "09xxxxxxxxx" : mode === "designer" ? "ایده‌ات رو بنویس..." : "پیام بنویسید...";
   const isLoading = loading || sendingOtp || uploadingFile;
-  const canSubmit = phoneStep ? Boolean(input.trim()) : Boolean(input.trim() || attachments.length);
+  const canSubmit = !chatBlocked && (phoneStep ? Boolean(input.trim()) : Boolean(input.trim() || attachments.length));
   const activeMode: ChatMode = botToken ? "sales" : mode;
   const isFresh = messages.length <= 1 && !loading && !briefOrderId;
 
@@ -743,6 +820,39 @@ function ChatPageInner() {
   function selectMode(next: ChatMode) {
     if (next !== mode && isFresh) toggleMode();
   }
+
+  function chooseProjectPath(next: ProjectPath) {
+    setProjectPath(next);
+    if (next !== "source") { setSourceUrl(""); setSourceType(undefined); setSourceArchive(undefined); }
+    setError("");
+    if (isFresh) setMessages([getWelcome(customerName, "designer", next)]);
+  }
+
+  async function handleSourceZip(file?: File) {
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".zip") || file.size > 12 * 1024 * 1024) { setError("فایل ZIP سورس باید حداکثر ۱۲ مگابایت باشد"); return; }
+    setUploadingFile(true); setError("");
+    try { setSourceArchive(await uploadChatFile(file)); }
+    catch (err) { setError(err instanceof Error ? err.message : "بارگذاری ZIP انجام نشد"); }
+    finally { setUploadingFile(false); if (sourceFileRef.current) sourceFileRef.current.value = ""; }
+  }
+
+  const pathPicker = !botToken && mode === "designer" && !briefOrderId && (isFresh || needsProjectPath) ? (
+    <fieldset className="mt-7 rounded-2xl border border-[--violet-border] bg-[--surface] p-4 sm:p-5">
+      <legend className="px-2 text-sm font-bold text-violet-300">مسیر پروژه را قبل از گفتگو مشخص کن</legend>
+      <p className="mb-4 text-xs leading-6 text-[hsl(var(--muted-foreground))]">سؤال‌ها و مراحل پروژه براساس این انتخاب تنظیم می‌شوند. مسیر بعد از شروع گفتگو ثابت می‌ماند.</p>
+      <div className="grid gap-3 sm:grid-cols-3">{PROJECT_PATHS.map(path => <label key={path.id} className="relative cursor-pointer">
+        <input type="radio" name="project-path" className="peer sr-only" value={path.id} checked={projectPath === path.id} onChange={() => chooseProjectPath(path.id)} />
+        <span className="block h-full rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] p-4 transition-colors hover:border-[--violet-border] peer-checked:border-[--violet] peer-checked:bg-[--violet-glow] peer-focus-visible:ring-2 peer-focus-visible:ring-[--violet-light]"><path.icon size={23} className="mb-3 text-violet-300" /><span className="block text-sm font-bold">{path.title}</span><span className="mt-2 block text-xs leading-6 text-[hsl(var(--muted-foreground))]">{path.description}</span></span>
+      </label>)}</div>
+      {projectPath === "source" && <fieldset className="mt-5 border-t border-[hsl(var(--border))] pt-4">
+        <legend className="px-2 text-sm font-semibold">سورس پروژه کجاست؟</legend>
+        <div className="mb-4 mt-2 grid grid-cols-2 gap-3">{[{ id: "github", title: "مخزن GitHub", description: "لینک مخزن پروژه را وارد کن" }, { id: "zip", title: "فایل ZIP", description: "سورس پروژه را بارگذاری کن" }].map(item => <label key={item.id} className="cursor-pointer"><input className="peer sr-only" type="radio" name="source-type" value={item.id} checked={sourceType === item.id} onChange={() => { setSourceType(item.id as "github" | "zip"); setError(""); }} /><span className="block rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-4 py-3 peer-checked:border-[--violet] peer-checked:bg-[--violet-glow] peer-focus-visible:ring-2 peer-focus-visible:ring-[--violet-light]"><span className="block text-sm font-bold">{item.title}</span><span className="mt-1 block text-xs leading-6 text-[hsl(var(--muted-foreground))]">{item.description}</span></span></label>)}</div>
+        {sourceType === "github" && <label className="block text-xs text-[hsl(var(--muted-foreground))]">لینک مخزن GitHub<input type="url" dir="ltr" value={sourceUrl} onChange={e => setSourceUrl(e.target.value)} maxLength={2000} className="mt-2 w-full rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-3 text-sm text-[hsl(var(--foreground))] outline-none focus:border-[--violet-light]" placeholder="https://github.com/owner/repo" /></label>}
+        {sourceType === "zip" && <div className="rounded-xl border border-dashed border-[--violet-border] bg-[hsl(var(--background))] p-4"><input ref={sourceFileRef} type="file" accept=".zip,application/zip" className="hidden" aria-label="فایل ZIP سورس پروژه" onChange={e => void handleSourceZip(e.target.files?.[0])} />{sourceArchive ? <div className="flex items-center justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-semibold" dir="auto">{sourceArchive.name}</p><p className="mt-1 text-xs text-violet-300">سورس بارگذاری شد · {(sourceArchive.size / 1024).toLocaleString("fa-IR", { maximumFractionDigits: 1 })} کیلوبایت</p></div><button type="button" onClick={() => setSourceArchive(undefined)} disabled={uploadingFile} className="rounded-lg px-3 py-2 text-xs text-violet-300">حذف فایل</button></div> : <><button type="button" onClick={() => sourceFileRef.current?.click()} disabled={uploadingFile} className="flex min-h-11 items-center gap-2 rounded-xl bg-[--violet] px-4 text-sm font-bold text-white disabled:opacity-50"><IconCloudUpload size={18} />{uploadingFile ? "در حال بارگذاری…" : "انتخاب فایل ZIP"}</button><p className="mt-3 text-xs leading-6 text-[hsl(var(--muted-foreground))]">حداکثر ۱۲ مگابایت؛ فایل‌های سورس بدون node_modules و پوشه‌های build.</p></>}</div>}
+      </fieldset>}
+    </fieldset>
+  ) : null;
 
   function retry() {
     const last = lastAttemptRef.current;
@@ -768,7 +878,7 @@ function ChatPageInner() {
             className="rounded-lg border border-[--violet-border] bg-[--violet-glow] px-2.5 py-1 text-xs font-semibold text-violet-300"
             title="برای تغییر حالت، یک چت جدید شروع کن"
           >
-            {MODE_CARDS[mode].label}
+            {MODE_CARDS[activeMode].label}{activeMode === "designer" && projectPath ? ` · ${PROJECT_PATHS.find(p => p.id === projectPath)?.title}` : ""}
           </span>
         )}
 
@@ -776,6 +886,7 @@ function ChatPageInner() {
           {messages.length > 1 && (
             <button
               onClick={resetChat}
+              disabled={isLoading}
               aria-label="چت جدید"
               className="flex h-9 items-center gap-1.5 rounded-xl border border-[hsl(var(--border))] bg-[--surface] px-3 text-xs text-[hsl(var(--muted-foreground))] outline-none transition-colors hover:text-white focus-visible:ring-2 focus-visible:ring-[--violet-light]"
             >
@@ -794,7 +905,9 @@ function ChatPageInner() {
         </div>
       </header>
 
-      <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-6 md:px-8">
+      {!isFresh && <ChatRobot busy={loading} stage={progressStage} uploading={uploadingFile} sendingOtp={sendingOtp} briefState={briefState} failed={Boolean(error)} input={input} replyKey={messages.at(-1)?.role === "assistant" ? `${messages.length}:${messages.at(-1)?.content}` : ""} waitingForPhone={phoneStep} />}
+
+      <main className={`min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-6 md:px-8 ${isFresh ? "pt-6" : "pt-12"}`}>
         <div className="mx-auto max-w-2xl">
           {isFresh ? (
             <section className="pb-4 pt-2 sm:pt-8" aria-labelledby="chat-hero-title">
@@ -876,17 +989,34 @@ function ChatPageInner() {
               </div>
               )}
 
+              {pathPicker}
+              {!needsProjectPath && (
+                <div className="mt-6 rounded-2xl border border-[--violet-border] p-3 sm:p-5">
+                  <ChatRobot
+                    busy={false}
+                    stage={null}
+                    uploading={false}
+                    sendingOtp={false}
+                    briefState="idle"
+                    failed={false}
+                    input=""
+                    replyKey=""
+                    waitingForPhone={false}
+                    introduction={ROBOT_INTRODUCTIONS[activeMode === "sales" ? "sales" : projectPath === "source" ? "source" : "designer"]}
+                  />
+                </div>
+              )}
               <div className="mt-8 text-center">
                 <p className="mb-3 text-xs text-[hsl(var(--muted-foreground))]">
-                  حالا ایده‌ات رو پایین بنویس، یا از یک نمونه شروع کن:
+                  {needsProjectPath ? "با انتخاب مسیر، گفتگو فعال می‌شود." : projectPath === "source" && mode === "designer" ? sourceReady ? "سورس ثبت شد؛ حالا درباره پروژه و هدفت از انتشار بنویس." : "ابتدا لینک GitHub یا فایل ZIP سورس را اضافه کن." : "حالا ایده‌ات رو پایین بنویس، یا از یک نمونه شروع کن:"}
                 </p>
                 <div className="flex flex-wrap justify-center gap-2">
-                  {QUICK_STARTS[activeMode].map((label) => (
+                  {(activeMode === "designer" && projectPath === "source" ? [] : QUICK_STARTS[activeMode]).map((label) => (
                     <button
                       key={label}
                       type="button"
                       onClick={() => submit(label)}
-                      disabled={isLoading}
+                      disabled={isLoading || chatBlocked}
                       className="min-h-10 rounded-full border border-[hsl(var(--border))] bg-[--surface] px-4 text-sm text-[hsl(var(--secondary-foreground))] outline-none transition-all hover:-translate-y-0.5 hover:border-[--violet-border] hover:text-white focus-visible:ring-2 focus-visible:ring-[--violet-light] disabled:opacity-50"
                     >
                       {label}
@@ -902,6 +1032,7 @@ function ChatPageInner() {
             </section>
           ) : (
             <div role="log" aria-live="polite" aria-label="گفتگو">
+              {pathPicker}
               {messages.map((m, i) =>
                 i === 0 ? null : <ChatBubble key={i} role={m.role} content={m.content} attachments={m.attachments} />,
               )}
@@ -1057,7 +1188,7 @@ function ChatPageInner() {
                   <button
                     type="button"
                     onClick={() => fileRef.current?.click()}
-                    disabled={isLoading}
+                    disabled={isLoading || chatBlocked}
                     className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-[hsl(var(--muted-foreground))] outline-none transition-colors hover:bg-white/5 hover:text-white focus-visible:ring-2 focus-visible:ring-[--violet-light] disabled:opacity-40"
                     aria-label="پیوست فایل یا تصویر"
                     title="پیوست فایل یا تصویر نمونه"
@@ -1083,7 +1214,7 @@ function ChatPageInner() {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleTextareaKeyDown}
                 placeholder={placeholder}
-                disabled={isLoading}
+                disabled={isLoading || chatBlocked}
                 dir={phoneStep ? "ltr" : "rtl"}
                 rows={1}
                 inputMode={phoneStep ? "tel" : "text"}

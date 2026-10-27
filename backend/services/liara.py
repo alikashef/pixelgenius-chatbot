@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import tarfile
+import tempfile
 import time
 from pathlib import Path
 
@@ -132,7 +133,15 @@ def read_meta(slug: str) -> dict | None:
 
 def write_meta(slug: str, meta: dict) -> None:
     META_DIR.mkdir(parents=True, exist_ok=True)
-    (META_DIR / f"{slug}.json").write_text(json.dumps(meta))
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", dir=META_DIR, prefix=f".{slug}-", delete=False) as handle:
+            temporary = Path(handle.name)
+            json.dump(meta, handle)
+        temporary.replace(META_DIR / f"{slug}.json")
+    finally:
+        if temporary:
+            temporary.unlink(missing_ok=True)
 
 
 def active_app_count() -> int:
@@ -331,6 +340,8 @@ async def watch_release(slug: str, release_id: str, max_seconds: int = 600) -> N
 
     Liara only streams build errors live; they are not returned once the build is over.
     """
+    context = read_meta(slug) or {}
+    last_state = None
     since = None
     errors: list[str] = []
     started = time.time()
@@ -347,6 +358,15 @@ async def watch_release(slug: str, release_id: str, max_seconds: int = 600) -> N
                 if output:
                     since = output[-1].get("createdAt") or since
                 state = (body.get("release") or {}).get("state")
+                if state and state != last_state and context.get("order_id"):
+                    from services import workspace
+                    await workspace.record_for_order(context["order_id"], {
+                        "state": state, "release_id": release_id,
+                        "attempt_id": context.get("attempt_id"),
+                        "version_id": context.get("version_id"),
+                        "expires_at": context.get("expires_at"),
+                    })
+                    last_state = state
                 if errors or state in TERMINAL_STATES:
                     meta = read_meta(slug) or {}
                     if meta.get("release_id") == release_id:

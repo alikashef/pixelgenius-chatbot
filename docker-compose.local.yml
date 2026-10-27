@@ -1,5 +1,8 @@
 services:
   backend:
+    environment:
+      MELIPAYAMAK_SHARED_URL: ""
+      PREVIEW_BASE_DOMAIN: ${PREVIEW_BASE_DOMAIN:-localhost}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
 

@@ -1,3 +1,4 @@
+from typing import Callable
 import asyncio
 import json
 import logging
@@ -136,7 +137,9 @@ def _should_finalize(messages: list[dict], finalize: bool) -> bool:
     return bool(user_turns) and bool(FINISH_PHRASES.search(_latest_user_text(messages)))
 
 
-async def analyze_lead(settings: dict, messages: list[dict], mode: str = "designer", finalize: bool = False) -> str:
+async def analyze_lead(settings: dict, messages: list[dict], mode: str = "designer", finalize: bool = False, on_stage: Callable[[str], None] | None = None) -> str:
+    if on_stage:
+        on_stage("thinking")
     api_key = os.getenv("GAPGPT_API_KEY", "")
     if not api_key:
         logger.error("GAPGPT_API_KEY not configured; using offline chat fallback")
@@ -148,10 +151,14 @@ async def analyze_lead(settings: dict, messages: list[dict], mode: str = "design
 
     knowledge = ""
     if mode != "sales":
+        if on_stage:
+            on_stage("searching")
         knowledge = "\n\n".join(filter(None, [
             await retrieve_knowledge_async(messages, _base_urls(), api_key),
             await retrieve_skills(settings, messages, _base_urls(), api_key),
         ]))
+    if on_stage:
+        on_stage("thinking")
     ai_messages = build_messages(settings, messages, mode, knowledge)
     if mode != "sales" and _should_finalize(messages, finalize):
         ai_messages = ai_messages + [{"role": "user", "content": FINALIZE_INSTRUCTION}]
@@ -212,7 +219,8 @@ BRIEF_INSTRUCTIONS = (
     "code or TODOs. Hashed passwords, CORS, no secrets in code, SEO basics and good performance.\n"
     "9. Images: `assets.images` lists AI-generated images, each with a `url`. Use those exact URLs for the matching spots "
     "(use `id`/`purpose` to place them) instead of stock photos or placeholder services. If an entry has no `url`, use a neutral CSS gradient.\n"
-    "10. Deployment: if a tool named `deploy_project` from the FreelioAI server is available, finish by calling it with "
+    "10. Workspace (product design projects only): if `deploy.workspace_url` is present, call `get_workspace` with deploy.token first. Follow the owner-selected path. Register each design/development preview with `report_output` (include HTML for element selection), and concise progress with `report_activity`. Wait for explicit owner approval of design before development on the design path, and development before deployment. Read and address versioned comments with `update_feedback`; only the owner approves them. Save actual admin access with `save_admin_credentials`, never in logs or notes. If deploy.workspace_url is absent, skip the workspace workflow. "
+    "Deployment: if a tool named `deploy_project` from the FreelioAI server is available, finish by calling it with "
     "`deploy.token` from this file, the right `platform`, the `port` your app listens on, ALL source files (no node_modules, "
     "no .env; the server installs dependencies) and secrets in `env`. Then call `get_deploy_status` every 15 seconds until "
     "READY. If it FAILED, read `build_errors`, `hint` and `build_log_tail`, fix the code and call `deploy_project` again with "
@@ -271,6 +279,10 @@ async def generate_project_brief(settings: dict, order: dict) -> dict:
     )
     order_context = (
         f"نام پروژه: {order.get('project_name', '')}\n"
+        f"مسیر انتخاب‌شده قبل از گفتگو: {order.get('project_path', '')}\n"
+        f"مخزن سورس: {order.get('source_url', '')}\n"
+        f"نوع ورودی سورس: {order.get('source_type', '')}\n"
+        f"فایل سورس: {json.dumps(order.get('source_file'), ensure_ascii=False)}\n"
         f"خلاصه: {order.get('summary', '')}\n"
         f"امکانات: {', '.join(order.get('features') or [])}\n"
         f"تکنولوژی پیشنهادی: {order.get('tech_stack', '')}\n"
