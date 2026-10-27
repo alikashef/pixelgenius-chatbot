@@ -14,6 +14,9 @@ from models import Customer, Order, ChatSession
 from schemas import CustomerProfileOut, CustomerProfileUpdateIn, OrderCreateIn, OrderOut
 from auth import get_current_customer
 from sms import send_notification
+from lib.ai.analyze_lead import generate_project_brief
+from routers.site_mcp import make_deploy_info
+from services.ai_settings import get_ai_settings
 
 FREELANCER_PHONE = os.getenv("FREELANCER_PHONE", "")
 
@@ -75,6 +78,7 @@ async def create_order(
         price_estimate=body.price_estimate,
         price_label=body.price_label,
         order_files=[item.model_dump(mode="json") for item in body.order_files],
+        mode=body.mode if body.mode in ("sales", "designer") else "sales",
     )
     db.add(order)
     await db.commit()
@@ -114,6 +118,34 @@ async def get_order(
     if not order:
         raise HTTPException(status_code=404, detail="سفارش یافت نشد")
     return order
+
+
+@router.post("/customer/orders/{order_id}/brief")
+async def get_order_brief(
+    order_id: str,
+    db: AsyncSession = Depends(get_db),
+    payload: dict = Depends(get_current_customer),
+):
+    result = await db.execute(
+        select(Order).where(Order.id == order_id, Order.customer_id == payload["sub"])
+    )
+    order = result.scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="سفارش یافت نشد")
+    settings = await get_ai_settings(db)
+    brief = await generate_project_brief(
+        settings,
+        {
+            "project_name": order.project_name,
+            "summary": order.summary,
+            "features": order.features,
+            "tech_stack": order.tech_stack,
+            "order_files": order.order_files,
+            "chat_history": order.chat_history,
+        },
+    )
+    brief["deploy"] = make_deploy_info(order.id)
+    return brief
 
 
 @router.post("/customer/orders/{order_id}/files", response_model=OrderOut)

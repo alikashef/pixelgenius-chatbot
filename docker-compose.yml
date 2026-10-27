@@ -10,6 +10,7 @@ services:
     environment:
       APP_DOMAIN: ${APP_DOMAIN:-chat.pixelgenius.ir}
       CADDY_EMAIL: ${CADDY_EMAIL:-admin@pixelgenius.ir}
+      PREVIEW_DOMAIN: ${PREVIEW_BASE_DOMAIN:-preview.pixelgenius.ir}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
@@ -53,8 +54,18 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
       MELIPAYAMAK_SHARED_URL: ${MELIPAYAMAK_SHARED_URL}
       MELIPAYAMAK_BODY_ID: ${MELIPAYAMAK_BODY_ID:-459793}
+      PREVIEW_BASE_DOMAIN: ${PREVIEW_BASE_DOMAIN:-}
+      PREVIEW_URL_TEMPLATE: ${PREVIEW_URL_TEMPLATE:-}
+      PUBLIC_MCP_URL: ${PUBLIC_MCP_URL:-}
+      SITE_TTL_DAYS: ${SITE_TTL_DAYS:-}
+      LIARA_API_TOKEN: ${LIARA_API_TOKEN:-}
+      LIARA_TTL_HOURS: ${LIARA_TTL_HOURS:-}
+      LIARA_MAX_APPS: ${LIARA_MAX_APPS:-}
+      LIARA_PLAN: ${LIARA_PLAN:-}
+      LIARA_BUNDLE_PLAN: ${LIARA_BUNDLE_PLAN:-}
     volumes:
       - uploads:/app/uploads
+      - sites:/app/sites
     depends_on:
       db:
         condition: service_healthy
@@ -76,5 +87,6 @@ services:
 volumes:
   pgdata:
   uploads:
+  sites:
   caddy_data:
   caddy_config:

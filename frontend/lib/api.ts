@@ -15,6 +15,7 @@ export interface Proposal {
   days: number;
   price: number;
   priceLabel: string;
+  mode?: ChatMode;
 }
 
 export interface LeadAnalysis {
@@ -49,6 +50,7 @@ export interface Order {
   price_estimate: number;
   price_label: string;
   order_files: OrderFile[];
+  mode?: ChatMode;
   final_price: number | null;
   payment_percentage: number | null;
   payment_amount: number | null;
@@ -137,11 +139,25 @@ export async function freelancerLogin(email: string, password: string): Promise<
   return res.json();
 }
 
-export async function sendChat(messages: Message[], attachments: OrderFile[] = [], botToken?: string): Promise<string> {
+export interface ChatHandoff {
+  version: 1;
+  proposal: Proposal;
+  chatHistory: Message[];
+  attachments: OrderFile[];
+}
+
+export type ChatMode = "designer" | "sales";
+
+export async function sendChat(
+  messages: Message[],
+  attachments: OrderFile[] = [],
+  mode: ChatMode = "designer",
+  botToken?: string,
+): Promise<string> {
   const res = await fetch(`${API_URL}/api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages, attachments, bot_token: botToken || null }),
+    body: JSON.stringify({ messages, attachments, mode, bot_token: botToken || null }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -174,6 +190,15 @@ export async function verifyOtp(phone: string, code: string) {
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.detail || "کد اشتباه است");
+  }
+  return res.json();
+}
+
+export async function fetchChatHandoff(handoffId: string): Promise<ChatHandoff> {
+  const res = await fetch(`${API_URL}/api/customer/handoff/${encodeURIComponent(handoffId)}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "اطلاعات گفتگو منقضی شده است");
   }
   return res.json();
 }
@@ -217,6 +242,7 @@ export async function submitOrder(token: string, proposal: Proposal, chatHistory
       price_label: proposal.priceLabel,
       order_files: orderFiles,
       session_id: sessionId || null,
+      mode: proposal.mode ?? "sales",
     }),
   });
   if (!res.ok) throw new Error("خطا در ثبت درخواست");
@@ -249,6 +275,16 @@ export async function fetchMyOrder(token: string, id: string): Promise<Order> {
   });
   if (res.status === 401 || res.status === 403) throw new Error("UNAUTHORIZED");
   if (!res.ok) throw new Error("خطا در دریافت سفارش");
+  return res.json();
+}
+
+export async function fetchOrderBrief(token: string, id: string): Promise<Record<string, unknown>> {
+  const res = await fetch(`${API_URL}/api/customer/orders/${id}/brief`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (res.status === 401 || res.status === 403) throw new Error("UNAUTHORIZED");
+  if (!res.ok) throw new Error("خطا در ساخت کانفیگ پروژه");
   return res.json();
 }
 

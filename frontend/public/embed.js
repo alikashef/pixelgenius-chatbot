@@ -24,6 +24,8 @@
   var WELCOME = "سلام! خوش اومدید.\nمن مشاور هوشمند تیم " + config.brand + " هستم. بهم بگید چه نوع پروژه‌ای در ذهن دارید؟";
   var PHONE_ASK = "پروپوزال پروژه‌تون آماده‌ست.\nبرای ثبت درخواست، شماره موبایلتون رو بنویسید تا کد تایید ارسال کنیم:";
   var STORAGE_KEY = "pixelgenius_embed_chat_v1";
+  var SESSIONS_KEY = "pixelgenius_embed_chat_sessions_v1";
+  var MAX_SESSIONS = 12;
 
   if (!document.body && currentScript) {
     document.addEventListener(
@@ -68,10 +70,20 @@
     ".pg-dot{width:10px;height:10px;border-radius:50%;background:var(--pg-primary);box-shadow:0 0 0 5px color-mix(in srgb,var(--pg-primary) 14%,transparent)}",
     ".pg-title{font-size:15px;font-weight:700;color:#0f172a;line-height:1.4;margin:0}",
     ".pg-sub{font-size:12px;color:#64748b;margin:0}",
-    ".pg-close,.pg-reset{border:0;background:transparent;color:#64748b;cursor:pointer;font:inherit;font-family:var(--pg-font);padding:6px;border-radius:8px}",
-    ".pg-close:hover,.pg-reset:hover{background:#eef5f1;color:#0f172a}",
+    ".pg-close,.pg-reset,.pg-history{border:0;background:transparent;color:#64748b;cursor:pointer;font:inherit;font-family:var(--pg-font);padding:6px;border-radius:8px}",
+    ".pg-history{font-size:12px;font-weight:700;padding:7px 8px}",
+    ".pg-close:hover,.pg-reset:hover,.pg-history:hover{background:#eef5f1;color:#0f172a}",
     ".pg-spacer{flex:1}",
     ".pg-body{overflow:auto;padding:16px 14px;background:linear-gradient(180deg,#f8fcfa 0%,#f1f7f4 100%)}",
+    ".pg-sessions{display:grid;gap:10px}",
+    ".pg-sessions-head{display:flex;align-items:center;gap:8px;margin-bottom:4px}",
+    ".pg-sessions-title{font-size:13px;font-weight:800;color:#0f172a;margin:0}",
+    ".pg-sessions-new{margin-right:auto;border:0;border-radius:10px;background:var(--pg-primary);color:#fff;cursor:pointer;font:700 12px/1 var(--pg-font);padding:9px 10px}",
+    ".pg-session{width:100%;border:1px solid #dbe5e1;border-radius:12px;background:#fff;color:#0f172a;cursor:pointer;text-align:right;padding:11px 12px;display:grid;gap:5px}",
+    ".pg-session:hover{border-color:color-mix(in srgb,var(--pg-primary) 40%,#dbe5e1);background:#fbfffd}",
+    ".pg-session-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:800}",
+    ".pg-session-meta{font-size:11px;color:#64748b}",
+    ".pg-empty{margin:28px 0;text-align:center;color:#64748b;font-size:13px;line-height:1.8}",
     ".pg-msg-row{display:flex;margin:0 0 12px}",
     ".pg-msg-row.user{justify-content:flex-start}",
     ".pg-msg-row.assistant{justify-content:flex-end}",
@@ -115,6 +127,7 @@
     "      <span class='pg-dot' aria-hidden='true'></span>",
     "      <div><p class='pg-title'></p><p class='pg-sub'></p></div>",
     "      <span class='pg-spacer'></span>",
+    "      <button class='pg-history' type='button' title='چت‌های قبلی'>چت‌ها</button>",
     "      <button class='pg-reset' type='button' title='چت جدید'>↻</button>",
     "      <button class='pg-close' type='button' title='بستن'>×</button>",
     "    </header>",
@@ -140,6 +153,7 @@
   var button = shadow.querySelector(".pg-button");
   var closeButton = shadow.querySelector(".pg-close");
   var resetButton = shadow.querySelector(".pg-reset");
+  var historyButton = shadow.querySelector(".pg-history");
   var title = shadow.querySelector(".pg-title");
   var subtitle = shadow.querySelector(".pg-sub");
   var body = shadow.querySelector(".pg-body");
@@ -159,8 +173,12 @@
   closeButton.addEventListener("click", function () {
     setOpen(false);
   });
+  historyButton.addEventListener("click", function () {
+    state.view = state.view === "history" ? "chat" : "history";
+    render();
+  });
   resetButton.addEventListener("click", function () {
-    state = defaultState();
+    state = defaultState(createSessionId());
     saveState();
     render();
     input.focus();
@@ -187,7 +205,7 @@
       setOpen(false);
     },
     reset: function () {
-      state = defaultState();
+      state = defaultState(createSessionId());
       saveState();
       render();
     },
@@ -222,11 +240,14 @@
     return document.body;
   }
 
-  function defaultState() {
+  function defaultState(sessionId) {
     return {
+      sessionId: sessionId || createSessionId(),
+      view: "chat",
       messages: [{ role: "assistant", content: WELCOME }],
       attachments: [],
       phoneStep: false,
+      handoff: null,
       loading: false,
       error: "",
     };
@@ -237,17 +258,20 @@
       var parsed = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || "");
       if (parsed && Array.isArray(parsed.messages) && typeof parsed.phoneStep === "boolean") {
         return {
+          sessionId: typeof parsed.sessionId === "string" ? parsed.sessionId : createSessionId(),
+          view: "chat",
           messages: parsed.messages.filter(isMessage),
           attachments: Array.isArray(parsed.attachments) ? parsed.attachments.filter(isAttachment) : [],
           phoneStep: parsed.phoneStep,
+          handoff: parsed.handoff && isHandoff(parsed.handoff) ? parsed.handoff : null,
           loading: false,
           error: "",
         };
       }
     } catch (error) {
-      return defaultState();
+      return defaultState(createSessionId());
     }
-    return defaultState();
+    return defaultState(createSessionId());
   }
 
   function isMessage(message) {
@@ -268,15 +292,97 @@
     );
   }
 
+  function isHandoff(handoff) {
+    return (
+      handoff &&
+      handoff.version === 1 &&
+      handoff.proposal &&
+      handoff.proposal.type === "proposal" &&
+      Array.isArray(handoff.chatHistory)
+    );
+  }
+
   function saveState() {
     try {
+      var snapshot = {
+        sessionId: state.sessionId,
+        messages: state.messages,
+        attachments: state.attachments || [],
+        phoneStep: state.phoneStep,
+        handoff: state.handoff || null,
+        updatedAt: new Date().toISOString(),
+      };
       window.localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ messages: state.messages, attachments: state.attachments || [], phoneStep: state.phoneStep })
+        JSON.stringify(snapshot)
       );
+      upsertSession(snapshot);
     } catch (error) {
       // Storage can be unavailable in restricted embeds; the chat still works for the current page.
     }
+  }
+
+  function readSessions() {
+    try {
+      var parsed = JSON.parse(window.localStorage.getItem(SESSIONS_KEY) || "[]");
+      if (!Array.isArray(parsed)) return [];
+      return parsed.filter(function (session) {
+        return session && typeof session.id === "string" && session.draft && Array.isArray(session.draft.messages);
+      });
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function writeSessions(sessions) {
+    try {
+      window.localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions.slice(0, MAX_SESSIONS)));
+    } catch (error) {
+      // Ignore unavailable storage.
+    }
+  }
+
+  function upsertSession(snapshot) {
+    var sessions = readSessions().filter(function (session) {
+      return session.id !== snapshot.sessionId;
+    });
+    sessions.unshift({
+      id: snapshot.sessionId,
+      title: getSessionTitle(snapshot.messages),
+      updatedAt: snapshot.updatedAt,
+      draft: snapshot,
+    });
+    writeSessions(sessions);
+  }
+
+  function createSessionId() {
+    return String(Date.now()) + "-" + Math.random().toString(36).slice(2, 9);
+  }
+
+  function getSessionTitle(messages) {
+    var userMessage = (messages || []).find(function (message) {
+      return message.role === "user" && message.content.trim();
+    });
+    return userMessage ? userMessage.content.trim().slice(0, 54) : "چت جدید";
+  }
+
+  function openSession(sessionId) {
+    var session = readSessions().find(function (item) {
+      return item.id === sessionId;
+    });
+    if (!session || !session.draft) return;
+    state = {
+      sessionId: session.id,
+      view: "chat",
+      messages: (session.draft.messages || []).filter(isMessage),
+      attachments: Array.isArray(session.draft.attachments) ? session.draft.attachments.filter(isAttachment) : [],
+      phoneStep: Boolean(session.draft.phoneStep),
+      handoff: session.draft.handoff && isHandoff(session.draft.handoff) ? session.draft.handoff : null,
+      loading: false,
+      error: "",
+    };
+    saveState();
+    render();
   }
 
   function setOpen(open) {
@@ -416,11 +522,10 @@
       saveState();
       render();
       setTimeout(function () {
-      var url = new URL(config.loginUrl, window.location.href);
-      url.searchParams.set("phone", phone);
-      url.searchParams.set("redirect", "/panel");
-      if (state.handoff) url.searchParams.set("handoff", encodeHandoff(state.handoff));
-      window.location.href = url.toString();
+        redirectToLogin(phone).catch(function (error) {
+          state.error = error.message || "خطا در انتقال به صفحه ورود";
+          render();
+        });
       }, 1200);
     } catch (error) {
       state.error = error.message || "خطا در ارسال کد";
@@ -429,6 +534,41 @@
       state.loading = false;
       render();
     }
+  }
+
+  async function redirectToLogin(phone) {
+    var url = new URL(config.loginUrl, window.location.href);
+    url.searchParams.set("phone", phone);
+    url.searchParams.set("redirect", "/panel");
+    if (state.handoff) {
+      var handoff = await storeHandoff(state.handoff);
+      url.searchParams.set("handoff_id", handoff.handoff_id);
+    }
+    state = {
+      sessionId: createSessionId(),
+      view: "chat",
+      messages: [
+        { role: "assistant", content: "کد تایید ارسال شد. ادامه ثبت درخواست داخل پنل انجام می‌شود." },
+        { role: "assistant", content: "بعد از تایید کد، درخواست در پنل ثبت می‌شود. این گفتگو از بخش «چت‌ها» همینجا قابل مشاهده است." },
+      ],
+      attachments: [],
+      phoneStep: false,
+      handoff: null,
+      loading: false,
+      error: "",
+    };
+    saveState();
+    window.location.href = url.toString();
+  }
+
+  async function storeHandoff(handoff) {
+    var response = await fetch(joinUrl(config.apiUrl, "/api/customer/handoff"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(handoff),
+    });
+    if (!response.ok) throw new Error(await readError(response, "خطا در آماده‌سازی ثبت درخواست"));
+    return response.json();
   }
 
   function parseLead(reply) {
@@ -509,6 +649,12 @@
 
   function render() {
     body.innerHTML = "";
+    historyButton.textContent = state.view === "history" ? "چت" : "چت‌ها";
+    form.style.display = state.view === "history" ? "none" : "grid";
+    if (state.view === "history") {
+      renderSessions();
+      return;
+    }
     state.messages.forEach(function (message) {
       var row = document.createElement("div");
       var bubble = document.createElement("div");
@@ -547,6 +693,69 @@
     panel.setAttribute("aria-busy", String(state.loading));
     autoSizeInput();
     body.scrollTop = body.scrollHeight;
+  }
+
+  function renderSessions() {
+    var wrapper = document.createElement("div");
+    wrapper.className = "pg-sessions";
+
+    var header = document.createElement("div");
+    header.className = "pg-sessions-head";
+    var heading = document.createElement("p");
+    heading.className = "pg-sessions-title";
+    heading.textContent = "چت‌های قبلی";
+    var newButton = document.createElement("button");
+    newButton.className = "pg-sessions-new";
+    newButton.type = "button";
+    newButton.textContent = "چت جدید";
+    newButton.addEventListener("click", function () {
+      state = defaultState(createSessionId());
+      saveState();
+      render();
+      input.focus();
+    });
+    header.appendChild(heading);
+    header.appendChild(newButton);
+    wrapper.appendChild(header);
+
+    var sessions = readSessions();
+    if (!sessions.length) {
+      var empty = document.createElement("p");
+      empty.className = "pg-empty";
+      empty.textContent = "هنوز چتی ذخیره نشده است.";
+      wrapper.appendChild(empty);
+      body.appendChild(wrapper);
+      return;
+    }
+
+    sessions.forEach(function (session) {
+      var item = document.createElement("button");
+      item.className = "pg-session";
+      item.type = "button";
+      item.addEventListener("click", function () {
+        openSession(session.id);
+      });
+
+      var itemTitle = document.createElement("span");
+      itemTitle.className = "pg-session-title";
+      itemTitle.textContent = session.title || "چت جدید";
+      var meta = document.createElement("span");
+      meta.className = "pg-session-meta";
+      meta.textContent = formatSessionDate(session.updatedAt);
+      item.appendChild(itemTitle);
+      item.appendChild(meta);
+      wrapper.appendChild(item);
+    });
+
+    body.appendChild(wrapper);
+  }
+
+  function formatSessionDate(value) {
+    try {
+      return new Date(value).toLocaleDateString("fa-IR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+    } catch (error) {
+      return "";
+    }
   }
 
   function renderButtonState() {

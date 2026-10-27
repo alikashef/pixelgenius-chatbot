@@ -3,7 +3,7 @@
 import { useState, useEffect, FormEvent, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { IconArrowRight, IconDeviceMobile, IconRefresh, IconShieldCheck } from "@tabler/icons-react";
-import { sendOtp, verifyOtp, submitOrder, Proposal, Message, OrderFile } from "@/lib/api";
+import { fetchChatHandoff, sendOtp, verifyOtp, submitOrder, Proposal, Message, OrderFile } from "@/lib/api";
 
 function LoginContent() {
   const router = useRouter();
@@ -11,6 +11,7 @@ function LoginContent() {
   const phoneParam = params.get("phone") || "";
   const redirect = params.get("redirect") || "/panel";
   const handoffParam = params.get("handoff") || "";
+  const handoffIdParam = params.get("handoff_id") || "";
 
   const [phone, setPhone] = useState(phoneParam);
   const [code, setCode] = useState("");
@@ -24,7 +25,7 @@ function LoginContent() {
     return messages.flatMap((message) => message.attachments || []);
   }
 
-  function readHandoff(): { proposal: Proposal; chatHistory: Message[]; attachments: OrderFile[] } | null {
+  function readEncodedHandoff(): { proposal: Proposal; chatHistory: Message[]; attachments: OrderFile[] } | null {
     if (!handoffParam) return null;
     try {
       const normalized = handoffParam.replace(/-/g, "+").replace(/_/g, "/");
@@ -46,6 +47,22 @@ function LoginContent() {
     } catch {
       return null;
     }
+  }
+
+  async function readHandoff(): Promise<{ proposal: Proposal; chatHistory: Message[]; attachments: OrderFile[] } | null> {
+    if (handoffIdParam) {
+      const parsed = await fetchChatHandoff(handoffIdParam);
+      if (parsed.proposal?.type !== "proposal" || !Array.isArray(parsed.chatHistory)) return null;
+      return {
+        proposal: parsed.proposal,
+        chatHistory: parsed.chatHistory.filter((message) => message.role === "user" || message.role === "assistant"),
+        attachments: [
+          ...(Array.isArray(parsed.attachments) ? parsed.attachments : []),
+          ...collectMessageAttachments(parsed.chatHistory),
+        ],
+      };
+    }
+    return readEncodedHandoff();
   }
 
   useEffect(() => {
@@ -107,18 +124,20 @@ function LoginContent() {
       }
 
       // auto-submit proposal if exists
-      const handoff = readHandoff();
+      const handoff = await readHandoff();
       const storedProposal = localStorage.getItem("proposal");
+      let designerOrderId = "";
       if (handoff) {
         try {
           const order = await submitOrder(token, handoff.proposal, handoff.chatHistory, handoff.attachments);
           localStorage.removeItem("proposal");
           localStorage.removeItem(`chat_draft_customer_${data.customer_id}`);
           localStorage.removeItem("chat_draft_anonymous");
-          router.push(`/panel/${order.id}`);
+          router.push(order.mode === "designer" ? `/chat?brief=${order.id}` : `/panel/${order.id}`);
           return;
-        } catch {
-          // handoff submit failed — fall back to normal redirect
+        } catch (submitError) {
+          setError(submitError instanceof Error ? submitError.message : "ورود انجام شد اما ثبت درخواست ناموفق بود. لطفاً دوباره تلاش کنید.");
+          return;
         }
       }
 
@@ -135,7 +154,8 @@ function LoginContent() {
             ...collectMessageAttachments(draftMessages),
           ];
           const chatHistory = draftMessages.filter((message) => message.role === "user" || message.role === "assistant").slice(1);
-          await submitOrder(token, proposal, chatHistory, attachments);
+          const created = await submitOrder(token, proposal, chatHistory, attachments);
+          if (created.mode === "designer") designerOrderId = created.id;
           localStorage.removeItem("proposal");
           localStorage.removeItem(`chat_draft_customer_${data.customer_id}`);
           localStorage.removeItem("chat_draft_anonymous");
@@ -144,7 +164,7 @@ function LoginContent() {
         }
       }
 
-      router.push(redirect);
+      router.push(designerOrderId ? `/chat?brief=${designerOrderId}` : redirect);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "کد اشتباه است");
     } finally {

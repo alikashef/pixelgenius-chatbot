@@ -1,10 +1,12 @@
-from prompts.output_schema import OUTPUT_SCHEMA
+from prompts.output_schema import DESIGNER_OUTPUT_SCHEMA, OUTPUT_SCHEMA
 from prompts.pricing_knowledge import render_pricing_knowledge
 from prompts.question_flow import render_question_flow
 from prompts.sales_rules import render_sales_rules
-from prompts.system_prompt import SYSTEM_PROMPT
+from prompts.system_prompt import DESIGNER_PROMPT, SYSTEM_PROMPT
 from prompts.technical_advice import render_technical_advice
 
+MAX_HISTORY_MESSAGES = 40
+MAX_TEXT_CONTENT_CHARS = 6000
 
 def _render_freelancer_context(settings: dict) -> str:
     name = (settings.get("freelancer_name") or "").strip()
@@ -34,16 +36,62 @@ def _render_freelancer_context(settings: dict) -> str:
     return "\n".join(lines)
 
 
-def build_messages(settings: dict, messages: list[dict]) -> list[dict]:
-    parts = [SYSTEM_PROMPT.strip()]
-    freelancer_ctx = _render_freelancer_context(settings)
-    if freelancer_ctx:
-        parts.append(freelancer_ctx)
-    parts += [
-        render_sales_rules(settings),
-        render_pricing_knowledge(settings),
-        render_question_flow(settings),
-        render_technical_advice(settings),
-        OUTPUT_SCHEMA.strip(),
+def _truncate_text(value: str, limit: int = MAX_TEXT_CONTENT_CHARS) -> str:
+    if len(value) <= limit:
+        return value
+    return value[:limit].rstrip() + "\n\n[بخشی از متن طولانی برای کاهش حجم پیام حذف شد.]"
+
+
+def _compact_message(message: dict) -> dict:
+    compact = dict(message)
+    content = compact.get("content")
+    if isinstance(content, str):
+        compact["content"] = _truncate_text(content)
+    elif isinstance(content, list):
+        compact["content"] = [
+            {**part, "text": _truncate_text(part.get("text", ""))}
+            if isinstance(part, dict) and part.get("type") == "text"
+            else part
+            for part in content
+        ]
+    return compact
+
+
+def _compact_history(messages: list[dict], old_limit: int | None = None, keep_recent: int = 6) -> list[dict]:
+    recent = messages[-MAX_HISTORY_MESSAGES:]
+    compacted = [_compact_message(message) for message in recent]
+    if old_limit is None:
+        return compacted
+    cutoff = len(compacted) - keep_recent
+    return [
+        _compact_message_to(message, old_limit) if index < cutoff else message
+        for index, message in enumerate(compacted)
     ]
-    return [{"role": "system", "content": "\n\n".join(parts)}] + messages
+
+
+def _compact_message_to(message: dict, limit: int) -> dict:
+    content = message.get("content")
+    if isinstance(content, str):
+        return {**message, "content": _truncate_text(content, limit)}
+    if isinstance(content, list):
+        text = " ".join(p.get("text", "") for p in content if isinstance(p, dict) and p.get("type") == "text")
+        return {**message, "content": _truncate_text(text, limit)}
+    return message
+
+
+def build_messages(settings: dict, messages: list[dict], mode: str = "designer", knowledge: str = "") -> list[dict]:
+    if mode == "sales":
+        freelancer_ctx = _render_freelancer_context(settings)
+        parts = [SYSTEM_PROMPT.strip()] + ([freelancer_ctx] if freelancer_ctx else []) + [
+            render_sales_rules(settings),
+            render_pricing_knowledge(settings),
+            render_question_flow(settings),
+            render_technical_advice(settings),
+            OUTPUT_SCHEMA.strip(),
+        ]
+    else:
+        parts = [DESIGNER_PROMPT.strip()] + ([knowledge] if knowledge else []) + [DESIGNER_OUTPUT_SCHEMA.strip()]
+        system_content = "\n\n".join(parts)
+        return [{"role": "system", "content": system_content}] + _compact_history(messages, old_limit=700)
+    system_content = "\n\n".join(parts)
+    return [{"role": "system", "content": system_content}] + _compact_history(messages)

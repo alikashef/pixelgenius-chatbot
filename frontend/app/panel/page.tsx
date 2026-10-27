@@ -3,7 +3,20 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { IconPlus, IconSparkles, IconLogout, IconClipboardList, IconMessage, IconSettings } from "@tabler/icons-react";
+import {
+  IconPlus,
+  IconSparkles,
+  IconLogout,
+  IconClipboardList,
+  IconMessage,
+  IconSettings,
+  IconWand,
+  IconCoin,
+  IconCheck,
+  IconDownload,
+  IconChevronLeft,
+  IconCalendar,
+} from "@tabler/icons-react";
 import { fetchCustomerProfile, fetchMyOrders, updateCustomerProfile, CustomerProfile, Order } from "@/lib/api";
 
 const STATUS_LABEL: Record<Order["status"], string> = {
@@ -54,10 +67,100 @@ function readChatSessions(customerId: string): ChatSessionListItem[] {
 }
 
 const TABS = [
-  { key: "orders", label: "درخواست‌ها", icon: IconClipboardList },
+  { key: "orders", label: "پروژه‌ها", icon: IconClipboardList },
   { key: "chats", label: "چت‌های ناتمام", icon: IconMessage },
-  { key: "account", label: "تنظیمات حساب", icon: IconSettings },
+  { key: "account", label: "حساب", icon: IconSettings },
 ] as const;
+
+function hasPrice(order: Order) {
+  const label = (order.price_label || "").trim();
+  return Boolean(order.final_price) || (label !== "" && label !== "-");
+}
+
+function ProjectCard({ order }: { order: Order }) {
+  const isDesigner = order.mode === "designer";
+  const Icon = isDesigner ? IconWand : IconCoin;
+  return (
+    <article className="group flex flex-col rounded-2xl border border-[hsl(var(--border))] bg-[--surface] p-5 transition-all hover:-translate-y-0.5 hover:border-[--violet-border]">
+      <div className="flex items-center justify-between gap-3">
+        <span className="inline-flex items-center gap-1.5 rounded-lg bg-[--violet-glow] px-2.5 py-1 text-xs font-semibold text-violet-300">
+          <Icon size={13} stroke={2.2} />
+          {isDesigner ? "طراحی محصول" : "مشاوره فروش"}
+        </span>
+        {isDesigner ? (
+          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-400">
+            <IconCheck size={12} stroke={3} />
+            کانفیگ آماده
+          </span>
+        ) : (
+          <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_CLASS[order.status]}`}>
+            {STATUS_LABEL[order.status]}
+          </span>
+        )}
+      </div>
+
+      <h3 className="mt-4 text-base font-bold leading-7 text-white">
+        <Link
+          href={`/panel/${order.id}`}
+          className="rounded outline-none after:absolute after:inset-0 focus-visible:ring-2 focus-visible:ring-[--violet-light]"
+        >
+          {order.project_name}
+        </Link>
+      </h3>
+      <p className="mt-1.5 line-clamp-2 text-sm leading-7 text-[hsl(var(--muted-foreground))]">{order.summary}</p>
+
+      <dl className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-[hsl(var(--muted-foreground))]">
+        <div className="flex items-center gap-1.5">
+          <IconCalendar size={13} stroke={2} />
+          <dt className="sr-only">تاریخ ثبت</dt>
+          <dd>{formatDate(order.created_at)}</dd>
+        </div>
+        {order.tech_stack && (
+          <div className="min-w-0 max-w-full truncate">
+            <dt className="sr-only">استک</dt>
+            <dd className="truncate" dir="auto">{order.tech_stack}</dd>
+          </div>
+        )}
+        {!isDesigner && hasPrice(order) && (
+          <div>
+            <dt className="sr-only">مبلغ</dt>
+            <dd className="font-semibold text-[hsl(var(--foreground))]">{formatMoney(order.final_price) || order.price_label}</dd>
+          </div>
+        )}
+      </dl>
+
+      <div className="relative z-10 mt-5 flex items-center justify-between gap-3 border-t border-[hsl(var(--border))] pt-4">
+        {isDesigner ? (
+          <Link
+            href={`/chat?brief=${order.id}`}
+            className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[--violet] px-4 text-sm font-bold text-white shadow-md shadow-[--violet-glow] outline-none transition-colors hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-[--violet-light]"
+          >
+            <IconDownload size={16} stroke={2.2} />
+            دریافت کانفیگ
+          </Link>
+        ) : order.status === "awaiting_payment" ? (
+          <Link
+            href={`/panel/${order.id}`}
+            className="inline-flex min-h-10 items-center rounded-xl bg-[--violet] px-4 text-sm font-bold text-white shadow-md shadow-[--violet-glow] outline-none transition-colors hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-[--violet-light]"
+          >
+            پرداخت
+          </Link>
+        ) : (
+          <span className="text-xs text-[hsl(var(--muted-foreground))]">
+            {order.status === "pending_review" ? "تیم ما در حال بررسی است" : ""}
+          </span>
+        )}
+        <Link
+          href={`/panel/${order.id}`}
+          className="inline-flex items-center gap-0.5 rounded text-xs font-semibold text-violet-300 outline-none transition-colors hover:text-white focus-visible:ring-2 focus-visible:ring-[--violet-light]"
+        >
+          جزئیات
+          <IconChevronLeft size={14} stroke={2.5} />
+        </Link>
+      </div>
+    </article>
+  );
+}
 
 type TabKey = (typeof TABS)[number]["key"];
 
@@ -71,6 +174,7 @@ export default function PanelPage() {
   const [lastName, setLastName] = useState("");
   const [businessType, setBusinessType] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -109,6 +213,7 @@ export default function PanelPage() {
     const token = localStorage.getItem("customer_token");
     if (!token) return;
     setSavingProfile(true);
+    setSaved(false);
     setError("");
     try {
       const updated = await updateCustomerProfile(token, {
@@ -117,6 +222,7 @@ export default function PanelPage() {
         business_type: businessType || null,
       });
       setProfile(updated);
+      setSaved(true);
       if (updated.first_name) localStorage.setItem("customer_first_name", updated.first_name);
       else localStorage.removeItem("customer_first_name");
     } catch (err: unknown) {
@@ -139,230 +245,217 @@ export default function PanelPage() {
     );
   }
 
+  const greeting = profile?.first_name ? `سلام ${profile.first_name} جان` : "سلام";
+
   return (
     <div className="min-h-screen bg-[hsl(var(--background))]">
-      {/* header */}
-      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-[hsl(var(--border))] bg-[hsl(var(--background))]/80 px-5 py-3.5 backdrop-blur-xl">
-        <Link href="/" className="flex items-center gap-2 font-black text-white">
+      <header className="sticky top-0 z-10 flex h-14 items-center gap-3 border-b border-[hsl(var(--border))] bg-[hsl(var(--background))]/85 px-4 backdrop-blur-xl sm:px-5">
+        <Link
+          href="/"
+          aria-label="FreelioAI، صفحه اصلی"
+          className="flex items-center gap-2 rounded-lg font-black text-white outline-none focus-visible:ring-2 focus-visible:ring-[--violet-light]"
+        >
           <span className="grid h-8 w-8 place-items-center rounded-xl bg-[--violet] shadow-md shadow-[--violet-glow]">
             <IconSparkles size={16} stroke={2.2} />
           </span>
           <span className="hidden text-sm sm:inline">FreelioAI</span>
         </Link>
 
-        <div className="h-4 w-px bg-[hsl(var(--border))]" />
-
-        <p className="text-sm font-semibold text-white">
-          {profile?.first_name ? `${profile.first_name} جان` : "پنل کاربری"}
-        </p>
-
         <div className="mr-auto flex items-center gap-2">
-          <button
-            onClick={() => router.push("/chat?new=1")}
-            className="flex items-center gap-1.5 rounded-lg border border-[--violet-border] bg-[--violet-glow] px-3 py-1.5 text-xs font-semibold text-violet-300 transition-colors hover:text-white"
+          <Link
+            href="/chat?new=1"
+            className="flex h-9 items-center gap-1.5 rounded-xl border border-[--violet-border] bg-[--violet-glow] px-3 text-xs font-semibold text-violet-300 outline-none transition-colors hover:text-white focus-visible:ring-2 focus-visible:ring-[--violet-light]"
           >
-            <IconPlus size={13} stroke={2.5} />
-            درخواست جدید
-          </button>
+            <IconPlus size={14} stroke={2.5} />
+            <span className="hidden sm:inline">پروژه جدید</span>
+            <span className="sm:hidden">جدید</span>
+          </Link>
           <button
             onClick={logout}
-            className="flex items-center gap-1.5 rounded-lg border border-[hsl(var(--border))] bg-[--surface] px-3 py-1.5 text-xs text-[hsl(var(--muted-foreground))] transition-colors hover:text-white"
+            aria-label="خروج از حساب"
+            className="flex h-9 items-center gap-1.5 rounded-xl border border-[hsl(var(--border))] bg-[--surface] px-3 text-xs text-[hsl(var(--muted-foreground))] outline-none transition-colors hover:text-white focus-visible:ring-2 focus-visible:ring-[--violet-light]"
           >
-            <IconLogout size={13} stroke={2} />
-            خروج
+            <IconLogout size={14} stroke={2} />
+            <span className="hidden sm:inline">خروج</span>
           </button>
         </div>
       </header>
 
       <main className="mx-auto max-w-4xl px-4 py-8">
+        <section className="mb-6">
+          <h1 className="text-xl font-extrabold text-white sm:text-2xl">{greeting} 👋</h1>
+          <p className="mt-1.5 text-sm leading-7 text-[hsl(var(--muted-foreground))]">
+            {orders.length > 0
+              ? "پروژه‌هات اینجاست. کانفیگ هر پروژه رو بگیر یا ادامه‌ی چت‌های ناتمام رو باز کن."
+              : "هنوز پروژه‌ای نداری. یه گفتگو با طراح محصول شروع کن تا پروژه‌ات ساخته بشه."}
+          </p>
+        </section>
+
         {error && (
-          <p className="mb-6 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2.5 text-center text-sm text-red-400">
+          <p role="alert" className="mb-6 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2.5 text-center text-sm text-red-400">
             {error}
           </p>
         )}
 
-        {/* tabs */}
-        <div className="mb-6 flex gap-1 rounded-2xl border border-[hsl(var(--border))] bg-[--surface] p-1.5">
-          {TABS.map(({ key, label, icon: Icon }) => (
-            <button
-              key={key}
-              onClick={() => setActiveTab(key)}
-              className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all ${
-                activeTab === key
-                  ? "bg-[--violet] text-white shadow-md shadow-[--violet-glow]"
-                  : "text-[hsl(var(--muted-foreground))] hover:text-white"
-              }`}
-            >
-              <Icon size={15} stroke={2} />
-              <span className="hidden sm:inline">{label}</span>
-            </button>
-          ))}
+        <div role="tablist" aria-label="بخش‌های پنل" className="mb-6 flex gap-1 rounded-2xl border border-[hsl(var(--border))] bg-[--surface] p-1.5">
+          {TABS.map(({ key, label, icon: Icon }) => {
+            const count = key === "orders" ? orders.length : key === "chats" ? chatSessions.length : 0;
+            const active = activeTab === key;
+            return (
+              <button
+                key={key}
+                role="tab"
+                aria-selected={active}
+                onClick={() => setActiveTab(key)}
+                className={`flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl px-2 text-[13px] font-semibold outline-none transition-all focus-visible:ring-2 focus-visible:ring-[--violet-light] sm:gap-2 sm:px-3 sm:text-sm ${
+                  active
+                    ? "bg-[--violet] text-white shadow-md shadow-[--violet-glow]"
+                    : "text-[hsl(var(--muted-foreground))] hover:text-white"
+                }`}
+              >
+                <Icon size={16} stroke={2} />
+                <span>{label}</span>
+                {count > 0 && (
+                  <span className={`rounded-full px-1.5 text-[11px] ${active ? "bg-white/20" : "bg-white/10"}`}>
+                    {count.toLocaleString("fa-IR")}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
-        {/* orders tab */}
         {activeTab === "orders" && orders.length === 0 && (
-          <div className="flex flex-col items-center justify-center rounded-3xl border border-[hsl(var(--border))] bg-[--surface] py-20 text-center">
-            <IconClipboardList size={40} stroke={1.2} className="mb-4 text-[hsl(var(--muted-foreground))]" />
-            <p className="mb-1 font-semibold text-white">هنوز درخواستی ثبت نشده</p>
-            <p className="mb-6 text-sm text-[hsl(var(--muted-foreground))]">یه مکالمه با AI شروع کن تا پروپوزال بگیری.</p>
-            <button
-              onClick={() => router.push("/chat?new=1")}
-              className="flex items-center gap-2 rounded-xl bg-[--violet] px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-[--violet-glow] transition-all hover:bg-violet-700"
+          <div className="flex flex-col items-center rounded-3xl border border-dashed border-[hsl(var(--border))] bg-[--surface] px-6 py-16 text-center">
+            <span className="mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-[--violet-glow] text-violet-300">
+              <IconWand size={26} stroke={1.8} />
+            </span>
+            <h2 className="mb-1 text-base font-bold text-white">اولین پروژه‌ات رو بساز</h2>
+            <p className="mb-6 max-w-sm text-sm leading-7 text-[hsl(var(--muted-foreground))]">
+              ایده‌ات رو به طراح محصول بگو، با چند سوال کوتاه ساختار پروژه مشخص می‌شه و یک کانفیگ آماده می‌گیری.
+            </p>
+            <Link
+              href="/chat?new=1"
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[--violet] px-5 text-sm font-bold text-white shadow-md shadow-[--violet-glow] outline-none transition-colors hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-[--violet-light]"
             >
               <IconPlus size={16} stroke={2.5} />
-              شروع مشاوره
-            </button>
+              شروع گفتگو
+            </Link>
           </div>
         )}
 
         {activeTab === "orders" && orders.length > 0 && (
-          <div className="space-y-4">
-            {/* summary bar */}
-            <div className="flex items-center justify-between rounded-2xl border border-[hsl(var(--border))] bg-[--surface] px-5 py-4">
-              <div>
-                <p className="font-semibold text-white">درخواست‌های ثبت‌شده</p>
-                <p className="mt-0.5 text-sm text-[hsl(var(--muted-foreground))]">
-                  {orders.length.toLocaleString("fa-IR")} درخواست برای این حساب
-                </p>
+          <div className="grid gap-4 md:grid-cols-2">
+            {orders.map((order) => (
+              <div key={order.id} className="relative">
+                <ProjectCard order={order} />
               </div>
-              <button
-                onClick={() => router.push("/chat?new=1")}
-                className="flex items-center gap-2 rounded-xl bg-[--violet] px-4 py-2.5 text-sm font-bold text-white shadow-md shadow-[--violet-glow] transition-all hover:bg-violet-700"
-              >
-                <IconPlus size={15} stroke={2.5} />
-                درخواست جدید
-              </button>
-            </div>
-
-            {/* orders list */}
-            <div className="overflow-hidden rounded-2xl border border-[hsl(var(--border))] bg-[--surface]">
-              {/* table header */}
-              <div className="hidden grid-cols-[1.5fr_1fr_1fr_1fr_auto] gap-4 border-b border-[hsl(var(--border))] px-5 py-3 text-xs text-[hsl(var(--muted-foreground))] md:grid">
-                <span>پروژه</span>
-                <span>تاریخ ثبت</span>
-                <span>مبلغ</span>
-                <span>وضعیت</span>
-                <span />
-              </div>
-
-              <div className="divide-y divide-[hsl(var(--border))]">
-                {orders.map((order) => (
-                  <button
-                    key={order.id}
-                    onClick={() => router.push(`/panel/${order.id}`)}
-                    className="grid w-full gap-4 px-5 py-5 text-right transition-colors hover:bg-white/3 md:grid-cols-[1.5fr_1fr_1fr_1fr_auto] md:items-center"
-                  >
-                    <div className="min-w-0">
-                      <h3 className="truncate font-semibold text-white">{order.project_name}</h3>
-                      <p className="mt-1 line-clamp-2 text-sm text-[hsl(var(--muted-foreground))] md:hidden">
-                        {order.summary}
-                      </p>
-                    </div>
-
-                    <div>
-                      <p className="text-xs text-[hsl(var(--muted-foreground))] md:hidden">تاریخ ثبت</p>
-                      <p className="mt-1 text-sm text-[hsl(var(--foreground))] md:mt-0">{formatDate(order.created_at)}</p>
-                    </div>
-
-                    <div>
-                      <p className="text-xs text-[hsl(var(--muted-foreground))] md:hidden">مبلغ</p>
-                      <p className="mt-1 text-sm text-[hsl(var(--foreground))] md:mt-0">
-                        {formatMoney(order.final_price) || order.price_label}
-                      </p>
-                      {order.payment_amount && (
-                        <p className="mt-1 text-xs text-violet-400">
-                          پیش‌پرداخت: {formatMoney(order.payment_amount)}
-                        </p>
-                      )}
-                    </div>
-
-                    <div>
-                      <p className="mb-2 text-xs text-[hsl(var(--muted-foreground))] md:hidden">وضعیت</p>
-                      <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${STATUS_CLASS[order.status]}`}>
-                        {STATUS_LABEL[order.status]}
-                      </span>
-                    </div>
-
-                    <span className="text-xs font-semibold text-violet-400">جزئیات ←</span>
-                  </button>
-                ))}
-              </div>
-            </div>
+            ))}
+            <Link
+              href="/chat?new=1"
+              className="flex min-h-40 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-[hsl(var(--border))] text-sm font-semibold text-[hsl(var(--muted-foreground))] outline-none transition-colors hover:border-[--violet-border] hover:text-white focus-visible:ring-2 focus-visible:ring-[--violet-light]"
+            >
+              <span className="grid h-10 w-10 place-items-center rounded-xl bg-[--violet-glow] text-violet-300">
+                <IconPlus size={18} stroke={2.5} />
+              </span>
+              پروژه جدید
+            </Link>
           </div>
         )}
 
-        {/* chats tab */}
         {activeTab === "chats" && (
           <div className="overflow-hidden rounded-2xl border border-[hsl(var(--border))] bg-[--surface]">
             <div className="flex items-center justify-between border-b border-[hsl(var(--border))] px-5 py-4">
-              <p className="font-semibold text-white">چت‌های نیمه‌کاره</p>
-              <button
-                onClick={() => router.push("/chat?new=1")}
-                className="flex items-center gap-1.5 rounded-xl bg-[--violet] px-4 py-2 text-xs font-bold text-white shadow-md shadow-[--violet-glow] transition-all hover:bg-violet-700"
+              <div>
+                <h2 className="font-semibold text-white">چت‌های ناتمام</h2>
+                <p className="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">گفتگوهایی که به نتیجه نرسیده‌اند را ادامه بده.</p>
+              </div>
+              <Link
+                href="/chat?new=1"
+                className="flex min-h-9 items-center gap-1.5 rounded-xl bg-[--violet] px-4 text-xs font-bold text-white shadow-md shadow-[--violet-glow] outline-none transition-colors hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-[--violet-light]"
               >
                 <IconPlus size={13} stroke={2.5} />
                 چت جدید
-              </button>
+              </Link>
             </div>
             {chatSessions.length === 0 ? (
-              <div className="px-5 py-12 text-center">
+              <div className="px-5 py-14 text-center">
                 <IconMessage size={36} stroke={1.2} className="mx-auto mb-3 text-[hsl(var(--muted-foreground))]" />
-                <p className="text-sm text-[hsl(var(--muted-foreground))]">چت ناتمامی وجود ندارد.</p>
+                <p className="text-sm text-[hsl(var(--muted-foreground))]">چت ناتمامی نداری.</p>
               </div>
             ) : (
-              <div className="divide-y divide-[hsl(var(--border))]">
+              <ul className="divide-y divide-[hsl(var(--border))]">
                 {chatSessions.map((session) => (
-                  <button
-                    key={session.id}
-                    onClick={() => router.push(`/chat?session=${session.id}`)}
-                    className="flex w-full items-center justify-between px-5 py-4 text-right transition-colors hover:bg-white/3"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate font-medium text-white">{session.title}</p>
-                      <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
-                        آخرین بروزرسانی: {formatDate(session.updated_at)}
-                      </p>
-                    </div>
-                    <span className="mr-4 shrink-0 text-xs font-semibold text-violet-400">ادامه ←</span>
-                  </button>
+                  <li key={session.id}>
+                    <Link
+                      href={`/chat?session=${session.id}`}
+                      className="flex items-center justify-between gap-4 px-5 py-4 outline-none transition-colors hover:bg-white/[0.03] focus-visible:bg-white/[0.05]"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-white">{session.title}</p>
+                        <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">آخرین بروزرسانی: {formatDate(session.updated_at)}</p>
+                      </div>
+                      <span className="inline-flex shrink-0 items-center gap-0.5 text-xs font-semibold text-violet-300">
+                        ادامه
+                        <IconChevronLeft size={14} stroke={2.5} />
+                      </span>
+                    </Link>
+                  </li>
                 ))}
-              </div>
+              </ul>
             )}
           </div>
         )}
 
-        {/* account tab */}
         {activeTab === "account" && (
-          <div className="space-y-5 rounded-2xl border border-[hsl(var(--border))] bg-[--surface] p-6">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSaveProfile();
+            }}
+            className="space-y-5 rounded-2xl border border-[hsl(var(--border))] bg-[--surface] p-6"
+          >
             <div>
-              <p className="font-semibold text-white">تنظیمات حساب کاربری</p>
-              <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
-                این اطلاعات برای شخصی‌سازی چت استفاده می‌شود.
-              </p>
+              <h2 className="font-semibold text-white">تنظیمات حساب</h2>
+              <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">این اطلاعات برای شخصی‌سازی چت استفاده می‌شه.</p>
+              {profile?.phone && (
+                <p className="mt-3 text-xs text-[hsl(var(--muted-foreground))]">
+                  شماره‌ی موبایل: <span dir="ltr" className="text-[hsl(var(--foreground))]">{profile.phone}</span>
+                </p>
+              )}
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
               {[
-                { label: "نام", value: firstName, setter: setFirstName, placeholder: "مثلاً علی" },
-                { label: "نام خانوادگی", value: lastName, setter: setLastName, placeholder: "مثلاً رضایی" },
-              ].map(({ label, value, setter, placeholder }) => (
-                <div key={label}>
-                  <label className="mb-2 block text-xs text-[hsl(var(--muted-foreground))]">{label}</label>
+                { id: "first-name", label: "نام", value: firstName, setter: setFirstName, placeholder: "مثلاً علی", autoComplete: "given-name" },
+                { id: "last-name", label: "نام خانوادگی", value: lastName, setter: setLastName, placeholder: "مثلاً رضایی", autoComplete: "family-name" },
+              ].map(({ id, label, value, setter, placeholder, autoComplete }) => (
+                <div key={id}>
+                  <label htmlFor={id} className="mb-2 block text-xs text-[hsl(var(--muted-foreground))]">{label}</label>
                   <input
+                    id={id}
                     value={value}
-                    onChange={(e) => setter(e.target.value)}
+                    onChange={(e) => {
+                      setter(e.target.value);
+                      setSaved(false);
+                    }}
                     placeholder={placeholder}
-                    className="w-full rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-4 py-3 text-sm text-white outline-none placeholder-[hsl(var(--muted-foreground))] transition-colors focus:border-[--violet-border]"
+                    autoComplete={autoComplete}
+                    className="min-h-11 w-full rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-4 text-sm text-white outline-none placeholder-[hsl(var(--muted-foreground))] transition-colors focus:border-[--violet-border] focus-visible:ring-2 focus-visible:ring-[--violet-light]"
                   />
                 </div>
               ))}
 
               <div className="md:col-span-2">
-                <label className="mb-2 block text-xs text-[hsl(var(--muted-foreground))]">نوع فعالیت</label>
+                <label htmlFor="business-type" className="mb-2 block text-xs text-[hsl(var(--muted-foreground))]">نوع فعالیت</label>
                 <select
+                  id="business-type"
                   value={businessType}
-                  onChange={(e) => setBusinessType(e.target.value)}
-                  className="w-full rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-4 py-3 text-sm text-white outline-none transition-colors focus:border-[--violet-border]"
+                  onChange={(e) => {
+                    setBusinessType(e.target.value);
+                    setSaved(false);
+                  }}
+                  className="min-h-11 w-full rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-4 text-sm text-white outline-none transition-colors focus:border-[--violet-border] focus-visible:ring-2 focus-visible:ring-[--violet-light]"
                 >
                   <option value="">انتخاب کنید</option>
                   <option value="فروشگاه آنلاین">فروشگاه آنلاین</option>
@@ -376,14 +469,22 @@ export default function PanelPage() {
               </div>
             </div>
 
-            <button
-              onClick={handleSaveProfile}
-              disabled={savingProfile}
-              className="flex items-center gap-2 rounded-xl bg-[--violet] px-6 py-3 text-sm font-bold text-white shadow-md shadow-[--violet-glow] transition-all hover:bg-violet-700 disabled:opacity-50"
-            >
-              {savingProfile ? "در حال ذخیره..." : "ذخیره تنظیمات"}
-            </button>
-          </div>
+            <div className="flex items-center gap-3">
+              <button
+                type="submit"
+                disabled={savingProfile}
+                className="flex min-h-11 items-center gap-2 rounded-xl bg-[--violet] px-6 text-sm font-bold text-white shadow-md shadow-[--violet-glow] outline-none transition-colors hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-[--violet-light] disabled:opacity-50"
+              >
+                {savingProfile ? "در حال ذخیره..." : "ذخیره تنظیمات"}
+              </button>
+              {saved && (
+                <span role="status" className="inline-flex items-center gap-1 text-sm text-emerald-400">
+                  <IconCheck size={16} stroke={2.5} />
+                  ذخیره شد
+                </span>
+              )}
+            </div>
+          </form>
         )}
       </main>
     </div>

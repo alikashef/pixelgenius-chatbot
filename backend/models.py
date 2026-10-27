@@ -91,6 +91,7 @@ class Order(Base):
     project_name: Mapped[str] = mapped_column(String(255))
     summary: Mapped[str] = mapped_column(Text)
     chat_history: Mapped[list] = mapped_column(JSON, default=list)
+    mode: Mapped[str] = mapped_column(String(20), default="sales", server_default="sales")
     features: Mapped[list] = mapped_column(JSON, default=list)
     tech_stack: Mapped[str] = mapped_column(String(255))
     delivery_days: Mapped[int] = mapped_column(Integer)

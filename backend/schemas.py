@@ -25,6 +25,7 @@ class ChatRequest(BaseModel):
     messages: list[MessageIn]
     attachments: list[ChatAttachmentIn] = Field(default_factory=list)
     bot_token: Optional[str] = None
+    mode: str = "sales"
 
 
 class ChatResponse(BaseModel):
@@ -100,6 +101,33 @@ class OrderFileOut(BaseModel):
     uploaded_at: datetime
 
 
+class HandoffProposalIn(BaseModel):
+    type: str
+    projectName: str
+    summary: str
+    features: list[str]
+    tech: str
+    days: int
+    price: int
+    priceLabel: str
+    mode: str = "sales"
+
+
+class HandoffCreateIn(BaseModel):
+    version: int = 1
+    proposal: HandoffProposalIn
+    chatHistory: list[MessageIn] = Field(default_factory=list)
+    attachments: list[OrderFileOut] = Field(default_factory=list)
+
+
+class HandoffCreateOut(BaseModel):
+    handoff_id: str
+
+
+class HandoffOut(HandoffCreateIn):
+    pass
+
+
 class OrderCreateIn(BaseModel):
     project_name: str
     summary: str
@@ -111,6 +139,7 @@ class OrderCreateIn(BaseModel):
     price_label: str
     order_files: list[OrderFileOut] = Field(default_factory=list)
     session_id: Optional[str] = None
+    mode: str = "sales"
 
 
 class MilestoneIn(BaseModel):
@@ -127,6 +156,7 @@ class AdminApproveIn(BaseModel):
 
 class OrderOut(BaseModel):
     id: str
+    mode: str = "sales"
     customer_id: Optional[str] = None
     project_name: str
     summary: str

@@ -1,5 +1,8 @@
 {
 	email {$CADDY_EMAIL}
+	on_demand_tls {
+		ask http://backend:8000/api/preview/allow
+	}
 }
 
 (app_routes) {
@@ -22,6 +25,10 @@
 		reverse_proxy backend:8000
 	}
 
+	handle /mcp {
+		reverse_proxy backend:8000
+	}
+
 	handle {
 		reverse_proxy frontend:3000
 	}
@@ -29,6 +36,14 @@
 
 {$APP_DOMAIN} {
 	import app_routes
+}
+
+*.{$PREVIEW_DOMAIN:preview.localhost} {
+	tls {
+		on_demand
+	}
+	encode gzip zstd
+	reverse_proxy backend:8000
 }
 
 http://:80 {
