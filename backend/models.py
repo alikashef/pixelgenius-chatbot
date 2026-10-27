@@ -118,6 +118,7 @@ class Order(Base):
     __tablename__ = "orders"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    project_brief: Mapped[dict | None] = mapped_column(JSON(none_as_null=True), nullable=True)
     customer_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("customers.id"), nullable=True)
     customer: Mapped["Customer | None"] = relationship("Customer", back_populates="orders")
     freelancer_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("freelancers.id"), nullable=True, index=True)

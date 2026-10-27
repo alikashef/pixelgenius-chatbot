@@ -280,13 +280,18 @@ export async function fetchMyOrder(token: string, id: string): Promise<Order> {
 }
 
 export async function fetchOrderBrief(token: string, id: string): Promise<Record<string, unknown>> {
-  const res = await fetch(`${API_URL}/api/customer/orders/${id}/brief`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (res.status === 401 || res.status === 403) throw new Error("UNAUTHORIZED");
-  if (!res.ok) throw new Error("خطا در ساخت کانفیگ پروژه");
-  return res.json();
+  const deadline = Date.now() + 10 * 60 * 1000;
+  while (Date.now() < deadline) {
+    const res = await fetch(`${API_URL}/api/customer/orders/${id}/brief`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.status === 401 || res.status === 403) throw new Error("UNAUTHORIZED");
+    if (!res.ok) throw new Error("خطا در ساخت کانفیگ پروژه");
+    if (res.status !== 202) return res.json();
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+  }
+  throw new Error("ساخت کانفیگ بیشتر از حد معمول طول کشید؛ دوباره تلاش کنید");
 }
 
 // ── Payment ───────────────────────────────────────────────────────────────────

@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 import shutil
 import uuid
@@ -6,10 +7,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from database import get_db
+from database import get_db, SessionLocal
 from models import Customer, Order, ChatSession
 from schemas import CustomerProfileOut, CustomerProfileUpdateIn, OrderCreateIn, OrderOut
 from auth import get_current_customer
@@ -23,6 +25,26 @@ FREELANCER_PHONE = os.getenv("FREELANCER_PHONE", "")
 router = APIRouter()
 UPLOAD_DIR = Path("/app/uploads/order-files")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+logger = logging.getLogger(__name__)
+_brief_tasks: dict[str, asyncio.Task] = {}
+_brief_errors: set[str] = set()
+
+
+async def _build_brief(order_id: str, context: dict) -> None:
+    try:
+        async with SessionLocal() as db:
+            settings = await get_ai_settings(db)
+        brief = await generate_project_brief(settings, context)
+        async with SessionLocal() as db:
+            order = await db.get(Order, order_id)
+            if order is not None:
+                order.project_brief = brief
+                await db.commit()
+    except Exception:
+        logger.exception("Project brief generation failed for %s", order_id)
+        _brief_errors.add(order_id)
+    finally:
+        _brief_tasks.pop(order_id, None)
 
 
 @router.get("/customer/profile", response_model=CustomerProfileOut)
@@ -132,20 +154,22 @@ async def get_order_brief(
     order = result.scalar_one_or_none()
     if not order:
         raise HTTPException(status_code=404, detail="سفارش یافت نشد")
-    settings = await get_ai_settings(db)
-    brief = await generate_project_brief(
-        settings,
-        {
+    if order.project_brief:
+        return {**order.project_brief, "deploy": make_deploy_info(order.id)}
+    if order_id in _brief_errors:
+        _brief_errors.discard(order_id)
+        raise HTTPException(status_code=502, detail="ساخت کانفیگ ناموفق بود؛ دوباره تلاش کنید")
+    if order_id not in _brief_tasks:
+        context = {
             "project_name": order.project_name,
             "summary": order.summary,
             "features": order.features,
             "tech_stack": order.tech_stack,
             "order_files": order.order_files,
             "chat_history": order.chat_history,
-        },
-    )
-    brief["deploy"] = make_deploy_info(order.id)
-    return brief
+        }
+        _brief_tasks[order_id] = asyncio.create_task(_build_brief(order_id, context))
+    return JSONResponse({"status": "processing"}, status_code=202, headers={"Retry-After": "2"})
 
 
 @router.post("/customer/orders/{order_id}/files", response_model=OrderOut)
