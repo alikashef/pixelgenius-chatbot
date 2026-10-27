@@ -24,6 +24,7 @@ CHUNK_OVERLAP = 150
 MAX_CONTEXT_CHARS = 6000
 DEFAULT_TOP_K = 2
 DEFAULT_BRIEF_TOP_K = 3
+WAIT_VECTOR_SECONDS = 8
 BRIEF_SPEC_KEYS = ("project", "pages", "features", "tech", "user_roles", "data_models", "integrations", "design")
 EMBED_BATCH = 32
 
@@ -226,7 +227,11 @@ async def _get_query_vector(messages: list[dict], base_urls: list[str], api_key:
             task = asyncio.create_task(_fill_query_vector(key, idea, base_urls, api_key))
             _pending[key] = task
         if wait:
-            await asyncio.shield(task)
+            # the gateway embedding can take a minute; past the cap fall back to keywords (the task keeps running)
+            try:
+                await asyncio.wait_for(asyncio.shield(task), timeout=WAIT_VECTOR_SECONDS)
+            except asyncio.TimeoutError:
+                logger.warning("Skill query embedding still pending after %ss, using keywords", WAIT_VECTOR_SECONDS)
             vector = _query_vectors.get(key)
     return vector
 
@@ -270,7 +275,7 @@ async def select_skills_for_brief(
     spec_text = json.dumps({k: spec.get(k) for k in BRIEF_SPEC_KEYS if spec.get(k)}, ensure_ascii=False)
     query_text = _normalize(" ".join(_user_texts(history)) + " " + spec_text)
     query_tokens = _tokens(query_text)
-    query_vector = await _get_query_vector(history, base_urls, api_key, wait=True)
+    query_vector = await _get_query_vector(history, base_urls, api_key, wait=False)
 
     selected: list[dict] = []
     used = 0

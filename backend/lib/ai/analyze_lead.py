@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import os
@@ -7,7 +8,7 @@ from fastapi import HTTPException
 from openai import APIConnectionError, APIStatusError, APITimeoutError, AsyncOpenAI
 
 from lib.ai.build_messages import build_messages
-from prompts.knowledge_base import retrieve_knowledge_async
+from prompts.knowledge_base import retrieve_knowledge, retrieve_knowledge_async
 from services.skills import retrieve_skills, select_skills_for_brief
 from services.images import fill_brief_images
 from prompts.stack_tiers import render_stack_tiers
@@ -279,10 +280,19 @@ async def generate_project_brief(settings: dict, order: dict) -> dict:
 
     api_key = os.getenv("GAPGPT_API_KEY", "")
     history_messages = order.get("chat_history") or []
-    knowledge = "\n\n".join(filter(None, [
-        await retrieve_knowledge_async(history_messages, _base_urls(), api_key, wait=True),
-        await retrieve_skills(settings, history_messages, _base_urls(), api_key, wait=True),
-    ]))
+    async def _knowledge() -> str:
+        # the embedding gateway can be slow; past the cap fall back to keyword retrieval (the vector keeps computing)
+        try:
+            return await asyncio.wait_for(
+                retrieve_knowledge_async(history_messages, _base_urls(), api_key, wait=True), timeout=10
+            )
+        except asyncio.TimeoutError:
+            return retrieve_knowledge(history_messages)
+
+    knowledge = "\n\n".join(filter(None, await asyncio.gather(
+        _knowledge(),
+        retrieve_skills(settings, history_messages, _base_urls(), api_key, wait=True),
+    )))
     spec: dict = {}
     selected_model = settings.get("ai_model", DEFAULT_MODEL)
     if selected_model not in AVAILABLE_MODELS:
