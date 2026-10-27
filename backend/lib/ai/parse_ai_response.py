@@ -18,6 +18,16 @@ LEAD_SCHEMA_KEYS = {
 }
 
 
+LEAD_DEFAULTS = {
+    "budget_level": "-",
+    "budget_fit": "fit",
+    "estimated_price_range": "-",
+    "client_risk_level": "low",
+    "lead_score": 50,
+    "missing_questions": [],
+}
+
+
 def _find_json_objects(text: str) -> list[str]:
     objects = []
     start = None
@@ -57,7 +67,11 @@ def parse_ai_response(content: str) -> str:
         except json.JSONDecodeError:
             continue
 
-        if isinstance(data, dict) and LEAD_SCHEMA_KEYS.issubset(data.keys()):
+        if not isinstance(data, dict):
+            continue
+        if (LEAD_SCHEMA_KEYS - LEAD_DEFAULTS.keys()).issubset(data.keys()):
+            for key, value in LEAD_DEFAULTS.items():
+                data.setdefault(key, value)
             return json.dumps(data, ensure_ascii=False, separators=(",", ":"))
 
     return content

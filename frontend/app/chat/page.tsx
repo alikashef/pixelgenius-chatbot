@@ -181,19 +181,21 @@ function parseLeadAnalysis(reply: string): LeadAnalysis | null {
     if (
       typeof parsed.project_type === "string" &&
       typeof parsed.project_goal === "string" &&
-      typeof parsed.budget_level === "string" &&
-      typeof parsed.budget_fit === "string" &&
       typeof parsed.recommended_solution === "string" &&
       typeof parsed.recommended_stack === "string" &&
-      typeof parsed.estimated_price_range === "string" &&
       typeof parsed.estimated_timeline === "string" &&
-      typeof parsed.client_risk_level === "string" &&
-      typeof parsed.lead_score === "number" &&
       typeof parsed.client_message === "string" &&
-      typeof parsed.admin_summary === "string" &&
-      Array.isArray(parsed.missing_questions)
+      typeof parsed.admin_summary === "string"
     ) {
-      return parsed as LeadAnalysis;
+      return {
+        budget_level: "-",
+        budget_fit: "fit",
+        estimated_price_range: "-",
+        client_risk_level: "low",
+        lead_score: 50,
+        missing_questions: [],
+        ...parsed,
+      } as LeadAnalysis;
     }
   } catch {
     return null;
