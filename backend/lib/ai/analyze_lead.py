@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 
 from fastapi import HTTPException
 from openai import APIConnectionError, APIStatusError, APITimeoutError, AsyncOpenAI
@@ -110,7 +111,28 @@ def _offline_reply(messages: list[dict], mode: str = "designer") -> str:
     )
 
 
-async def analyze_lead(settings: dict, messages: list[dict], mode: str = "designer") -> str:
+FINALIZE_AFTER_USER_TURNS = 7
+FINISH_PHRASES = re.compile(
+    r"(همین\s*(کافی|خوبه|بسه)|دیگه\s*(چیزی|نیست)|تمام\s*شد|تمومه|نهایی|فایل\s*(رو|را)?\s*(بده|بساز)|کانفیگ)"
+)
+FINALIZE_INSTRUCTION = (
+    "اطلاعات کافی است. همین الان فقط JSON نهایی را دقیقاً طبق schema برگردان؛ بدون هیچ متن، توضیح یا بلوک کد دیگر. "
+    "مقدارهای نامشخص را با بهترین حدس منطقی پر کن یا در missing_questions بنویس."
+)
+
+
+def _should_finalize(messages: list[dict], finalize: bool) -> bool:
+    """Do not rely on the model deciding to end the chat: force the final JSON when the user asked for it,
+    said they are done, or the conversation has gone on long enough."""
+    if finalize:
+        return True
+    user_turns = [m for m in messages if m.get("role") == "user"]
+    if len(user_turns) >= FINALIZE_AFTER_USER_TURNS:
+        return True
+    return bool(user_turns) and bool(FINISH_PHRASES.search(_latest_user_text(messages)))
+
+
+async def analyze_lead(settings: dict, messages: list[dict], mode: str = "designer", finalize: bool = False) -> str:
     api_key = os.getenv("GAPGPT_API_KEY", "")
     if not api_key:
         logger.error("GAPGPT_API_KEY not configured; using offline chat fallback")
@@ -122,6 +144,8 @@ async def analyze_lead(settings: dict, messages: list[dict], mode: str = "design
 
     knowledge = await retrieve_knowledge_async(messages, _base_urls(), api_key) if mode != "sales" else ""
     ai_messages = build_messages(settings, messages, mode, knowledge)
+    if mode != "sales" and _should_finalize(messages, finalize):
+        ai_messages = ai_messages + [{"role": "user", "content": FINALIZE_INSTRUCTION}]
 
     for model in _model_order(selected_model, ai_messages):
         for base_url in _base_urls():

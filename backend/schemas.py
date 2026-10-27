@@ -26,6 +26,7 @@ class ChatRequest(BaseModel):
     attachments: list[ChatAttachmentIn] = Field(default_factory=list)
     bot_token: Optional[str] = None
     mode: str = "sales"
+    finalize: bool = False
 
 
 class ChatResponse(BaseModel):

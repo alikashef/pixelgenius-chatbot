@@ -12,9 +12,15 @@ const WELCOME: Message = {
   content: "سلام! خوش اومدید 👋\nمن طراح محصول هوشمند شما هستم. بهم بگید چه ایده‌ای برای سایت یا اپلیکیشن دارید؟",
 };
 
-const PHONE_ASK: Message = {
-  role: "assistant",
-  content: "پروپوزال پروژه‌تون آماده‌ست! 🎉\nبرای ثبت درخواست نیاز به یه حساب کاربری داریم. شماره موبایلتون رو بنویسید:",
+const PHONE_ASK: Record<ChatMode, Message> = {
+  designer: {
+    role: "assistant",
+    content: "کانفیگ پروژه‌ات آماده‌ست! 🎉\nبرای دریافتش یه حساب کاربری لازمه. شماره موبایلت رو بنویس:",
+  },
+  sales: {
+    role: "assistant",
+    content: "پروپوزال پروژه‌تون آماده‌ست! 🎉\nبرای ثبت درخواست نیاز به یه حساب کاربری داریم. شماره موبایلتون رو بنویسید:",
+  },
 };
 
 const QUICK_STARTS: Record<ChatMode, string[]> = {
@@ -449,7 +455,7 @@ function ChatPageInner() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const hydratedRef = useRef(false);
-  const lastAttemptRef = useRef<{ messages: Message[]; attachments: OrderFile[] } | null>(null);
+  const lastAttemptRef = useRef<{ messages: Message[]; attachments: OrderFile[]; finalize: boolean } | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -640,8 +646,8 @@ function ChatPageInner() {
     await runReply(newMessages, currentAttachments);
   }
 
-  async function runReply(newMessages: Message[], currentAttachments: OrderFile[]) {
-    lastAttemptRef.current = { messages: newMessages, attachments: currentAttachments };
+  async function runReply(newMessages: Message[], currentAttachments: OrderFile[], finalize = false) {
+    lastAttemptRef.current = { messages: newMessages, attachments: currentAttachments, finalize };
     setLoading(true);
     setError("");
 
@@ -652,7 +658,7 @@ function ChatPageInner() {
       }
 
       const apiMessages = newMessages.slice(1);
-      const reply = await sendChat(apiMessages, currentAttachments, activeMode, botToken);
+      const reply = await sendChat(apiMessages, currentAttachments, activeMode, botToken, finalize);
       const lead = parseLeadAnalysis(reply);
       const allMessages = lead
         ? [...newMessages, { role: "assistant" as const, content: lead.client_message || "" }]
@@ -685,7 +691,7 @@ function ChatPageInner() {
           return;
         }
         localStorage.setItem("proposal", JSON.stringify(proposal));
-        setMessages([...newMessages, { role: "assistant", content: `${clientReply}\n\n${PHONE_ASK.content}` }]);
+        setMessages([...newMessages, { role: "assistant", content: `${clientReply}\n\n${PHONE_ASK[activeMode].content}` }]);
         setPhoneStep(true);
         return;
       }
@@ -720,6 +726,8 @@ function ChatPageInner() {
   const isLoading = loading || sendingOtp || uploadingFile;
   const canSubmit = phoneStep ? Boolean(input.trim()) : Boolean(input.trim() || attachments.length);
   const activeMode: ChatMode = botToken ? "sales" : mode;
+  const userTurns = messages.filter((m) => m.role === "user").length;
+  const canFinalize = activeMode === "designer" && !phoneStep && !briefOrderId && userTurns >= 3;
   const isFresh = messages.length <= 1 && !loading && !briefOrderId;
 
   function handleTextareaKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
@@ -732,9 +740,16 @@ function ChatPageInner() {
     if (next !== mode && isFresh) toggleMode();
   }
 
+  async function finalizeNow() {
+    if (loading || phoneStep) return;
+    const newMessages: Message[] = [...messages, { role: "user", content: "همین کافیه، کانفیگ نهایی پروژه رو بساز." }];
+    setMessages(newMessages);
+    await runReply(newMessages, [], true);
+  }
+
   function retry() {
     const last = lastAttemptRef.current;
-    if (last) runReply(last.messages, last.attachments);
+    if (last) runReply(last.messages, last.attachments, last.finalize);
   }
 
   return (
@@ -1009,6 +1024,20 @@ function ChatPageInner() {
       </main>
 
       <footer className="shrink-0 border-t border-[hsl(var(--border))] bg-[hsl(var(--background))]/90 px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 backdrop-blur md:px-8">
+        {canFinalize && (
+          <div className="mx-auto mb-2 flex max-w-2xl items-center justify-between gap-3 rounded-xl border border-[--violet-border] bg-[--violet-glow] px-3 py-2">
+            <p className="text-xs leading-6 text-violet-200">اطلاعات کافی به نظر می‌رسه؟ می‌تونی همین حالا کانفیگ رو بسازی.</p>
+            <button
+              type="button"
+              onClick={finalizeNow}
+              disabled={isLoading}
+              className="flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg bg-[--violet] px-3 text-xs font-bold text-white outline-none transition-colors hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-[--violet-light] disabled:opacity-50"
+            >
+              <IconCheck size={14} stroke={2.5} />
+              ساخت کانفیگ
+            </button>
+          </div>
+        )}
         <form onSubmit={handleSubmit} className="mx-auto max-w-2xl">
           <div className="rounded-2xl border border-[hsl(var(--border))] bg-[--surface] p-2 transition-colors focus-within:border-[--violet-border] focus-within:shadow-[0_0_0_3px_var(--violet-glow)]">
             {attachments.length > 0 && (

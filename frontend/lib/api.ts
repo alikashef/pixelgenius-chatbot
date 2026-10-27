@@ -153,11 +153,12 @@ export async function sendChat(
   attachments: OrderFile[] = [],
   mode: ChatMode = "designer",
   botToken?: string,
+  finalize = false,
 ): Promise<string> {
   const res = await fetch(`${API_URL}/api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages, attachments, mode, bot_token: botToken || null }),
+    body: JSON.stringify({ messages, attachments, mode, bot_token: botToken || null, finalize }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));

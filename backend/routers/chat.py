@@ -148,7 +148,7 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
                     "freelancer_timeline": freelancer.timeline or "",
                     "freelancer_note": freelancer.note or "",
                 })
-        content = await analyze_lead(settings, _merge_attachments(messages, request.attachments), request.mode)
+        content = await analyze_lead(settings, _merge_attachments(messages, request.attachments), request.mode, request.finalize)
         return ChatResponse(content=content)
     except HTTPException:
         raise
