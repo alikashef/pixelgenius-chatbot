@@ -522,7 +522,7 @@ function ChatPageInner() {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, loading, phoneStep]);
+  }, [messages, loading, phoneStep, briefOrderId, briefState]);
 
   useEffect(() => {
     if (!inputRef.current) return;
@@ -726,8 +726,6 @@ function ChatPageInner() {
   const isLoading = loading || sendingOtp || uploadingFile;
   const canSubmit = phoneStep ? Boolean(input.trim()) : Boolean(input.trim() || attachments.length);
   const activeMode: ChatMode = botToken ? "sales" : mode;
-  const userTurns = messages.filter((m) => m.role === "user").length;
-  const canFinalize = activeMode === "designer" && !phoneStep && !briefOrderId && userTurns >= 3;
   const isFresh = messages.length <= 1 && !loading && !briefOrderId;
 
   function handleTextareaKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
@@ -738,13 +736,6 @@ function ChatPageInner() {
 
   function selectMode(next: ChatMode) {
     if (next !== mode && isFresh) toggleMode();
-  }
-
-  async function finalizeNow() {
-    if (loading || phoneStep) return;
-    const newMessages: Message[] = [...messages, { role: "user", content: "همین کافیه، کانفیگ نهایی پروژه رو بساز." }];
-    setMessages(newMessages);
-    await runReply(newMessages, [], true);
   }
 
   function retry() {
@@ -1024,20 +1015,6 @@ function ChatPageInner() {
       </main>
 
       <footer className="shrink-0 border-t border-[hsl(var(--border))] bg-[hsl(var(--background))]/90 px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 backdrop-blur md:px-8">
-        {canFinalize && (
-          <div className="mx-auto mb-2 flex max-w-2xl items-center justify-between gap-3 rounded-xl border border-[--violet-border] bg-[--violet-glow] px-3 py-2">
-            <p className="text-xs leading-6 text-violet-200">اطلاعات کافی به نظر می‌رسه؟ می‌تونی همین حالا کانفیگ رو بسازی.</p>
-            <button
-              type="button"
-              onClick={finalizeNow}
-              disabled={isLoading}
-              className="flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg bg-[--violet] px-3 text-xs font-bold text-white outline-none transition-colors hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-[--violet-light] disabled:opacity-50"
-            >
-              <IconCheck size={14} stroke={2.5} />
-              ساخت کانفیگ
-            </button>
-          </div>
-        )}
         <form onSubmit={handleSubmit} className="mx-auto max-w-2xl">
           <div className="rounded-2xl border border-[hsl(var(--border))] bg-[--surface] p-2 transition-colors focus-within:border-[--violet-border] focus-within:shadow-[0_0_0_3px_var(--violet-glow)]">
             {attachments.length > 0 && (
