@@ -8,7 +8,9 @@ from fastapi.staticfiles import StaticFiles
 
 from database import create_tables
 from services import liara
-from routers import chat, payment, orders, auth, customer_auth, customer, settings, freelancer_auth, site_mcp
+from services import skills as skills_service
+from lib.ai.analyze_lead import _base_urls
+from routers import chat, payment, orders, auth, customer_auth, customer, settings, freelancer_auth, site_mcp, skills
 
 UPLOAD_DIR = Path("/app/uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -17,10 +19,15 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await create_tables()
+    await skills_service.seed_default_skills()
+    embed_task = asyncio.create_task(
+        skills_service.embed_missing(_base_urls(), os.getenv("GAPGPT_API_KEY", ""))
+    )
     site_mcp.cleanup_expired_sites()
     cleanup_task = asyncio.create_task(liara.cleanup_loop())
     yield
     cleanup_task.cancel()
+    embed_task.cancel()
 
 
 app = FastAPI(title="Freelance Intake API", lifespan=lifespan)
@@ -54,6 +61,7 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(customer_auth.router, prefix="/api")
 app.include_router(customer.router, prefix="/api")
 app.include_router(settings.router, prefix="/api")
+app.include_router(skills.router, prefix="/api")
 app.include_router(freelancer_auth.router, prefix="/api")
 app.include_router(site_mcp.router)
 

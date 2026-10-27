@@ -8,6 +8,9 @@ from openai import APIConnectionError, APIStatusError, APITimeoutError, AsyncOpe
 
 from lib.ai.build_messages import build_messages
 from prompts.knowledge_base import retrieve_knowledge_async
+from services.skills import retrieve_skills
+from services.images import fill_brief_images
+from prompts.stack_tiers import render_stack_tiers
 from lib.ai.parse_ai_response import parse_ai_response
 
 logger = logging.getLogger(__name__)
@@ -142,7 +145,12 @@ async def analyze_lead(settings: dict, messages: list[dict], mode: str = "design
     if selected_model not in AVAILABLE_MODELS:
         selected_model = DEFAULT_MODEL
 
-    knowledge = await retrieve_knowledge_async(messages, _base_urls(), api_key) if mode != "sales" else ""
+    knowledge = ""
+    if mode != "sales":
+        knowledge = "\n\n".join(filter(None, [
+            await retrieve_knowledge_async(messages, _base_urls(), api_key),
+            await retrieve_skills(settings, messages, _base_urls(), api_key),
+        ]))
     ai_messages = build_messages(settings, messages, mode, knowledge)
     if mode != "sales" and _should_finalize(messages, finalize):
         ai_messages = ai_messages + [{"role": "user", "content": FINALIZE_INSTRUCTION}]
@@ -192,7 +200,9 @@ BRIEF_INSTRUCTIONS = (
     "Never use placeholders like '...' or 'rest of the code'. Include seed data, `.env.example`, and a README with exact "
     "install and run commands. If the answer is too long, stop at a clean file boundary and continue when the user says 'continue'.\n"
     "5. For anything in `open_questions` or missing, choose a sensible default and list your assumptions at the end.\n"
-    "6. Deployment: if a tool named `deploy_project` from the FreelioAI server is available, finish by calling it with "
+    "6. Images: `assets.images` lists AI-generated images, each with a `url`. Use those exact URLs for the matching spots "
+    "(use `id`/`purpose` to place them) instead of stock photos or placeholder services. If an entry has no `url`, use a neutral CSS gradient.\n"
+    "7. Deployment: if a tool named `deploy_project` from the FreelioAI server is available, finish by calling it with "
     "`deploy.token` from this file, the right `platform`, the `port` your app listens on, ALL source files (no node_modules, "
     "no .env; the server installs dependencies) and secrets in `env`. Then call `get_deploy_status` every 15 seconds until "
     "READY. If it FAILED, read `build_errors`, `hint` and `build_log_tail`, fix the code and call `deploy_project` again with "
@@ -207,7 +217,7 @@ BRIEF_SYSTEM_PROMPT = """
 (Claude یا ChatGPT) بتواند از روی آن سایت را بسازد. فقط JSON معتبر برگردان، بدون هیچ متن دیگر، با دقیقاً این کلیدها:
 
 {
-  "project": {"name": "", "type": "", "goal": "", "target_audience": "", "language": "fa", "direction": "rtl"},
+  "project": {"name": "", "type": "", "size": "", "goal": "", "target_audience": "", "language": "fa", "direction": "rtl"},
   "pages": [{"name": "", "purpose": "", "sections": []}],
   "features": [],
   "design": {"style": "", "colors": [], "fonts": [], "references": []},
@@ -217,6 +227,7 @@ BRIEF_SYSTEM_PROMPT = """
   "data_models": [{"name": "", "fields": [{"name": "", "type": "", "notes": ""}], "relations": []}],
   "api_endpoints": [{"method": "", "path": "", "purpose": "", "auth": ""}],
   "integrations": [{"name": "", "purpose": "", "notes": ""}],
+  "assets": {"images": [{"id": "", "purpose": "", "prompt": "", "size_hint": ""}]},
   "constraints": [],
   "open_questions": []
 }
@@ -224,8 +235,11 @@ BRIEF_SYSTEM_PROMPT = """
 قوانین:
 - فقط از اطلاعاتی استفاده کن که مشتری گفته یا مستقیماً از آن نتیجه می‌شود؛ چیزی از خودت درباره برند یا محتوا نساز.
 - اگر پروژه بک‌اند دارد (ثبت‌نام، پرداخت، پنل مدیریت، رزرو، دیتابیس و غیره)، user_roles و data_models و api_endpoints و integrations را کامل و دقیق خودت طراحی کن (مدل‌ها با فیلدها و روابط، endpointها با متد و مسیر). برای سایت کاملاً ایستا خالی بگذار.
+- project.size را از روی همان گفتگو و معیارهای جدول استک تشخیص بده و یکی از اندازه‌های جدول را بنویس؛ tech را از ردیف همان اندازه پر کن.
+- اگر مشتری یا کارمندانش باید خودشان محتوا یا داده را وارد و ویرایش کنند، یک صفحه/بخش «پنل مدیریت» در pages با بخش‌های هر منبع (فهرست، افزودن، ویرایش، حذف)، نقش admin در user_roles، مدل‌های داده و endpointهای CRUD و احراز هویت را حتماً بیاور و در features بنویس «پنل مدیریت». اگر محتوا ثابت است و پنل لازم نیست، چیزی اضافه نکن.
 - بخش tech را تو پر کن: استک مناسب نیازها را انتخاب کن، دلیلش را در rationale بنویس و ساختار پوشه‌ها یا ماژول‌های اصلی را در structure بیاور.
 - اگر چیزی گفته نشده، مقدار خالی ("" یا []) بگذار و سوال مربوطه را در open_questions بنویس.
+- assets.images: فقط اگر سایت واقعاً به عکس یا تصویرسازی نیاز دارد (Hero، بنر، تصویر محصول، مقاله)، برای هر تصویر یک prompt انگلیسی توصیفی و دقیق (سبک، رنگ، ترکیب‌بندی، بدون متن داخل تصویر) بنویس؛ id کوتاه انگلیسی مثل hero_main و purpose فارسی. حداکثر ۴ تصویر. اگر نیاز نیست آرایه خالی بگذار.
 - pages و sections را مشخص و قابل ساخت بنویس (مثلاً Hero، لیست محصولات، فرم تماس).
 """
 
@@ -257,7 +271,11 @@ async def generate_project_brief(settings: dict, order: dict) -> dict:
     )
 
     api_key = os.getenv("GAPGPT_API_KEY", "")
-    knowledge = await retrieve_knowledge_async(order.get("chat_history") or [], _base_urls(), api_key, wait=True)
+    history_messages = order.get("chat_history") or []
+    knowledge = "\n\n".join(filter(None, [
+        await retrieve_knowledge_async(history_messages, _base_urls(), api_key, wait=True),
+        await retrieve_skills(settings, history_messages, _base_urls(), api_key, wait=True),
+    ]))
     spec: dict = {}
     selected_model = settings.get("ai_model", DEFAULT_MODEL)
     if selected_model not in AVAILABLE_MODELS:
@@ -270,7 +288,7 @@ async def generate_project_brief(settings: dict, order: dict) -> dict:
                 response = await client.chat.completions.create(
                     model=selected_model,
                     messages=[
-                        {"role": "system", "content": "\n\n".join(filter(None, [BRIEF_SYSTEM_PROMPT.strip(), knowledge]))},
+                        {"role": "system", "content": "\n\n".join(filter(None, [BRIEF_SYSTEM_PROMPT.strip(), render_stack_tiers(settings), knowledge]))},
                         {"role": "user", "content": order_context[:30000]},
                     ],
                     max_tokens=6000,
@@ -288,6 +306,7 @@ async def generate_project_brief(settings: dict, order: dict) -> dict:
             except Exception as e:
                 logger.error("Unexpected brief error for %s: %s", base_url, e, exc_info=True)
 
+    await fill_brief_images(spec, settings, _base_urls(), api_key)
     project = spec.get("project") if isinstance(spec.get("project"), dict) else {}
     project.setdefault("name", order.get("project_name", ""))
     project.setdefault("language", "fa")

@@ -463,3 +463,83 @@ export async function updateAISettings(token: string, settings: Record<string, u
   if (!res.ok) throw new Error("خطا در ذخیره تنظیمات هوش مصنوعی");
   return res.json();
 }
+
+// ── Admin: AI skills ──────────────────────────────────────────────────────────
+export interface SkillCategory {
+  key: string;
+  label: string;
+  hint: string;
+  count: number;
+  enabled_count: number;
+}
+
+export interface Skill {
+  id: string;
+  category: string;
+  title: string;
+  source_name: string | null;
+  keywords: string[];
+  enabled: boolean;
+  builtin: boolean;
+  chunk_count: number;
+  embedded_count: number;
+  size: number;
+  preview: string;
+  created_at: string;
+}
+
+async function skillsRequest<T>(token: string, path: string, init: RequestInit = {}, fallback = "خطا در ارتباط با سرور"): Promise<T> {
+  const res = await fetch(`${API_URL}/api/skills${path}`, {
+    ...init,
+    headers: { Authorization: `Bearer ${token}`, ...(init.headers || {}) },
+  });
+  if (res.status === 401 || res.status === 403) throw new Error("UNAUTHORIZED");
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new Error(typeof data?.detail === "string" ? data.detail : fallback);
+  }
+  return res.json();
+}
+
+const jsonHeaders = { "Content-Type": "application/json" };
+
+export const fetchSkillCategories = (token: string) => skillsRequest<SkillCategory[]>(token, "/categories");
+export const fetchSkills = (token: string, category: string) =>
+  skillsRequest<Skill[]>(token, `?category=${encodeURIComponent(category)}`);
+export const fetchSkillContent = (token: string, id: string) =>
+  skillsRequest<Skill & { content: string }>(token, `/${id}`);
+
+export function uploadSkillFile(token: string, category: string, file: File, title: string, keywords: string) {
+  const form = new FormData();
+  form.append("category", category);
+  form.append("file", file);
+  form.append("title", title);
+  form.append("keywords", keywords);
+  return skillsRequest<Skill>(token, "/upload", { method: "POST", body: form }, "خطا در آپلود مهارت");
+}
+
+export const createSkill = (token: string, body: { category: string; title: string; content: string; keywords: string }) =>
+  skillsRequest<Skill>(token, "", { method: "POST", headers: jsonHeaders, body: JSON.stringify(body) }, "خطا در ذخیره مهارت");
+
+export const updateSkill = (token: string, id: string, body: Partial<{ category: string; title: string; content: string; keywords: string; enabled: boolean }>) =>
+  skillsRequest<Skill>(token, `/${id}`, { method: "PATCH", headers: jsonHeaders, body: JSON.stringify(body) }, "خطا در ویرایش مهارت");
+
+export const deleteSkill = (token: string, id: string) =>
+  skillsRequest<{ ok: boolean }>(token, `/${id}`, { method: "DELETE" }, "خطا در حذف مهارت");
+
+export const reindexSkills = (token: string) =>
+  skillsRequest<{ ok: boolean }>(token, "/reindex/all", { method: "POST" }, "خطا در ایندکس مجدد");
+
+export async function testImageGeneration(token: string, prompt: string): Promise<{ url: string; model: string }> {
+  const res = await fetch(`${API_URL}/api/settings/ai/test-image`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ prompt }),
+  });
+  if (res.status === 401 || res.status === 403) throw new Error("UNAUTHORIZED");
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new Error(typeof data?.detail === "string" ? data.detail : "خطا در تولید تصویر");
+  }
+  return res.json();
+}

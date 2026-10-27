@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
+import SkillsManager from "@/components/admin/SkillsManager";
+import DesignerSettings from "@/components/admin/DesignerSettings";
 import {
   fetchOrders,
   fetchStats,
@@ -67,7 +69,7 @@ export default function AdminDashboard() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [selected, setSelected] = useState<Order | null>(null);
-  const [activeTab, setActiveTab] = useState<"orders" | "settings">("orders");
+  const [activeTab, setActiveTab] = useState<"orders" | "settings" | "skills">("orders");
   const [settings, setSettings] = useState<Record<string, unknown>>({});
   const [savingSettings, setSavingSettings] = useState(false);
   const [savedToast, setSavedToast] = useState(false);
@@ -215,10 +217,11 @@ export default function AdminDashboard() {
           {[
             ["orders", "سفارشات"],
             ["settings", "تنظیمات فروش و AI"],
+            ["skills", "طراحی محصول (استک، مهارت، تصویر)"],
           ].map(([key, label]) => (
             <button
               key={key}
-              onClick={() => setActiveTab(key as "orders" | "settings")}
+              onClick={() => setActiveTab(key as "orders" | "settings" | "skills")}
               className={`px-4 py-3 text-sm transition-colors ${
                 activeTab === key ? "border-b-2 border-[--violet] text-violet-300" : "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
               }`}
@@ -279,6 +282,23 @@ export default function AdminDashboard() {
             </div>
           )}
         </div>}
+
+        {activeTab === "skills" && (
+          <div className="space-y-8">
+            <DesignerSettings
+              getToken={getToken}
+              settings={settings}
+              onSettingsChange={setSettings}
+              onUnauthorized={() => { localStorage.removeItem("admin_token"); router.push("/admin/login"); }}
+            />
+            <SkillsManager
+              getToken={getToken}
+              settings={settings}
+              onSettingsChange={setSettings}
+              onUnauthorized={() => { localStorage.removeItem("admin_token"); router.push("/admin/login"); }}
+            />
+          </div>
+        )}
 
         {activeTab === "settings" && (
           <div className="space-y-5">

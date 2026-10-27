@@ -79,6 +79,41 @@ class AIConfig(Base):
     )
 
 
+class AISkill(Base):
+    __tablename__ = "ai_skills"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    category: Mapped[str] = mapped_column(String(40), index=True)
+    title: Mapped[str] = mapped_column(String(200))
+    source_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    content: Mapped[str] = mapped_column(Text)
+    keywords: Mapped[list] = mapped_column(JSON, default=list)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    builtin: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+    chunks: Mapped[list["AISkillChunk"]] = relationship(
+        "AISkillChunk", back_populates="skill", cascade="all, delete-orphan", order_by="AISkillChunk.position"
+    )
+
+
+class AISkillChunk(Base):
+    __tablename__ = "ai_skill_chunks"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    skill_id: Mapped[str] = mapped_column(String(36), ForeignKey("ai_skills.id", ondelete="CASCADE"), index=True)
+    skill: Mapped["AISkill"] = relationship("AISkill", back_populates="chunks")
+    position: Mapped[int] = mapped_column(Integer, default=0)
+    text: Mapped[str] = mapped_column(Text)
+    embedding: Mapped[list | None] = mapped_column(JSON(none_as_null=True), nullable=True)
+
+
 class Order(Base):
     __tablename__ = "orders"
 

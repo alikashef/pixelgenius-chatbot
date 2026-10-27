@@ -2,6 +2,7 @@ from prompts.output_schema import DESIGNER_OUTPUT_SCHEMA, OUTPUT_SCHEMA
 from prompts.pricing_knowledge import render_pricing_knowledge
 from prompts.question_flow import render_question_flow
 from prompts.sales_rules import render_sales_rules
+from prompts.stack_tiers import render_stack_tiers
 from prompts.system_prompt import DESIGNER_PROMPT, SYSTEM_PROMPT
 from prompts.technical_advice import render_technical_advice
 
@@ -90,7 +91,8 @@ def build_messages(settings: dict, messages: list[dict], mode: str = "designer",
             OUTPUT_SCHEMA.strip(),
         ]
     else:
-        parts = [DESIGNER_PROMPT.strip()] + ([knowledge] if knowledge else []) + [DESIGNER_OUTPUT_SCHEMA.strip()]
+        parts = [DESIGNER_PROMPT.strip(), render_stack_tiers(settings)] + ([knowledge] if knowledge else []) + [DESIGNER_OUTPUT_SCHEMA.strip()]
+        parts = [p for p in parts if p]
         system_content = "\n\n".join(parts)
         return [{"role": "system", "content": system_content}] + _compact_history(messages, old_limit=700)
     system_content = "\n\n".join(parts)
