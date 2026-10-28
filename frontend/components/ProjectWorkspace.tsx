@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -114,6 +114,13 @@ export default function ProjectWorkspace({
     "BUILDING",
     "DEPLOYING",
   ].includes(state);
+  // A redeploy keeps the previous release online, so the site stays reviewable while the new one builds.
+  const liveUrl = ["NOT_STARTED", "EXPIRED"].includes(state)
+    ? undefined
+    : safeUrl(deployment?.url) || safeUrl((deployment?.history || []).filter((d) => d.state === "READY").at(-1)?.url);
+  const siteLive = Boolean(liveUrl) && (state === "READY" || (deployment?.history || []).some((d) => d.state === "READY"));
+  const deployingRef = useRef(false);
+  deployingRef.current = deploying;
 
   function handleError(err: unknown) {
     const message =
@@ -164,7 +171,8 @@ export default function ProjectWorkspace({
         if (!stopped) handleError(err);
       }
       if (!stopped) await refreshDeployment();
-      if (!stopped) timer = setTimeout(poll, 12000);
+      // Follow a running deployment closely so the owner sees the moment it goes live.
+      if (!stopped) timer = setTimeout(poll, deployingRef.current ? 4000 : 12000);
     }
     void poll();
     return () => {
@@ -288,7 +296,7 @@ export default function ProjectWorkspace({
       </ol>
       {state === "NOT_STARTED" && (
         <p className="mt-5 text-sm leading-7 text-muted-foreground">
-          بعد از ثبت و تأیید نسخه توسعه، ایجنت می‌تواند انتشار را شروع کند.
+          ایجنت هر وقت تغییری آماده کند منتشرش می‌کند؛ نیازی به تأیید قبلی نیست. بعد از انتشار، نتیجه را ببین و تأیید کن.
           وضعیت اینجا خودکار به‌روز می‌شود.
         </p>
       )}
@@ -568,10 +576,20 @@ export default function ProjectWorkspace({
               <PreviewReview
                 projectName={order.project_name}
                 version={version}
-                url={state === "READY" ? safeUrl(deployment?.url) : undefined}
+                url={siteLive ? liveUrl : undefined}
+                deploy={deployment}
                 siteState={state}
                 expiresAt={deployment?.expires_at}
-                comments={version ? data.comments.filter((c) => c.version_id === version.id) : []}
+                comments={
+                  version
+                    ? data.comments.filter(
+                        (c) =>
+                          c.version_id === version.id ||
+                          // Unfinished tasks follow the project to its newest version: they are about the same live site.
+                          (version.id === data.versions.at(-1)?.id && c.status !== "approved"),
+                      )
+                    : []
+                }
                 busy={busy}
                 onAdd={(note) => (version ? mutate("/comments", { version_id: version.id, ...note }) : Promise.resolve(false))}
                 onStatus={(id, status) => void mutate(`/comments/${id}`, { status }, "PATCH")}
@@ -612,11 +630,22 @@ export default function ProjectWorkspace({
                           <Button
                             size="sm"
                             className="h-9"
-                            disabled={busy || data.versions.filter((v) => v.stage === version.stage).at(-1)?.id !== version.id}
+                            disabled={
+                              busy ||
+                              data.versions.filter((v) => v.stage === version.stage).at(-1)?.id !== version.id ||
+                              (version.stage === "development" && (!siteLive || deploying))
+                            }
+                            title={
+                              version.stage === "development" && deploying
+                                ? "صبر کن انتشار تمام شود و نتیجه را ببینی"
+                                : version.stage === "development" && !siteLive
+                                  ? "اول باید سایت منتشر شود تا نتیجه را ببینی"
+                                  : undefined
+                            }
                             onClick={() => void mutate("/approve", { version_id: version.id })}
                           >
                             <IconCheck size={16} aria-hidden="true" />
-                            {version.stage === "design" ? "تأیید طراحی" : "تأیید توسعه"}
+                            {version.stage === "design" ? "تأیید طراحی" : "تأیید نهایی توسعه"}
                           </Button>
                         )}
                       </div>

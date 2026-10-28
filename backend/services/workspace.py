@@ -93,6 +93,9 @@ def approve(data: dict, version_id: str) -> None:
         raise HTTPException(409, "این خروجی براساس طراحی قبلی است؛ نسخه توسعه جدید لازم است")
     if any(c["version_id"] == version_id and c["status"] != "approved" for c in data["comments"]):
         raise HTTPException(409, "ابتدا بازخوردهای این نسخه را تأیید کنید")
+    # The owner accepts what they have seen: a development version is approved only once the site is live.
+    if stage == "development" and not live_since(data, ""):
+        raise HTTPException(409, "اول باید سایت منتشر شود تا نتیجه را ببینی؛ بعد تأیید کن")
     data["approvals"][stage] = {"version_id": version_id, "approved_at": now()}
     event(data, "طراحی تأیید شد" if stage == "design" else "توسعه تأیید شد")
 
@@ -103,6 +106,11 @@ def change_comment(data: dict, comment_id: str, status: str, actor: str, note: s
         raise HTTPException(404, "بازخورد یافت نشد")
     if actor == "agent" and status == "approved":
         raise HTTPException(403, "تأیید بازخورد فقط توسط صاحب پروژه انجام می‌شود")
+    # A fix goes to the owner only once it is live, so they review the real site rather than a promise.
+    if actor == "agent" and status == "review" and data["deployments"] and not live_since(data, comment.get("started_at") or comment["created_at"]):
+        raise HTTPException(409, "Publish the fix first: redeploy with publish_site or deploy_project and wait until get_deploy_status is READY, then set this task to review. The owner approves after seeing it on the live site.")
+    if actor == "agent" and status == "in_progress":
+        comment["started_at"] = now()
     comment["status"] = status
     comment["updated_at"] = now()
     comment["updated_by"] = actor
@@ -141,11 +149,13 @@ def agent_tasks(data: dict, site_url: str = "") -> list[dict]:
     return tasks
 
 
-def require_deploy_approval(data: dict) -> None:
-    if not data["approvals"].get("development"):
-        raise HTTPException(409, "ابتدا نسخه توسعه را در Workspace تأیید کنید")
-    if data["path"] == "design" and not data["approvals"].get("design"):
-        raise HTTPException(409, "ابتدا طراحی را در Workspace تأیید کنید")
+def live_since(data: dict, moment: str) -> bool:
+    """Whether a deployment became READY at or after `moment` (any READY one for an empty moment)."""
+    return any(d.get("state") == "READY" and (d.get("ready_at") or d.get("updated_at") or "") >= moment for d in data["deployments"])
+
+
+def latest_version_id(data: dict) -> str | None:
+    return data["versions"][-1]["id"] if data["versions"] else None
 
 
 def encrypt_credentials(body: dict) -> str:
@@ -172,7 +182,9 @@ def record_deployment(data: dict, result: dict) -> None:
         data["deployments"].append(entry)
     if entry.get("state") != status:
         event(data, f"وضعیت انتشار: {status}", "system")
-    entry.update(version_id=result.get("version_id") or entry.get("version_id") or data["approvals"].get("development", {}).get("version_id"), state=status, url=result.get("url", entry.get("url", "")), expires_at=result.get("expires_at"), updated_at=now())
+        if status == "READY":
+            entry["ready_at"] = now()
+    entry.update(version_id=result.get("version_id") or entry.get("version_id") or latest_version_id(data), state=status, url=result.get("url", entry.get("url", "")), expires_at=result.get("expires_at"), updated_at=now())
 
 
 async def record_for_order(order_id: str, result: dict) -> None:

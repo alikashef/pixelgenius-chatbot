@@ -353,7 +353,7 @@ def make_deploy_info(order_id: str, workspace_enabled: bool = True) -> dict:
         "site_ttl_days": SITE_TTL_SECONDS // 86400,
         "supports": "static previews and full-stack project deployment",
         "workspace_url": f"/panel/{order_id}" if workspace_enabled else None,
-        "workflow": "Call get_workspace first. The owner selects a path. Use report_output for design/development previews (include html for element selection), report_activity for updates, update_feedback for comment progress. Wait for owner approval of design before development, and development before deploy_project. Use save_admin_credentials to deliver real admin access. An external agent must run these tools; no automatic runner is connected." if workspace_enabled else "Deploy the project using deploy_project and poll get_deploy_status.",
+        "workflow": "Call get_workspace first. The owner selects a path. Use report_output for design/development previews (include html for element selection), report_activity for updates, update_feedback for comment progress. Wait for owner approval of design before development. Deploying never needs approval: deploy (publish_site / deploy_project) whenever there is something to show, because the owner reviews and approves on the live site afterwards. Use save_admin_credentials to deliver real admin access. An external agent must run these tools; no automatic runner is connected." if workspace_enabled else "Deploy the project using deploy_project and poll get_deploy_status.",
     }
 
 
@@ -491,9 +491,8 @@ async def _tool_deploy_locked(args: dict) -> dict:
         version_id = None
         order_id = None
         if order.mode == "designer":
-            approved = workspace.state(order)
-            workspace.require_deploy_approval(approved)
-            version_id = approved["approvals"]["development"]["version_id"]
+            # Deploying is how the owner gets to see the work; their approval comes after, on the live site.
+            version_id = workspace.latest_version_id(workspace.state(order))
             order_id = order.id
     platform = args.get("platform")
     if platform not in liara.PLATFORMS:
@@ -650,7 +649,7 @@ async def _tool_workspace(args: dict, action: str) -> dict:
             return {
                 **data,
                 "tasks": workspace.agent_tasks(data, site),
-                "task_workflow": "Each task is an owner annotation on a preview. Work through them in order: call update_feedback with status in_progress when you start, fix it, then status review with a short note of what you changed. Only the owner approves.",
+                "task_workflow": "Each task is an owner annotation on the live site. Work through them in order: call update_feedback with status in_progress when you start and fix it in the code. Then publish the fix without waiting for any approval (publish_site for a static site, or deploy_project and poll get_deploy_status until READY). Only after it is live, set each fixed task to review with a short note of what you changed. The owner sees the change in the workspace preview and approves or sends it back. Do not call report_output just for task fixes, and never ask the owner to approve something before it is deployed.",
                 "configuration": order.project_brief,
                 "runner_connected": False,
             }
@@ -727,12 +726,14 @@ async def _handle_message(message) -> dict | None:
             output = handler(params.get("arguments") or {})
             if inspect.isawaitable(output):
                 output = await output
-            if params.get("name") in ("deploy_project", "get_deploy_status") and output.get("state"):
+            # A static publish is live at once; record it like a READY deployment so the workspace sees it.
+            recorded = {**output, "state": "READY"} if params.get("name") == "publish_site" else output
+            if params.get("name") in ("deploy_project", "get_deploy_status", "publish_site") and recorded.get("state"):
                 async with SessionLocal() as db:
                     order = await _workspace_agent_order(db, params.get("arguments") or {}, designer_only=False)
                     if order.mode == "designer":
                         data = workspace.state(order)
-                        workspace.record_deployment(data, output)
+                        workspace.record_deployment(data, recorded)
                         order.workspace = data
                         await db.commit()
             return _rpc_result(msg_id, {"content": [{"type": "text", "text": json.dumps(output, ensure_ascii=False)}]})

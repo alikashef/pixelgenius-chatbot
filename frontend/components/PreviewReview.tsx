@@ -7,6 +7,8 @@ import {
   IconArrowUp,
   IconArrowUpRight,
   IconCheck,
+  IconChevronDown,
+  IconCircleCheck,
   IconClockHour4,
   IconListDetails,
   IconCopy,
@@ -23,7 +25,7 @@ import {
 } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { WorkspaceComment, WorkspaceVersion } from "@/lib/api";
+import { DeploymentStatus, WorkspaceComment, WorkspaceVersion } from "@/lib/api";
 
 /** A task pinned to an element: its page, CSS selector and HTML tag go to the agent with the request. */
 export interface NewComment {
@@ -50,7 +52,7 @@ const DEVICES = [
 const STATUS: Record<WorkspaceComment["status"], { label: string; tone: string }> = {
   open: { label: "در صف ایجنت", tone: "bg-warning/10 text-warning" },
   in_progress: { label: "ایجنت در حال اصلاح", tone: "bg-info/10 text-info" },
-  review: { label: "منتظر بازبینی تو", tone: "bg-brand-soft text-brand" },
+  review: { label: "منتشر شد؛ ببین و تأیید کن", tone: "bg-brand-soft text-brand" },
   approved: { label: "تأییدشده", tone: "bg-success/10 text-success" },
 };
 
@@ -67,10 +69,30 @@ function reviewUrl(url: string) {
   }
 }
 
+const DEPLOYING = ["PREPARING", "UPLOADING", "QUEUED", "BUILDING", "DEPLOYING"];
+const DEPLOY_STEPS = ["در صف", "ساخت", "انتشار", "آماده"];
+const DEPLOY_LABEL: Record<string, string> = {
+  PREPARING: "در حال آماده‌سازی",
+  UPLOADING: "در حال ارسال فایل‌ها",
+  QUEUED: "در صف ساخت",
+  BUILDING: "در حال ساخت",
+  DEPLOYING: "در حال انتشار",
+  READY: "منتشر شد",
+  FAILED: "انتشار ناموفق بود",
+  UNHEALTHY: "سایت بالا نیامد",
+};
+
+function deployStep(state: string) {
+  if (state === "PREPARING" || state === "UPLOADING") return 0;
+  return Math.max(0, ["QUEUED", "BUILDING", "DEPLOYING", "READY"].indexOf(state));
+}
+
 /** What the owner pastes into the same AI chat that built the project; the agent then reads the tasks over MCP. */
 function agentPrompt(projectName: string, versionNumber: number) {
   return `تغییراتی که برای پروژه‌ی «${projectName}» (نسخه ${versionNumber}) توی PixelGenius ثبت کردم رو بخون و درستش کن.
-با get_workspace از سرور PixelGenius لیست tasks رو بگیر و یکی‌یکی اصلاح کن: اول update_feedback با in_progress، بعد از اصلاح update_feedback با review و یک note کوتاه از کاری که کردی. آخر کار نسخه‌ی جدید رو با report_output ثبت کن.`;
+با get_workspace از سرور PixelGenius لیست tasks رو بگیر و یکی‌یکی اصلاح کن: اول update_feedback با in_progress.
+بعد از اصلاح، بدون این‌که منتظر تأیید من بمونی دوباره منتشر کن (publish_site یا deploy_project و get_deploy_status تا READY).
+وقتی تغییرات روی سایت زنده شد، هر تسک رو با update_feedback به review ببر و یک note کوتاه بنویس. من روی سایت می‌بینم و خودم تأیید می‌کنم.`;
 }
 
 /**
@@ -86,6 +108,7 @@ export default function PreviewReview({
   comments,
   busy,
   header,
+  deploy,
   onAdd,
   onStatus,
 }: {
@@ -99,6 +122,8 @@ export default function PreviewReview({
   comments: WorkspaceComment[];
   busy: boolean;
   header?: ReactNode;
+  /** The latest deployment, so the owner can follow a redeploy and sees the new site as soon as it is live. */
+  deploy?: DeploymentStatus | null;
   onAdd: (comment: NewComment) => Promise<boolean>;
   onStatus: (id: string, status: WorkspaceComment["status"]) => void;
 }) {
@@ -132,6 +157,27 @@ export default function PreviewReview({
   const [activeId, setActiveId] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [showLog, setShowLog] = useState(false);
+  const [justPublished, setJustPublished] = useState<string | null>(null);
+  const lastDeploy = useRef<string | null>(null);
+
+  const deployState = deploy?.state || "NOT_STARTED";
+  const deploying = DEPLOYING.includes(deployState);
+  const deployFailed = deployState === "FAILED" || deployState === "UNHEALTHY";
+
+  // A redeploy that turns READY reloads the preview, so the owner always reviews what is actually live.
+  useEffect(() => {
+    const previous = lastDeploy.current;
+    lastDeploy.current = deployState;
+    if (previous && DEPLOYING.includes(previous) && deployState === "READY") {
+      setReloadKey((k) => k + 1);
+      setJustPublished(new Date().toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit" }));
+    }
+    if (deploying) {
+      setJustPublished(null);
+      setShowLog(true);
+    }
+  }, [deployState, deploying]);
 
   const width = DEVICES.find((d) => d.id === device)!.width;
   const numbered = useMemo(() => comments.map((c, i) => ({ ...c, n: i + 1 })), [comments]);
@@ -272,7 +318,7 @@ export default function PreviewReview({
                     <Button type="button" size="sm" variant="outline" className="h-8 px-2 text-xs" disabled={busy} onClick={() => onStatus(c.id, "open")}><IconArrowBackUp size={14} aria-hidden="true" />برگشت</Button>
                   </>
                 ) : (
-                  <button type="button" disabled={busy} onClick={() => onStatus(c.id, c.status === "approved" ? "open" : "approved")} className="min-h-8 rounded-lg px-2 text-xs font-bold text-secondary-foreground outline-none hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40">{c.status === "approved" ? "بازگشایی" : "تأیید دستی"}</button>
+                  <button type="button" disabled={busy} onClick={() => onStatus(c.id, c.status === "approved" ? "open" : "approved")} className="min-h-8 rounded-lg px-2 text-xs font-bold text-secondary-foreground outline-none hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40">{c.status === "approved" ? "بازگشایی" : "بستن بدون اصلاح"}</button>
                 )}
               </div>
               <p className="text-[11px] text-muted-foreground">{new Date(c.updated_at || c.created_at).toLocaleString("fa-IR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}{c.updated_by === "agent" && <span className="mr-2 text-brand">توسط ایجنت</span>}</p>
@@ -287,6 +333,69 @@ export default function PreviewReview({
     <div className="min-w-0 pb-20 min-[1441px]:grid min-[1441px]:grid-cols-[minmax(0,1fr)_360px] min-[1441px]:items-start min-[1441px]:gap-5 min-[1441px]:pb-0">
       <section aria-label="پیش‌نمایش سایت" className="min-w-0 overflow-hidden rounded-2xl border border-border bg-surface shadow-card">
         {header && <div className="border-b border-border px-4 py-3 sm:px-5">{header}</div>}
+
+        {(deploying || deployFailed || justPublished) && (
+          <div
+            role={deployFailed ? "alert" : "status"}
+            aria-live="polite"
+            className={cn(
+              "border-b border-border px-4 py-3 sm:px-5",
+              deployFailed ? "bg-danger/10" : justPublished && !deploying ? "bg-success/10" : "bg-brand-soft"
+            )}
+          >
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              {deploying ? (
+                <IconLoader2 size={18} className="shrink-0 animate-spin text-brand motion-reduce:animate-none" aria-hidden="true" />
+              ) : deployFailed ? (
+                <IconAlertTriangle size={18} className="shrink-0 text-danger" aria-hidden="true" />
+              ) : (
+                <IconCircleCheck size={18} className="shrink-0 text-success" aria-hidden="true" />
+              )}
+              <p className={cn("min-w-0 flex-1 text-sm font-bold", deployFailed ? "text-danger" : deploying ? "text-brand" : "text-success")}>
+                {deploying
+                  ? `${DEPLOY_LABEL[deployState] || "در حال انتشار"} · تغییرات جدید بعد از آماده‌شدن همین‌جا باز می‌شه`
+                  : deployFailed
+                    ? `${DEPLOY_LABEL[deployState]}؛ نسخه‌ی قبلی سایت هنوز در دسترسه`
+                    : `نسخه‌ی جدید ساعت ${justPublished} منتشر شد؛ پیش‌نمایش به‌روز شد`}
+              </p>
+              {deploy?.build_log_tail?.length ? (
+                <button
+                  type="button"
+                  onClick={() => setShowLog((v) => !v)}
+                  aria-expanded={showLog}
+                  className="inline-flex min-h-8 items-center gap-1 rounded-lg px-2 text-xs font-bold text-secondary-foreground outline-none transition-colors hover:bg-foreground/5 focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {showLog ? "بستن لاگ" : "نمایش لاگ"}
+                  <IconChevronDown size={14} className={cn("transition-transform duration-150", showLog && "rotate-180")} aria-hidden="true" />
+                </button>
+              ) : null}
+              {!deploying && (
+                <button type="button" onClick={() => setJustPublished(null)} aria-label="بستن پیام" className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground outline-none hover:bg-foreground/5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+                  <IconX size={15} aria-hidden="true" />
+                </button>
+              )}
+            </div>
+            {deploying && (
+              <ol className="mt-3 grid grid-cols-4 gap-2" aria-label="مراحل انتشار">
+                {DEPLOY_STEPS.map((label, i) => {
+                  const step = deployStep(deployState);
+                  return (
+                    <li key={label} aria-current={i === step ? "step" : undefined} className="space-y-1.5">
+                      <span className={cn("block h-1.5 rounded-full", i < step ? "bg-primary" : i === step ? "bg-primary motion-safe:animate-pulse" : "bg-foreground/10")} />
+                      <span className={cn("block text-[11px]", i <= step ? "font-bold text-brand" : "text-muted-foreground")}>{label}</span>
+                    </li>
+                  );
+                })}
+              </ol>
+            )}
+            {deployFailed && deploy?.fail_reason && <p className="mt-2 text-xs leading-6 text-danger">{deploy.fail_reason}</p>}
+            {showLog && deploy?.build_log_tail?.length ? (
+              <pre dir="ltr" className="mt-3 max-h-56 overflow-auto rounded-lg border border-border bg-surface p-3 text-left font-mono text-[11px] leading-5 text-secondary-foreground">
+                {deploy.build_log_tail.join("\n")}
+              </pre>
+            ) : null}
+          </div>
+        )}
 
         <div className="flex flex-wrap items-center gap-2 border-b border-border bg-surface-2/60 px-3 py-2">
           <div className="flex h-9 min-w-0 flex-1 basis-56 items-center gap-2 rounded-lg border border-border bg-surface px-3">
