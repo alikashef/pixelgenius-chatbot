@@ -3,7 +3,7 @@
 import { ReactNode, useEffect, useState } from "react";
 import Link from "next/link";
 import {
-  IconBrush, IconClipboardList, IconHelp, IconLayoutDashboard, IconLayoutGrid, IconLogout, IconMenu2, IconMessage, IconPlugConnected, IconPlus,
+  IconBrush, IconClipboardList, IconHelp, IconLayoutDashboard, IconLayoutGrid, IconLogout, IconMenu2, IconMessage, IconPlugConnected, IconPlus, IconReceipt, IconWorld,
   IconSchool, IconSettings, IconWand, IconX, type Icon,
 } from "@tabler/icons-react";
 import { BrandLogo } from "@/components/Brand";
@@ -25,11 +25,12 @@ export interface ShellNavItem {
   comingSoon?: boolean;
 }
 
-type CustomerTab = "design" | "connect" | "orders" | "chats" | "account";
+type CustomerTab = "design" | "sites" | "connect" | "orders" | "chats" | "account";
 
 // One sidebar for every signed-in account: its sections follow the account's permissions.
 const CUSTOMER_NAV: (Omit<ShellNavItem, "key"> & { key: CustomerTab | "templates" })[] = [
   { key: "design", group: "طراحی محصول", label: "پروژه‌های طراحی", icon: IconWand },
+  { key: "sites", group: "طراحی محصول", label: "سایت‌ها و دامنه", icon: IconWorld },
   { key: "connect", group: "طراحی محصول", label: "اتصال به هوش مصنوعی", icon: IconPlugConnected },
   { key: "templates", group: "طراحی محصول", label: "سایت‌های آماده", icon: IconLayoutGrid, comingSoon: true },
   { key: "orders", group: "فروش", label: "سفارش‌ها", icon: IconClipboardList },
@@ -43,6 +44,7 @@ const ACCOUNT_NAV: (Omit<ShellNavItem, "key"> & { key: CustomerTab })[] = [
   { key: "chats", group: "حساب کاربری", label: "گفتگوهای ناتمام", icon: IconMessage },
   { key: "account", group: "حساب کاربری", label: "تنظیمات حساب", icon: IconSettings },
 ];
+const PRICING_NAV: ShellNavItem = { key: "pricing", group: "حساب کاربری", label: "تعرفه‌ها", icon: IconReceipt, href: "/pricing" };
 
 /**
  * The shared sidebar items. Customer sections link to /panel tabs (or switch tabs in place when
@@ -75,6 +77,7 @@ export function useAccountNav({
     ...(customer ? CUSTOMER_NAV.map(customerItem) : []),
     ...(roles.includes("freelancer") ? FREELANCER_NAV.map((item) => ({ ...item, active: active === item.key, count: counts[item.key] })) : []),
     ...(customer ? ACCOUNT_NAV.map(customerItem) : []),
+    ...(roles.length ? [{ ...PRICING_NAV, group: customer ? PRICING_NAV.group : "حساب", active: active === "pricing" }] : []),
   ];
 }
 

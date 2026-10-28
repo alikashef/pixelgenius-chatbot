@@ -19,7 +19,7 @@ META_DIR.mkdir(parents=True, exist_ok=True)
 
 PLAN_ID = os.getenv("LIARA_PLAN") or "small-g2"
 BUNDLE_PLAN_ID = os.getenv("LIARA_BUNDLE_PLAN") or "basic"
-TTL_SECONDS = int(float(os.getenv("LIARA_TTL_HOURS") or "24") * 3600)
+TTL_SECONDS = int(float(os.getenv("LIARA_TTL_HOURS") or "120") * 3600)
 MAX_APPS = int(os.getenv("LIARA_MAX_APPS") or "3")
 MIN_BALANCE = int(os.getenv("LIARA_MIN_BALANCE") or "50000")
 

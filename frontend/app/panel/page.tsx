@@ -7,6 +7,7 @@ import { IconPlus, IconClipboardList, IconPlugConnected, IconMessage, IconSettin
 import { fetchCustomerProfile, fetchMyOrders, updateCustomerProfile, CustomerProfile, Order, clearSession } from "@/lib/api";
 import AppShell, { NewProjectLink, ShellLoading, useAccountNav } from "@/components/AppShell";
 import McpTour, { isMcpTourDone } from "@/components/McpTour";
+import HostingSites from "@/components/HostingSites";
 import GuidedTour, { startTour } from "@/components/GuidedTour";
 import { Button } from "@/components/ui/button";
 
@@ -69,6 +70,7 @@ function readChatSessions(customerId: string): ChatSessionListItem[] {
 // Product-design projects (config briefs) and sales orders (priced, paid) are separate workflows.
 const TABS = [
   { key: "design", group: "طراحی محصول", label: "پروژه‌های طراحی", icon: IconWand },
+  { key: "sites", group: "طراحی محصول", label: "سایت‌ها و دامنه", icon: IconPlugConnected },
   { key: "connect", group: "طراحی محصول", label: "اتصال به هوش مصنوعی", icon: IconPlugConnected },
   { key: "orders", group: "فروش", label: "سفارش‌ها", icon: IconClipboardList },
   { key: "chats", group: "حساب کاربری", label: "گفتگوهای ناتمام", icon: IconMessage },
@@ -293,6 +295,10 @@ export default function PanelPage() {
       title: "پروژه‌های طراحی محصول",
       description: "کانفیگ‌هایی که با طراح محصول ساختی؛ دانلودشون کن یا فضای پروژه رو باز کن.",
     },
+    sites: {
+      title: "سایت‌ها و دامنه",
+      description: "سایت‌هایی که منتشر کردی، مهلتشون و دامنه‌ی اختصاصی.",
+    },
     connect: {
       title: "اتصال به هوش مصنوعی",
       description: "یک‌بار Claude، ChatGPT یا Cursor رو به PixelGenius وصل کن تا پروژه‌هات رو خودش بسازه و منتشر کنه.",
@@ -340,6 +346,12 @@ export default function PanelPage() {
       })()}
 
       {activeTab === "connect" && <McpTour designOrders={designOrders} />}
+      {activeTab === "sites" && (
+        <HostingSites
+          token={localStorage.getItem("customer_token") || ""}
+          onUnauthorized={() => { clearSession(); router.replace("/login?redirect=/panel?tab=sites"); }}
+        />
+      )}
 
       {activeTab === "design" && designOrders.length > 0 && !tourDone && (
         <div className="mb-5 flex flex-wrap items-center gap-4 rounded-xl border border-brand-line bg-brand-soft p-4">

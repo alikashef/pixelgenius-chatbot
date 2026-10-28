@@ -6,11 +6,11 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from database import create_tables
+from database import SessionLocal, create_tables
 from services import liara
 from services import skills as skills_service
 from lib.ai.analyze_lead import _base_urls
-from routers import chat, payment, orders, auth, customer_auth, customer, settings, freelancer_auth, site_mcp, skills, github
+from routers import chat, payment, orders, auth, customer_auth, customer, settings, freelancer_auth, site_mcp, skills, github, hosting
 
 UPLOAD_DIR = Path("/app/uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -24,6 +24,8 @@ async def lifespan(app: FastAPI):
         skills_service.embed_missing(_base_urls(), os.getenv("GAPGPT_API_KEY", ""))
     )
     site_mcp.cleanup_expired_sites()
+    async with SessionLocal() as db:
+        await hosting.load_custom_domains(db)
     cleanup_task = asyncio.create_task(liara.cleanup_loop())
     yield
     cleanup_task.cancel()
@@ -49,6 +51,8 @@ async def serve_preview_sites(request: Request, call_next):
     suffix = "." + PREVIEW_BASE_DOMAIN
     if host.endswith(suffix) and host != PREVIEW_BASE_DOMAIN:
         return site_mcp.serve_site(host[: -len(suffix)], request.url.path)
+    if host in site_mcp.CUSTOM_DOMAINS:
+        return site_mcp.serve_site(site_mcp.CUSTOM_DOMAINS[host], request.url.path, indexable=True)
     return await call_next(request)
 
 
@@ -64,6 +68,7 @@ app.include_router(settings.router, prefix="/api")
 app.include_router(skills.router, prefix="/api")
 app.include_router(freelancer_auth.router, prefix="/api")
 app.include_router(github.router, prefix="/api")
+app.include_router(hosting.router, prefix="/api")
 app.include_router(site_mcp.router)
 
 

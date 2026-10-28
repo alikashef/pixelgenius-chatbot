@@ -953,3 +953,48 @@ export async function checkMcpServer(url: string): Promise<{ serverName: string;
     tools: Array.isArray(list?.tools) ? list.tools.map((t: { name: string }) => t.name) : [],
   };
 }
+
+// ── Hosting (published sites and custom domains) ────────────────────────────
+
+export interface HostedSite {
+  order_id: string;
+  project_name: string;
+  url: string;
+  /** Host a custom domain's CNAME record points to. */
+  target: string;
+  kind: "static" | "dynamic";
+  expires_at: number;
+  expired: boolean;
+  has_database: boolean;
+  state: string;
+  can_renew_free: boolean;
+  domains: { domain: string; verified: boolean }[];
+}
+
+export interface HostingOverview {
+  billing_enabled: boolean;
+  trial_days: number;
+  /** A-record addresses for apex domains. */
+  server_ips: string[];
+  sites: HostedSite[];
+}
+
+async function hostingRequest<T>(token: string, path: string, init: RequestInit = {}, fallback = "درخواست انجام نشد"): Promise<T> {
+  const res = await fetch(`${API_URL}/api/customer/sites${path}`, {
+    ...init,
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+  });
+  if (res.status === 401 || res.status === 403) throw new Error("UNAUTHORIZED");
+  if (!res.ok) throw new Error(await readDetail(res, fallback));
+  return res.json();
+}
+
+export const fetchHostedSites = (token: string) => hostingRequest<HostingOverview>(token, "", {}, "دریافت سایت‌ها ناموفق بود");
+export const renewSite = (token: string, orderId: string) =>
+  hostingRequest<{ expires_at: number }>(token, `/${orderId}/renew`, { method: "POST" }, "تمدید انجام نشد");
+export const addSiteDomain = (token: string, orderId: string, domain: string) =>
+  hostingRequest<{ domain: string; verified: boolean }>(token, `/${orderId}/domains`, { method: "POST", body: JSON.stringify({ domain }) }, "افزودن دامنه انجام نشد");
+export const verifySiteDomain = (token: string, orderId: string, domain: string) =>
+  hostingRequest<{ domain: string; verified: boolean; detail?: string }>(token, `/${orderId}/domains/${encodeURIComponent(domain)}/verify`, { method: "POST" }, "بررسی دامنه انجام نشد");
+export const removeSiteDomain = (token: string, orderId: string, domain: string) =>
+  hostingRequest<{ removed: string }>(token, `/${orderId}/domains/${encodeURIComponent(domain)}`, { method: "DELETE" }, "حذف دامنه انجام نشد");

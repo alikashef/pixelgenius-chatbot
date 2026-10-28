@@ -93,6 +93,15 @@ http://*.{$PREVIEW_DOMAIN:preview.localhost} {
 	redir https://{host}{uri} permanent
 }
 
+# Customers' own domains, verified in the panel; /api/preview/allow gates on-demand certificates.
+https:// {
+	tls {
+		on_demand
+	}
+	encode gzip zstd
+	import preview_routes
+}
+
 http://:80 {
 	import app_routes
 }

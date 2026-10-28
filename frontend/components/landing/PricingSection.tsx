@@ -1,121 +1,51 @@
 import { IconCheck } from "@tabler/icons-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import Link from "next/link";
+import { BILLING_ENABLED, formatToman, Plan, yearly } from "@/lib/plans";
+import { cn } from "@/lib/utils";
 
-const PLANS = [
-  {
-    name: "رایگان",
-    price: "۰",
-    period: "تومان/ماه",
-    description: "برای شروع و آزمایش",
-    highlight: false,
-    features: [
-      "تا ۳ پروژه فعال",
-      "ویجت با برند PixelGenius",
-      "چت AI پایه",
-      "پرداخت آنلاین",
-    ],
-    cta: "شروع رایگان",
-    href: "/register",
-  },
-  {
-    name: "حرفه‌ای",
-    price: "۱۹۹,۰۰۰",
-    period: "تومان/ماه",
-    description: "برای فریلنسرهای فعال",
-    highlight: true,
-    badge: "محبوب‌ترین",
-    features: [
-      "پروژه نامحدود",
-      "ویجت با برند خودت (White-label)",
-      "AI پیشرفته + تسک خودکار",
-      "مدیریت Milestone کامل",
-      "چت پروژه زنده",
-      "پشتیبانی اولویت‌دار",
-    ],
-    cta: "۷ روز رایگان امتحان کن",
-    href: "/register?plan=pro",
-  },
-  {
-    name: "تیم",
-    price: "۴۹۹,۰۰۰",
-    period: "تومان/ماه",
-    description: "برای آژانس‌ها و تیم‌ها",
-    highlight: false,
-    features: [
-      "همه امکانات حرفه‌ای",
-      "تا ۵ کاربر",
-      "داشبورد تیمی",
-      "گزارش‌های پیشرفته",
-      "API دسترسی",
-      "پشتیبانی اختصاصی",
-    ],
-    cta: "تماس بگیر",
-    href: "/contact",
-  },
-];
-
-export default function PricingSection() {
+/** A row of plan cards; purchase stays "coming soon" until payment is live. */
+export default function PricingSection({ id, title, description, plans }: { id: string; title: string; description: string; plans: Plan[] }) {
   return (
-    <section id="pricing" className="mx-auto max-w-7xl px-4 py-24">
-      <div className="mb-14 text-center">
-        <p className="mb-3 text-sm font-semibold text-brand">قیمت‌گذاری</p>
-        <h2 className="text-3xl font-black text-foreground md:text-4xl">
-          ساده، شفاف، بدون هزینه پنهان
-        </h2>
-        <p className="mx-auto mt-4 max-w-xl text-muted-foreground">
-          با پلن رایگان شروع کن. هر وقت آماده بودی ارتقا بده.
-        </p>
+    <section id={id} aria-labelledby={`${id}-title`} className="scroll-mt-20">
+      <div className="mb-5">
+        <h2 id={`${id}-title`} className="text-lg font-black text-foreground">{title}</h2>
+        <p className="mt-1 text-sm leading-7 text-muted-foreground">{description}</p>
       </div>
-
-      <div className="grid gap-6 md:grid-cols-3">
-        {PLANS.map((plan) => (
-          <Card
-            key={plan.name}
-            className={`relative flex flex-col p-7 transition-all duration-200 ${
-              plan.highlight
-                ? "border-brand-line bg-brand-soft"
-                : "hover:border-brand-line"
-            }`}
-          >
-            {plan.badge && (
-              <div className="absolute -top-3 right-6">
-                <Badge>{plan.badge}</Badge>
-              </div>
+      <div className="grid gap-4 md:grid-cols-3">
+        {plans.map((plan) => (
+          <article
+            key={plan.id}
+            className={cn(
+              "relative flex flex-col rounded-xl border bg-surface p-5",
+              plan.highlight ? "border-brand-line shadow-[inset_0_0_0_1px_hsl(var(--brand-line))]" : "border-border"
             )}
-
-            <div className="mb-6">
-              <p className="text-sm font-bold text-muted-foreground">{plan.name}</p>
-              <div className="mt-2 flex items-baseline gap-1">
-                <span className="text-4xl font-black text-foreground">{plan.price}</span>
-                <span className="text-sm text-muted-foreground">{plan.period}</span>
-              </div>
-              <p className="mt-2 text-sm text-muted-foreground">{plan.description}</p>
-            </div>
-
-            <ul className="mb-8 flex-1 space-y-3">
+          >
+            {plan.highlight && (
+              <span className="absolute -top-2.5 left-5 rounded-full bg-brand-solid px-2.5 text-[11px] font-bold leading-5 text-brand-foreground">محبوب‌تر</span>
+            )}
+            <h3 className="text-sm font-bold text-foreground">{plan.name}</h3>
+            <p className="mt-1 text-xs leading-6 text-muted-foreground">{plan.tagline}</p>
+            <p className="mt-4 flex items-baseline gap-1.5">
+              <span className="text-3xl font-black text-foreground">{formatToman(plan.monthly / 1000)}</span>
+              <span className="text-xs text-muted-foreground">هزار تومان / ماه</span>
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">سالانه {formatToman(yearly(plan) / 1000)} هزار تومان (۲ ماه رایگان)</p>
+            <ul className="mt-5 flex-1 space-y-2.5">
               {plan.features.map((feature) => (
-                <li key={feature} className="flex items-start gap-2.5 text-sm">
-                  <IconCheck
-                    size={16}
-                    className="mt-0.5 shrink-0 text-brand"
-                    stroke={2.5}
-                  />
-                  <span className="text-muted-foreground">{feature}</span>
+                <li key={feature} className="flex items-start gap-2 text-[13px] leading-6 text-secondary-foreground">
+                  <IconCheck size={15} stroke={2.4} className="mt-1 shrink-0 text-brand" aria-hidden="true" />
+                  {feature}
                 </li>
               ))}
             </ul>
-
-            <Button
-              variant={plan.highlight ? "default" : "secondary"}
-              className="w-full"
-              asChild
+            <button
+              type="button"
+              disabled={!BILLING_ENABLED}
+              className="mt-5 flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-border bg-surface-2 text-sm font-bold text-muted-foreground disabled:cursor-not-allowed"
             >
-              <Link href={plan.href}>{plan.cta}</Link>
-            </Button>
-          </Card>
+              خرید
+              <span className="rounded-full bg-accent-soft px-2 text-[11px] leading-5 text-accent">به‌زودی</span>
+            </button>
+          </article>
         ))}
       </div>
     </section>

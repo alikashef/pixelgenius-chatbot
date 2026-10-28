@@ -34,7 +34,9 @@ SITES_DIR.mkdir(parents=True, exist_ok=True)
 PREVIEW_BASE_DOMAIN = (os.getenv("PREVIEW_BASE_DOMAIN") or "localhost").lower()
 PREVIEW_URL_TEMPLATE = os.getenv("PREVIEW_URL_TEMPLATE") or ("http://{slug}.localhost:8000" if PREVIEW_BASE_DOMAIN == "localhost" else "https://{slug}." + PREVIEW_BASE_DOMAIN)
 PUBLIC_MCP_URL = os.getenv("PUBLIC_MCP_URL") or "http://localhost:8000/mcp"
-SITE_TTL_SECONDS = int(os.getenv("SITE_TTL_DAYS") or "7") * 86400
+SITE_TTL_SECONDS = int(os.getenv("SITE_TTL_DAYS") or "5") * 86400
+# Expired static sites go offline but keep their files this long, so a renewal can bring them back.
+SITE_GRACE_SECONDS = int(os.getenv("SITE_GRACE_DAYS") or "7") * 86400
 TOKEN_TTL_SECONDS = 30 * 86400
 
 MAX_FILES = 150
@@ -208,10 +210,14 @@ def canonicalize_workspace_urls(order_id: str, data: dict) -> None:
             entry["url"] = canonical_project_url(order_id, entry["url"])
 
 
+# Verified customer domains -> site slug. Refreshed from the database by services.hosting.
+CUSTOM_DOMAINS: dict[str, str] = {}
+
+
 def _slug_from_domain(domain: str) -> str:
     host = domain.lower().rstrip(".")
     suffix = "." + PREVIEW_BASE_DOMAIN
-    slug = host[:-len(suffix)] if host.endswith(suffix) else ""
+    slug = host[:-len(suffix)] if host.endswith(suffix) else CUSTOM_DOMAINS.get(host, "")
     return slug if SLUG_RE.fullmatch(slug) else ""
 
 
@@ -297,16 +303,21 @@ async def admin_sites(_: dict = Depends(get_current_admin)):
                          "default_static_hours": SITE_TTL_SECONDS / 3600}, headers={"Cache-Control": "no-store"})
 
 
-@router.post("/api/admin/sites/{kind}/{slug}/extend")
-async def admin_extend_site(kind: str, slug: str, body: SiteExtensionIn, _: dict = Depends(get_current_admin)):
+async def extend_site(slug: str, kind: str, seconds: int) -> int:
+    """Push a site's expiry forward from now or from its current expiry, whichever is later."""
     async with liara.site_lock(slug):
         meta = _admin_site(slug, kind)
-        meta["expires_at"] = int(max(time.time(), meta.get("expires_at", 0))) + body.hours * 3600
+        meta["expires_at"] = int(max(time.time(), meta.get("expires_at", 0))) + seconds
         if kind == "dynamic":
             liara.write_meta(slug, meta)
         else:
             (_site_dir(slug) / ".meta.json").write_text(json.dumps(meta))
-    return {"expires_at": meta["expires_at"]}
+    return meta["expires_at"]
+
+
+@router.post("/api/admin/sites/{kind}/{slug}/extend")
+async def admin_extend_site(kind: str, slug: str, body: SiteExtensionIn, _: dict = Depends(get_current_admin)):
+    return {"expires_at": await extend_site(slug, kind, body.hours * 3600)}
 
 
 @router.delete("/api/admin/sites/{kind}/{slug}")
@@ -373,7 +384,8 @@ def _expired(meta: dict | None) -> bool:
 def cleanup_expired_sites() -> int:
     removed = 0
     for site in SITES_DIR.iterdir():
-        if site.is_dir() and not site.name.startswith(".") and _expired(_read_meta(site.name)):
+        meta = _read_meta(site.name)
+        if site.is_dir() and not site.name.startswith(".") and (not meta or meta.get("expires_at", 0) + SITE_GRACE_SECONDS < time.time()):
             shutil.rmtree(site, ignore_errors=True)
             removed += 1
     return removed
@@ -750,7 +762,7 @@ async def mcp_endpoint(request: Request):
 
 @router.get("/api/preview/allow")
 async def preview_allow(domain: str = ""):
-    """Allow certificates only for live static sites or provisioned full-stack projects."""
+    """Allow certificates only for live static sites or provisioned full-stack projects (preview hosts or verified custom domains)."""
     slug = _slug_from_domain(domain)
     kind, _ = _preview_target(slug)
     if kind in ("static", "dynamic"):
@@ -767,15 +779,19 @@ SITE_HEADERS = {
 }
 
 
-def serve_site(slug: str, url_path: str) -> Response:
+def serve_site(slug: str, url_path: str, indexable: bool = False) -> Response:
+    """Serve a static site; preview hosts stay out of search engines, custom domains are indexable."""
     if not SLUG_RE.match(slug):
         return Response("Not found", status_code=404)
+    headers = {k: v for k, v in SITE_HEADERS.items() if not (indexable and k == "X-Robots-Tag")}
     meta = _read_meta(slug)
     if meta is None:
-        return Response("این پیش‌نمایش وجود ندارد.", status_code=404, headers=SITE_HEADERS)
+        return Response("این سایت وجود ندارد.", status_code=404, headers=headers)
     if _expired(meta):
-        shutil.rmtree(_site_dir(slug), ignore_errors=True)
-        return Response("این پیش‌نمایش منقضی شده است.", status_code=410, headers=SITE_HEADERS)
+        # Files stay through the grace period so the owner can still renew.
+        if meta.get("expires_at", 0) + SITE_GRACE_SECONDS < time.time():
+            shutil.rmtree(_site_dir(slug), ignore_errors=True)
+        return Response("مهلت این سایت تمام شده است؛ صاحب سایت می‌تواند از پنل تمدیدش کند.", status_code=410, headers=headers)
 
     root = _site_dir(slug).resolve()
     relative = url_path.lstrip("/") or "index.html"
@@ -786,5 +802,5 @@ def serve_site(slug: str, url_path: str) -> Response:
             content_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
             if content_type.startswith("text/") or content_type in ("application/javascript", "application/json"):
                 content_type += "; charset=utf-8"
-            return Response(path.read_bytes(), media_type=content_type, headers=SITE_HEADERS)
-    return Response("صفحه پیدا نشد.", status_code=404, headers=SITE_HEADERS)
+            return Response(path.read_bytes(), media_type=content_type, headers=headers)
+    return Response("صفحه پیدا نشد.", status_code=404, headers=headers)

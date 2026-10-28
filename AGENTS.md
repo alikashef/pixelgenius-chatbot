@@ -140,10 +140,12 @@ frontend/
     McpTour.tsx                   ← تور آموزشی اتصال MCP در پنل مشتری + CopyBlock و BUILD_PROMPT مشترک
     OrderManager.tsx              ← بررسی/قیمت‌گذاری سفارش؛ مشترک ادمین و فریلنسر (scope)
     GuidedTour.tsx                ← تور خوش‌آمد (اسپات‌لایت + روبات راهنما + صدا)
+    HostingSites.tsx              ← تب «سایت‌ها و دامنه» پنل: مهلت، تمدید رایگان، اتصال دامنه‌ی اختصاصی
     GithubRepoPicker.tsx          ← اتصال OAuth به GitHub و انتخاب مخزن در مسیر «انتشار سورس آماده»
     FreelancerPromo.tsx           ← بنر جذب فریلنسر در سایدبار صفحه اصلی (قابل بستن برای ۷ روز)
     admin/FreelancerInvites.tsx   ← ادمین: ساخت/لغو کد دعوت + لیست فریلنسرها (`/admin/dashboard?tab=freelancers`)
   lib/tours.json                  ← متن مراحل تورها (منبع مشترک UI و تولید صدا)
+  lib/plans.ts                    ← تعرفه‌ها (میزبانی + فریلنسر) و BILLING_ENABLED؛ صفحه‌ی /pricing
   lib/widget.ts                   ← پالت رنگ ویجت و رنگ روبات فریلنسر
   app/freelancer/settings/        ← آموزش دستیار (حوزه، خدمات و قیمت، روش کار، FAQ)
   app/freelancer/widget/          ← ظاهر و نصب ویجت با پیش‌نمایش زنده
@@ -181,6 +183,7 @@ backend/
     auth.py                       ← POST /api/auth/login (admin JWT)
     customer.py                   ← GET/PATCH /api/customer/profile
     customer_auth.py              ← POST /api/customer/otp/send + verify (خروجی: نشست واحد با همه‌ی نقش‌ها)
+    hosting.py                    ← /api/customer/sites: لیست سایت‌ها، renew رایگان، دامنه‌ی اختصاصی (add/verify/delete)
     github.py                     ← /api/github/status|connect|callback|repos + DELETE (توکن رمزشده روی customers)
     settings.py                   ← تنظیمات AI
   services/
@@ -201,6 +204,12 @@ backend/
 - ورود ایمیل/رمز (`POST /api/auth/password-login`) برای فریلنسرهای قدیمی و ادمین env؛ فریلنسر بدون شماره بعد از ورود به `link-phone` هدایت می‌شود
 - **سایدبار یکی است:** `useAccountNav` در `AppShell` منوی مشترک را می‌سازد (طراحی محصول، فروش، فریلنسر، حساب کاربری)؛ بخش «فریلنسر» فقط اگر حساب دسترسی فریلنسر داشته باشد اضافه می‌شود. بدون چیپ و بدون سوییچ پنل
 - **پنل ادمین خصوصی است:** در انتخاب پنل و سایدبار هرگز نمایش داده نمی‌شود
+
+### میزبانی و دامنه
+- هر سایت منتشرشده ۵ روز رایگان (`SITE_TTL_DAYS`، `LIARA_TTL_HOURS=120`)؛ سایت استاتیک منقضی‌شده تا `SITE_GRACE_DAYS` (۷) فایل‌هایش می‌ماند
+- پرداخت فعلاً خاموش (`HOSTING_BILLING` در backend، `BILLING_ENABLED` در `lib/plans.ts`)؛ تا آن موقع «تمدید رایگان» در دو روز آخر مهلت
+- دامنه‌ی اختصاصی از gateway خودمان (نه API ارائه‌دهنده): جدول `site_domains`، تأیید با مقایسه‌ی DNS، کش `site_mcp.CUSTOM_DOMAINS`؛ بلوک catch-all `https://` در Caddy با on-demand TLS
+- **نام ارائه‌دهنده‌ی هاست هرگز به مشتری نمایش داده نمی‌شود**: `liara.scrub()` روی خطاها و لاگ‌ها؛ فقط پنل ادمین آن را می‌بیند
 
 ### Zarinpal
 - API v4: `api.zarinpal.com/pg/v4/...`

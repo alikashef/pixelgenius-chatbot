@@ -135,6 +135,19 @@ class AISkillChunk(Base):
     embedding: Mapped[list | None] = mapped_column(JSON(none_as_null=True), nullable=True)
 
 
+class SiteDomain(Base):
+    """A customer's own domain pointed at one of their published sites."""
+    __tablename__ = "site_domains"
+
+    domain: Mapped[str] = mapped_column(String(253), primary_key=True)
+    order_id: Mapped[str] = mapped_column(String(36), ForeignKey("orders.id"), index=True)
+    slug: Mapped[str] = mapped_column(String(48))
+    verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+
 class Order(Base):
     __tablename__ = "orders"
 
