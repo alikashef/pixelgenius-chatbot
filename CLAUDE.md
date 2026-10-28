@@ -199,7 +199,7 @@ backend/
 - شناسه‌ی اصلی **شماره موبایل** است: `build_session` در `auth.py` از روی شماره، حساب مشتری + فریلنسر (`freelancers.phone`) + ادمین (`ADMIN_PHONES`) را پیدا می‌کند و برای هر نقش توکن JWT جدا (`role`) می‌دهد
 - فرانت با `saveSession` در `lib/api.ts` توکن‌ها را در کلیدهای قبلی (`customer_token`، `freelancer_token`، `admin_token`) می‌گذارد؛ خروج = `clearSession()` (خروج از همه)
 - ورود ایمیل/رمز (`POST /api/auth/password-login`) برای فریلنسرهای قدیمی و ادمین env؛ فریلنسر بدون شماره بعد از ورود به `link-phone` هدایت می‌شود
-- **پنل ادمین خصوصی است:** در انتخاب پنل و سوییچر سایدبار (`AppShell`) هرگز نمایش داده نمی‌شود
+- **پنل ادمین خصوصی است:** در انتخاب پنل و لینک پنل‌های دیگر در سایدبار (`OtherPanels` در `AppShell`، فقط اگر دسترسی باشد) هرگز نمایش داده نمی‌شود
 
 ### Zarinpal
 - API v4: `api.zarinpal.com/pg/v4/...`

@@ -3,7 +3,7 @@
 import { ReactNode, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { IconHelp, IconLogout, IconMenu2, IconX, type Icon } from "@tabler/icons-react";
+import { IconArrowUpLeft, IconBriefcase, IconHelp, IconLogout, IconMenu2, IconUser, IconX, type Icon } from "@tabler/icons-react";
 import { BrandLogo } from "@/components/Brand";
 import ThemeToggle from "@/components/ThemeToggle";
 import { PANELS, Role, signedInRoles } from "@/lib/api";
@@ -11,35 +11,33 @@ import { cn } from "@/lib/utils";
 
 const ROLE_PREFIX: Record<Role, string> = { customer: "/panel", freelancer: "/freelancer", admin: "/admin" };
 
-/** Lets an account with several roles hop between its panels; hidden when there is only one. */
-function PanelSwitcher({ onNavigate }: { onNavigate: () => void }) {
+const ROLE_ICONS: Record<Role, Icon> = { customer: IconUser, freelancer: IconBriefcase, admin: IconUser };
+
+/** A plain link to each other panel this account may open; nothing when it has none. Admin is never listed. */
+function OtherPanels({ onNavigate }: { onNavigate: () => void }) {
   const pathname = usePathname();
   const [roles, setRoles] = useState<Role[]>([]);
-  // The admin panel stays private and is never listed next to the others.
   useEffect(() => setRoles(signedInRoles().filter((role) => role !== "admin")), []);
-  if (roles.length < 2) return null;
+  const others = roles.filter((role) => !pathname.startsWith(ROLE_PREFIX[role]));
+  if (!others.length) return null;
   return (
-    <nav aria-label="پنل‌ها" className="px-3 pb-3">
-      <div className="grid gap-1 rounded-lg bg-foreground/[0.05] p-1" style={{ gridTemplateColumns: `repeat(${roles.length}, minmax(0, 1fr))` }}>
-        {roles.map((role) => {
-          const active = pathname.startsWith(ROLE_PREFIX[role]);
-          return (
-            <Link
-              key={role}
-              href={PANELS[role].href}
-              onClick={onNavigate}
-              aria-current={active ? "page" : undefined}
-              className={cn(
-                "flex min-h-8 items-center justify-center rounded-md px-1 text-xs font-bold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-                active ? "bg-surface text-foreground shadow-card" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {PANELS[role].label.replace("پنل ", "")}
-            </Link>
-          );
-        })}
-      </div>
-    </nav>
+    <div className="space-y-0.5 px-3 pb-3">
+      {others.map((role) => {
+        const RoleIcon = ROLE_ICONS[role];
+        return (
+          <Link
+            key={role}
+            href={PANELS[role].href}
+            onClick={onNavigate}
+            className="flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm text-secondary-foreground outline-none transition-colors hover:bg-foreground/5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <RoleIcon size={19} stroke={1.8} aria-hidden="true" className="text-muted-foreground" />
+            <span className="flex-1 truncate text-right">{PANELS[role].label}</span>
+            <IconArrowUpLeft size={15} aria-hidden="true" className="text-muted-foreground" />
+          </Link>
+        );
+      })}
+    </div>
   );
 }
 
@@ -174,7 +172,7 @@ export default function AppShell({
           </div>
         ))}
       </nav>
-      <PanelSwitcher onNavigate={() => setOpen(false)} />
+      <OtherPanels onNavigate={() => setOpen(false)} />
       <div className="border-t border-border p-3" data-tour="shell-footer">
         <div className="flex items-center gap-2">
           {user && (
