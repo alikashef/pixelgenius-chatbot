@@ -1120,7 +1120,7 @@ function ChatPageInner() {
       </div>
       <FreelancerPromo onNavigate={() => setSidebarOpen(false)} />
       <div className="flex items-center gap-2 border-t border-border p-3">
-        <Link href={customerToken ? "/account" : "/login?redirect=/account"} data-tour="account" className="flex h-10 min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2 text-sm font-bold text-foreground outline-none transition-colors hover:bg-foreground/5 focus-visible:ring-2 focus-visible:ring-ring">
+        <Link href={customerToken ? "/account?tab=account" : "/login?redirect=/account?tab=account"} data-tour="account" className="flex h-10 min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2 text-sm font-bold text-foreground outline-none transition-colors hover:bg-foreground/5 focus-visible:ring-2 focus-visible:ring-ring">
           <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-surface-2 text-muted-foreground">
             <IconUser size={15} aria-hidden="true" />
           </span>

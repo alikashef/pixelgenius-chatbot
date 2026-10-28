@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   IconBrush, IconClipboardList, IconHelp, IconLayoutDashboard, IconLayoutGrid, IconLogout, IconMenu2, IconMessage, IconPlugConnected, IconReceipt, IconWorld,
   IconSchool, IconSettings, IconWand, IconX, type Icon,
-  IconBriefcase, IconUser,
+  IconBriefcase, IconArrowRight,
 } from "@tabler/icons-react";
 import { BrandLogo } from "@/components/Brand";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -49,12 +49,11 @@ const PRICING_NAV: ShellNavItem = { key: "pricing", group: "حساب کاربر�
 
 type Section = { id: string; label: string; icon: Icon; href: string; role: Role };
 
-// The main page lists only these sections; each section's page lists its own links.
+// The main page lists only these sections (the account opens from its footer); each section's page lists its own links.
 const SECTIONS: Section[] = [
   { id: "طراحی محصول", label: "طراحی محصول", icon: IconWand, href: "/account?tab=design", role: "customer" },
   { id: "فروش", label: "فروش", icon: IconClipboardList, href: "/account?tab=orders", role: "customer" },
   { id: "فریلنسر", label: "فریلنسر", icon: IconBriefcase, href: "/freelancer/dashboard", role: "freelancer" },
-  { id: "حساب کاربری", label: "حساب کاربری", icon: IconUser, href: "/account?tab=account", role: "customer" },
 ];
 
 function useRoles() {
@@ -128,6 +127,8 @@ interface AppShellProps {
   nav: ShellNavItem[];
   /** Prominent action at the top of the sidebar (e.g. new project). */
   primaryAction?: ReactNode;
+  /** Shows a "back" link at the top of the sidebar, e.g. to the main page from a section. */
+  backHref?: string;
   user?: { name: string; detail?: string };
   onLogout?: () => void;
   /** Shows a help button that replays the onboarding tour. */
@@ -210,6 +211,7 @@ export function NavGroups({ nav, onNavigate, dense }: { nav: ShellNavItem[]; onN
 export default function AppShell({
   nav,
   primaryAction,
+  backHref,
   user,
   onLogout,
   onHelp,
@@ -243,6 +245,18 @@ export default function AppShell({
           <IconX size={18} aria-hidden="true" />
         </button>
       </div>
+      {backHref && (
+        <div className="px-3 pb-2">
+          <Link
+            href={backHref}
+            onClick={() => setOpen(false)}
+            className="flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-bold text-secondary-foreground outline-none transition-colors hover:bg-foreground/5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <IconArrowRight size={17} aria-hidden="true" />
+            بازگشت
+          </Link>
+        </div>
+      )}
       {primaryAction && <div className="px-3 pb-2" data-tour="new-project">{primaryAction}</div>}
       <nav aria-label="منوی اصلی" className="mt-3 min-h-0 flex-1 overflow-y-auto px-3">
         <NavGroups nav={nav} onNavigate={() => setOpen(false)} />

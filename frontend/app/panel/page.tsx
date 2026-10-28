@@ -314,6 +314,7 @@ export default function PanelPage() {
   return (
     <AppShell
       nav={nav}
+      backHref="/"
       primaryAction={<NewProjectLink />}
       user={{ name: [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || "کاربر", detail: profile?.phone }}
       onLogout={logout}

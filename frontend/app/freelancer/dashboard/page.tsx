@@ -70,6 +70,7 @@ export default function FreelancerDashboardPage() {
   return (
     <AppShell
       nav={nav}
+      backHref="/"
       primaryAction={<NewProjectLink />}
       user={name ? { name } : undefined}
       onLogout={handleLogout}

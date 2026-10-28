@@ -10,6 +10,7 @@ export default function PricingPage() {
   return (
     <AppShell
       nav={nav}
+      backHref="/"
       primaryAction={<NewProjectLink />}
       width="wide"
       title="تعرفه‌ها"

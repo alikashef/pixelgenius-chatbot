@@ -178,6 +178,7 @@ export default function FreelancerTrainingPage() {
     <AppShell
       width="wide"
       nav={nav}
+      backHref="/"
       primaryAction={<NewProjectLink />}
       user={name ? { name } : undefined}
       onLogout={logout}
