@@ -13,8 +13,7 @@ import {
   uploadProposal,
   fetchAISettings,
   updateAISettings,
-  Order,
-} from "@/lib/api";
+  Order, clearSession } from "@/lib/api";
 import AppShell, { ShellLoading } from "@/components/AppShell";
 import { IconAdjustments, IconCheck, IconClipboardList, IconPalette, IconUsers, IconWand, IconWorld, IconX } from "@tabler/icons-react";
 
@@ -102,14 +101,14 @@ export default function AdminDashboard() {
 
   async function load() {
     const token = getToken();
-    if (!token) { router.replace("/admin/login"); return; }
+    if (!token) { router.replace("/login"); return; }
     try {
       const [o, aiSettings] = await Promise.all([fetchOrders(token), fetchAISettings(token)]);
       setOrders(o);
       setSettings(aiSettings);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "";
-      if (msg === "UNAUTHORIZED") { localStorage.removeItem("admin_token"); router.replace("/admin/login"); }
+      if (msg === "UNAUTHORIZED") { localStorage.removeItem("admin_token"); router.replace("/login"); }
       else setError(msg);
     } finally {
       setLoading(false);
@@ -239,7 +238,7 @@ export default function AdminDashboard() {
           count: key === "orders" ? salesOrders.length || undefined : key === "design" ? designOrders.length || undefined : undefined,
         }))}
         user={{ name: "مدیر سیستم" }}
-        onLogout={() => { localStorage.removeItem("admin_token"); router.push("/admin/login"); }}
+        onLogout={() => { clearSession(); router.push("/login"); }}
         title={ADMIN_TABS.find((t) => t.key === activeTab)?.title}
         description={ADMIN_TABS.find((t) => t.key === activeTab)?.description}
       >
@@ -332,7 +331,7 @@ export default function AdminDashboard() {
         )}
 
         {activeTab === "freelancers" && (
-          <FreelancerInvites getToken={getToken} onUnauthorized={() => { localStorage.removeItem("admin_token"); router.push("/admin/login"); }} />
+          <FreelancerInvites getToken={getToken} onUnauthorized={() => { localStorage.removeItem("admin_token"); router.push("/login"); }} />
         )}
 
         {activeTab === "skills" && (
@@ -341,13 +340,13 @@ export default function AdminDashboard() {
               getToken={getToken}
               settings={settings}
               onSettingsChange={setSettings}
-              onUnauthorized={() => { localStorage.removeItem("admin_token"); router.push("/admin/login"); }}
+              onUnauthorized={() => { localStorage.removeItem("admin_token"); router.push("/login"); }}
             />
             <SkillsManager
               getToken={getToken}
               settings={settings}
               onSettingsChange={setSettings}
-              onUnauthorized={() => { localStorage.removeItem("admin_token"); router.push("/admin/login"); }}
+              onUnauthorized={() => { localStorage.removeItem("admin_token"); router.push("/login"); }}
             />
           </div>
         )}

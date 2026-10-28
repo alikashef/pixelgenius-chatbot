@@ -43,7 +43,7 @@ export default function FreelancerOnboardingPage() {
     if (!isLastStep) { setStep((s) => s + 1); return; }
 
     const token = localStorage.getItem("freelancer_token") || "";
-    if (!token) { router.replace("/freelancer/login"); return; }
+    if (!token) { router.replace("/login"); return; }
 
     setLoading(true);
     setError("");

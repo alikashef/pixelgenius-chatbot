@@ -121,12 +121,11 @@ frontend/
     panel/
       page.tsx                    ← پنل مشتری (client)
       [id]/page.tsx               ← جزئیات سفارش (client)
-    login/page.tsx                ← OTP login مشتری (client)
+    login/page.tsx                ← ورود واحد همه (OTP + ایمیل/رمز)؛ نشست همه‌ی پنل‌ها را می‌سازد
     proposal/page.tsx             ← نمایش پروپوزال (client)
     payment/verify/page.tsx       ← تایید پرداخت Zarinpal (client)
     admin/
-      login/page.tsx              ← JWT login ادمین
-      dashboard/page.tsx          ← داشبورد ادمین
+      dashboard/page.tsx          ← داشبورد ادمین (لینکش هیچ‌جا نمایش داده نمی‌شود)
   components/
     ui/                           ← shadcn/ui (button, badge, card)
     landing/                      ← sections لندینگ (همه server component)
@@ -141,6 +140,7 @@ frontend/
     McpTour.tsx                   ← تور آموزشی اتصال MCP در پنل مشتری + CopyBlock و BUILD_PROMPT مشترک
     OrderManager.tsx              ← بررسی/قیمت‌گذاری سفارش؛ مشترک ادمین و فریلنسر (scope)
     GuidedTour.tsx                ← تور خوش‌آمد (اسپات‌لایت + روبات راهنما + صدا)
+    GithubRepoPicker.tsx          ← اتصال OAuth به GitHub و انتخاب مخزن در مسیر «انتشار سورس آماده»
     FreelancerPromo.tsx           ← بنر جذب فریلنسر در سایدبار صفحه اصلی (قابل بستن برای ۷ روز)
     admin/FreelancerInvites.tsx   ← ادمین: ساخت/لغو کد دعوت + لیست فریلنسرها (`/admin/dashboard?tab=freelancers`)
   lib/tours.json                  ← متن مراحل تورها (منبع مشترک UI و تولید صدا)
@@ -180,7 +180,8 @@ backend/
     orders.py                     ← GET /api/orders, /orders/stats, /orders/{id}
     auth.py                       ← POST /api/auth/login (admin JWT)
     customer.py                   ← GET/PATCH /api/customer/profile
-    customer_auth.py              ← POST /api/customer/auth/send-otp + verify-otp
+    customer_auth.py              ← POST /api/customer/otp/send + verify (خروجی: نشست واحد با همه‌ی نقش‌ها)
+    github.py                     ← /api/github/status|connect|callback|repos + DELETE (توکن رمزشده روی customers)
     settings.py                   ← تنظیمات AI
   services/
     ai_settings.py
@@ -192,8 +193,13 @@ backend/
 
 ### Database
 - جدول اصلی: `orders` — PK: UUID، `features`: JSON array، `status`: enum
-- Auth ادمین: JWT با jose، توکن ۸ ساعته، credentials از env
-- Auth مشتری: OTP → توکن در localStorage
+
+### ورود واحد (Unified login)
+- همه از `/login` وارد می‌شوند؛ `/freelancer/login` و `/admin/login` در `next.config.js` به آن redirect می‌شوند
+- شناسه‌ی اصلی **شماره موبایل** است: `build_session` در `auth.py` از روی شماره، حساب مشتری + فریلنسر (`freelancers.phone`) + ادمین (`ADMIN_PHONES`) را پیدا می‌کند و برای هر نقش توکن JWT جدا (`role`) می‌دهد
+- فرانت با `saveSession` در `lib/api.ts` توکن‌ها را در کلیدهای قبلی (`customer_token`، `freelancer_token`، `admin_token`) می‌گذارد؛ خروج = `clearSession()` (خروج از همه)
+- ورود ایمیل/رمز (`POST /api/auth/password-login`) برای فریلنسرهای قدیمی و ادمین env؛ فریلنسر بدون شماره بعد از ورود به `link-phone` هدایت می‌شود
+- **پنل ادمین خصوصی است:** در انتخاب پنل و سوییچر سایدبار (`AppShell`) هرگز نمایش داده نمی‌شود
 
 ### Zarinpal
 - API v4: `api.zarinpal.com/pg/v4/...`
@@ -210,6 +216,10 @@ ADMIN_USERNAME
 ADMIN_PASSWORD
 SMS_API_KEY           ← ملی‌پیامک
 SMS_LINE_NUMBER
+ADMIN_PHONES          ← شماره‌هایی که با OTP پنل ادمین هم می‌گیرند (با کاما)
+PUBLIC_APP_URL        ← آدرس سایت (پیش‌فرض: PUBLIC_MCP_URL بدون /mcp)
+GITHUB_CLIENT_ID      ← GitHub OAuth App؛ callback: PUBLIC_APP_URL/api/github/callback
+GITHUB_CLIENT_SECRET
 ```
 
 ### Environment Variables — Frontend
@@ -339,7 +349,7 @@ ELEVENLABS_API_KEY=... python3 scripts/generate_tour_audio.py
 - ظاهر ویجت در `freelancers.widget_settings`؛ پروفایل عمومی: `GET /api/bot/{token}`
 - سفارش‌ها با `bot_token` به فریلنسر نسبت داده می‌شوند (در proposal/handoff)؛ فریلنسر فقط سفارش‌های خودش را از `/api/freelancer/orders/*` می‌بیند
 - نصب: `<script src="https://APP/embed.js" data-bot="TOKEN" async></script>`
-- ثبت‌نام فریلنسر **فقط با کد دعوت** (جدول `invite_codes`، کد `FRL-XXXXXXXX`، مصرف اتمیک با `used_count < max_uses`)؛ لینک دعوت: `/freelancer/register?invite=CODE`
+- ثبت‌نام فریلنسر = فعال‌کردن پنل فریلنسر روی حساب واردشده با موبایل (`/freelancer/register`)، **فقط با کد دعوت** (جدول `invite_codes`، کد `FRL-XXXXXXXX`، مصرف اتمیک با `used_count < max_uses`)؛ لینک دعوت: `/freelancer/register?invite=CODE`
 - ادمین: `GET/POST /api/admin/invites`، `DELETE /api/admin/invites/{code}` (لغو)، `GET /api/admin/freelancers`
 
 ### قبل از هر commit

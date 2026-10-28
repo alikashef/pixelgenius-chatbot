@@ -13,6 +13,7 @@ import ChatRobot, { ROBOT_INTRODUCTIONS } from "@/components/ChatRobot";
 import ThemeToggle from "@/components/ThemeToggle";
 import GuidedTour, { startTour } from "@/components/GuidedTour";
 import FreelancerPromo from "@/components/FreelancerPromo";
+import GithubRepoPicker from "@/components/GithubRepoPicker";
 import { fetchBotProfile, BotProfile, fetchOrderBrief, fetchChatProgress, ChatProgressStage, sendChat, sendOtp, submitOrder, uploadChatFile, createChatSession, updateChatSession, ChatMode, ProjectPath, Message, Proposal, LeadAnalysis, OrderFile } from "@/lib/api";
 
 const WELCOME: Message = {
@@ -690,7 +691,7 @@ function ChatPageInner() {
 
   async function submit(text: string) {
     if (activeMode === "designer" && !projectPath) { setError("ابتدا مسیر پروژه را انتخاب کن"); return; }
-    if (activeMode === "designer" && projectPath === "source" && !sourceReady) { setError("لینک مخزن GitHub یا فایل ZIP سورس را اضافه کن"); return; }
+    if (activeMode === "designer" && projectPath === "source" && !sourceReady) { setError("مخزن GitHub را انتخاب کن یا فایل ZIP سورس را اضافه کن"); return; }
     if (activeMode === "designer" && projectPath === "source" && sourceType === "github") {
       try { const source = new URL(sourceUrl); if (source.protocol !== "https:" || !["github.com", "www.github.com"].includes(source.hostname) || source.pathname.split("/").filter(Boolean).length < 2 || source.username) throw new Error(); }
       catch { setError("لینک معتبر مخزن GitHub را وارد کن؛ مثل https://github.com/owner/repo"); return; }
@@ -811,7 +812,7 @@ function ChatPageInner() {
   const needsProjectPath = !botToken && mode === "designer" && !projectPath && !briefOrderId;
   const sourceReady = projectPath !== "source" || (sourceType === "github" ? Boolean(sourceUrl.trim()) : sourceType === "zip" && Boolean(sourceArchive));
   const chatBlocked = !hydrated || needsProjectPath || (!botToken && mode === "designer" && !briefOrderId && !sourceReady);
-  const placeholder = needsProjectPath ? "اول مسیر پروژه را انتخاب کن" : mode === "designer" && projectPath === "source" && !sourceReady ? "لینک GitHub یا ZIP سورس را اضافه کن" : phoneStep ? "09xxxxxxxxx" : mode === "designer" ? "ایده‌ات رو بنویس..." : "پیام بنویسید...";
+  const placeholder = needsProjectPath ? "اول مسیر پروژه را انتخاب کن" : mode === "designer" && projectPath === "source" && !sourceReady ? "مخزن GitHub یا ZIP سورس را انتخاب کن" : phoneStep ? "09xxxxxxxxx" : mode === "designer" ? "ایده‌ات رو بنویس..." : "پیام بنویسید...";
   const isLoading = loading || sendingOtp || uploadingFile;
   const canSubmit = !chatBlocked && (phoneStep ? Boolean(input.trim()) : Boolean(input.trim() || attachments.length));
   const activeMode: ChatMode = botToken || embedded ? "sales" : mode;
@@ -844,7 +845,7 @@ function ChatPageInner() {
   }
 
   const sourceOptions: { id: "github" | "zip"; title: string; description: string; icon: typeof IconLayout }[] = [
-    { id: "github", title: "مخزن GitHub", description: "لینک مخزن پروژه را وارد کن", icon: IconBrandGithub },
+    { id: "github", title: "مخزن GitHub", description: "مخزن را از حساب GitHub انتخاب کن", icon: IconBrandGithub },
     { id: "zip", title: "فایل ZIP", description: "سورس پروژه را بارگذاری کن", icon: IconFileZip },
   ];
 
@@ -889,10 +890,7 @@ function ChatPageInner() {
           </div>
           {!sourceType && <p className="text-xs leading-6 text-muted-foreground">یکی از دو روش بالا را انتخاب کن.</p>}
           {sourceType === "github" && (
-            <label className="block">
-              <span className="field-label">لینک مخزن GitHub</span>
-              <input type="url" dir="ltr" value={sourceUrl} onChange={e => setSourceUrl(e.target.value)} maxLength={2000} className="field py-3" placeholder="https://github.com/owner/repo" />
-            </label>
+            <GithubRepoPicker token={customerToken} value={sourceUrl} onChange={(url) => { setSourceUrl(url); setError(""); }} />
           )}
           {sourceType === "zip" && (
             <div className="rounded-lg border border-dashed border-input bg-surface-2 p-4">

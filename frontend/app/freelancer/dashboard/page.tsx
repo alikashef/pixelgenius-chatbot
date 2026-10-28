@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { IconBrush, IconChevronLeft, IconCode, IconInbox, IconLayoutDashboard, IconSchool } from "@tabler/icons-react";
-import { fetchFreelancerOrders, Order } from "@/lib/api";
+import { fetchFreelancerOrders, Order, clearSession } from "@/lib/api";
 import AppShell from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { CopyBlock } from "@/components/McpTour";
@@ -39,7 +39,7 @@ export default function FreelancerDashboardPage() {
 
   useEffect(() => {
     const token = localStorage.getItem("freelancer_token");
-    if (!token) { router.replace("/freelancer/login"); return; }
+    if (!token) { router.replace("/login"); return; }
     setOrigin(window.location.origin);
     setName(localStorage.getItem("freelancer_name") || "");
     setBotToken(localStorage.getItem("freelancer_bot_token") || "");
@@ -49,15 +49,15 @@ export default function FreelancerDashboardPage() {
       .catch((err) => {
         if (err.message === "UNAUTHORIZED") {
           localStorage.removeItem("freelancer_token");
-          router.replace("/freelancer/login");
+          router.replace("/login");
         }
       })
       .finally(() => setLoading(false));
   }, [router]);
 
   function handleLogout() {
-    ["freelancer_token", "freelancer_id", "freelancer_name", "freelancer_bot_token"].forEach((k) => localStorage.removeItem(k));
-    router.push("/freelancer/login");
+    clearSession();
+    router.push("/login");
   }
 
 

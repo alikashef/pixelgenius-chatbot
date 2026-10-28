@@ -8,7 +8,7 @@ import AppShell, { ShellLoading } from "@/components/AppShell";
 import { CopyBlock } from "@/components/McpTour";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { DEFAULT_WIDGET, fetchFreelancerSettings, updateWidgetSettings, WidgetColor, WidgetSettings } from "@/lib/api";
+import { DEFAULT_WIDGET, fetchFreelancerSettings, updateWidgetSettings, WidgetColor, WidgetSettings, clearSession } from "@/lib/api";
 import { ROBOT_SHAPES, WIDGET_COLORS, accentStyle, robotColors } from "@/lib/widget";
 
 const RobotHead = dynamic(() => import("robot-heads").then((module) => module.RobotHead), {
@@ -93,14 +93,14 @@ export default function FreelancerWidgetPage() {
   const [error, setError] = useState("");
 
   function logout() {
-    ["freelancer_token", "freelancer_id", "freelancer_name", "freelancer_bot_token"].forEach((k) => localStorage.removeItem(k));
-    router.push("/freelancer/login");
+    clearSession();
+    router.push("/login");
   }
 
   useEffect(() => {
     setOrigin(window.location.origin);
     const token = localStorage.getItem("freelancer_token");
-    if (!token) { router.replace("/freelancer/login"); return; }
+    if (!token) { router.replace("/login"); return; }
     fetchFreelancerSettings(token)
       .then((data) => {
         setName(data.name);

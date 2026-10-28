@@ -3,16 +3,18 @@ from datetime import datetime, timedelta, timezone
 
 import bcrypt as _bcrypt
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select, update
 
 from database import get_db
-from models import Freelancer, InviteCode, Order
+from models import Customer, Freelancer, InviteCode, Order
 from schemas import (
     AdminApproveIn, AdminFreelancerOut, InviteCreateIn, InviteOut, FreelancerRegisterIn, FreelancerLoginIn, FreelancerOnboardingIn,
-    FreelancerKnowledge, FreelancerTokenOut, OrderOut, BotProfileOut, WidgetSettings,
+    FreelancerKnowledge, FreelancerTokenOut, LinkPhoneIn, OrderOut, BotProfileOut, SessionOut, WidgetSettings,
 )
-from auth import create_access_token, get_current_admin, get_current_freelancer
+from auth import _decode, build_session, freelancer_session, get_current_admin, get_current_freelancer, optional_bearer
+from otp_store import verify_otp
 from routers.orders import add_order_file, approve, load_order, save_proposal, summarize
 
 router = APIRouter()
@@ -22,7 +24,7 @@ def _hash_password(plain: str) -> str:
     return _bcrypt.hashpw(plain.encode(), _bcrypt.gensalt()).decode()
 
 
-def _verify_password(plain: str, hashed: str) -> bool:
+def verify_password(plain: str, hashed: str) -> bool:
     return _bcrypt.checkpw(plain.encode(), hashed.encode())
 
 
@@ -55,22 +57,28 @@ def _invite_out(invite: InviteCode) -> InviteOut:
     return InviteOut.model_validate({**{c: getattr(invite, c) for c in ("code", "note", "max_uses", "used_count", "revoked", "created_at")}, "expires_at": expires, "active": active})
 
 
-def _token_out(freelancer: Freelancer, token: str) -> FreelancerTokenOut:
-    return FreelancerTokenOut(
-        access_token=token,
-        token_type="bearer",
-        freelancer_id=freelancer.id,
-        name=freelancer.name,
-        onboarding_completed=freelancer.onboarding_completed,
-        bot_token=freelancer.bot_token,
-    )
-
-
-@router.post("/freelancer/register", response_model=FreelancerTokenOut, status_code=201)
-async def register(body: FreelancerRegisterIn, db: AsyncSession = Depends(get_db)):
-    existing = await db.execute(select(Freelancer).where(Freelancer.email == body.email))
-    if existing.scalar_one_or_none():
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="این ایمیل قبلاً ثبت شده")
+@router.post("/freelancer/register", response_model=SessionOut, status_code=201)
+async def register(
+    body: FreelancerRegisterIn,
+    db: AsyncSession = Depends(get_db),
+    credentials: HTTPAuthorizationCredentials | None = Depends(optional_bearer),
+):
+    """Turn a signed-in account into a freelancer with an invite code (the account's phone is the login)."""
+    customer = None
+    if credentials:
+        payload = _decode(credentials.credentials)
+        if payload.get("role") == "customer":
+            customer = await db.get(Customer, payload.get("sub"))
+    if customer:
+        taken = await db.execute(select(Freelancer).where(Freelancer.phone == customer.phone))
+        if taken.scalar_one_or_none():
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="این شماره قبلاً حساب فریلنسر دارد")
+    elif not body.email or not body.password:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="اول با شماره موبایل وارد شو")
+    if body.email:
+        existing = await db.execute(select(Freelancer).where(func.lower(Freelancer.email) == body.email.strip().lower()))
+        if existing.scalar_one_or_none():
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="این ایمیل قبلاً ثبت شده")
 
     code = normalize_code(body.invite_code)
     # Claim one use atomically so two sign-ups cannot both take the last use of a code.
@@ -89,28 +97,49 @@ async def register(body: FreelancerRegisterIn, db: AsyncSession = Depends(get_db
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="کد دعوت نامعتبر است یا ظرفیتش تمام شده")
 
     freelancer = Freelancer(
-        email=body.email,
-        password_hash=_hash_password(body.password),
-        name=body.name,
+        email=body.email.strip() if body.email else None,
+        password_hash=_hash_password(body.password) if body.password else None,
+        phone=customer.phone if customer else None,
+        name=body.name or (" ".join(filter(None, [customer.first_name, customer.last_name])) if customer else None) or None,
         invite_code=code,
     )
     db.add(freelancer)
     await db.commit()
     await db.refresh(freelancer)
+    return await build_session(db, customer=customer, freelancer=freelancer)
 
-    token = create_access_token({"sub": freelancer.id, "role": "freelancer"})
-    return _token_out(freelancer, token)
+
+@router.post("/freelancer/link-phone", response_model=SessionOut)
+async def link_phone(body: LinkPhoneIn, db: AsyncSession = Depends(get_db), payload: dict = Depends(get_current_freelancer)):
+    """Attach a verified phone to an email-only freelancer so they sign in like everyone else."""
+    phone = body.phone.strip()
+    if not verify_otp(phone, body.code.strip()):
+        raise HTTPException(status_code=400, detail="کد اشتباه یا منقضی شده")
+    freelancer = await db.get(Freelancer, payload.get("sub"))
+    if not freelancer:
+        raise HTTPException(status_code=404, detail="فریلنسر پیدا نشد")
+    taken = (await db.execute(select(Freelancer).where(Freelancer.phone == phone, Freelancer.id != freelancer.id))).scalar_one_or_none()
+    if taken:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="این شماره به حساب فریلنسر دیگری وصل است")
+    customer = (await db.execute(select(Customer).where(Customer.phone == phone))).scalar_one_or_none()
+    if not customer:
+        customer = Customer(phone=phone)
+        db.add(customer)
+    freelancer.phone = phone
+    await db.commit()
+    await db.refresh(freelancer)
+    await db.refresh(customer)
+    return await build_session(db, customer=customer, freelancer=freelancer)
 
 
 @router.post("/freelancer/login", response_model=FreelancerTokenOut)
 async def login(body: FreelancerLoginIn, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Freelancer).where(Freelancer.email == body.email))
     freelancer = result.scalar_one_or_none()
-    if not freelancer or not _verify_password(body.password, freelancer.password_hash):
+    if not freelancer or not freelancer.password_hash or not verify_password(body.password, freelancer.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="ایمیل یا رمز اشتباه است")
 
-    token = create_access_token({"sub": freelancer.id, "role": "freelancer"})
-    return _token_out(freelancer, token)
+    return freelancer_session(freelancer)
 
 
 @router.get("/freelancer/settings")
@@ -155,8 +184,7 @@ async def complete_onboarding(
     await db.commit()
     await db.refresh(freelancer)
 
-    token = create_access_token({"sub": freelancer.id, "role": "freelancer"})
-    return _token_out(freelancer, token)
+    return freelancer_session(freelancer)
 
 
 @router.get("/freelancer/orders", response_model=list[OrderOut])
@@ -310,7 +338,7 @@ async def list_freelancers(db: AsyncSession = Depends(get_db), _: dict = Depends
     )
     return [
         AdminFreelancerOut(
-            id=f.id, email=f.email, name=f.name, position=f.position, invite_code=f.invite_code,
+            id=f.id, email=f.email, phone=f.phone, name=f.name, position=f.position, invite_code=f.invite_code,
             onboarding_completed=f.onboarding_completed, created_at=f.created_at, order_count=n,
         )
         for f, n in result.all()

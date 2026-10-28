@@ -21,8 +21,7 @@ import {
   FreelancerField,
   FreelancerKnowledge,
   FreelancerService,
-  updateFreelancerKnowledge,
-} from "@/lib/api";
+  updateFreelancerKnowledge, clearSession } from "@/lib/api";
 import AppShell, { ShellLoading } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -108,13 +107,13 @@ export default function FreelancerTrainingPage() {
   }
 
   function logout() {
-    ["freelancer_token", "freelancer_id", "freelancer_name", "freelancer_bot_token"].forEach((key) => localStorage.removeItem(key));
-    router.push("/freelancer/login");
+    clearSession();
+    router.push("/login");
   }
 
   useEffect(() => {
     const token = getToken();
-    if (!token) { router.replace("/freelancer/login"); return; }
+    if (!token) { router.replace("/login"); return; }
     fetchFreelancerSettings(token)
       .then((data) => {
         setName(data.name || "");

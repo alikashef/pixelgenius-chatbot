@@ -22,6 +22,8 @@ class Customer(Base):
     first_name: Mapped[str | None] = mapped_column(String(80), nullable=True)
     last_name: Mapped[str | None] = mapped_column(String(80), nullable=True)
     business_type: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    github_login: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    github_token: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
@@ -32,8 +34,9 @@ class Freelancer(Base):
     __tablename__ = "freelancers"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    email: Mapped[str] = mapped_column(String(120), unique=True, index=True)
-    password_hash: Mapped[str] = mapped_column(String(255))
+    email: Mapped[str | None] = mapped_column(String(120), unique=True, index=True, nullable=True)
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(20), unique=True, index=True, nullable=True)
     name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     position: Mapped[str | None] = mapped_column(String(255), nullable=True)
     services: Mapped[str | None] = mapped_column(Text, nullable=True)

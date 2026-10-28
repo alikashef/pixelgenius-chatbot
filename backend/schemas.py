@@ -267,8 +267,9 @@ class TokenOut(BaseModel):
 
 # ── Freelancer Auth ───────────────────────────────────────────────────────────
 class FreelancerRegisterIn(BaseModel):
-    email: str
-    password: str
+    # Without a customer session the legacy email + password sign-up is used.
+    email: Optional[str] = None
+    password: Optional[str] = Field(default=None, min_length=8)
     name: Optional[str] = None
     invite_code: str = Field(default="", max_length=32)
 
@@ -294,7 +295,8 @@ class InviteOut(BaseModel):
 
 class AdminFreelancerOut(BaseModel):
     id: str
-    email: str
+    email: Optional[str] = None
+    phone: Optional[str] = None
     name: Optional[str] = None
     position: Optional[str] = None
     invite_code: Optional[str] = None
@@ -315,6 +317,33 @@ class FreelancerTokenOut(BaseModel):
     name: Optional[str] = None
     onboarding_completed: bool
     bot_token: str
+
+
+class PasswordLoginIn(BaseModel):
+    identifier: str = Field(max_length=120)
+    password: str = Field(max_length=200)
+
+
+class SessionOut(BaseModel):
+    """Every panel the signed-in person may open, each with its own role token."""
+    roles: list[str]
+    customer: Optional[CustomerTokenOut] = None
+    freelancer: Optional[FreelancerTokenOut] = None
+    admin_token: Optional[str] = None
+    needs_phone: bool = False
+
+
+class OtpSessionOut(SessionOut):
+    # Flat customer fields kept for callers written before the unified session.
+    access_token: str
+    token_type: str
+    customer_id: str
+    first_name: Optional[str] = None
+
+
+class LinkPhoneIn(BaseModel):
+    phone: str = Field(max_length=20)
+    code: str = Field(max_length=10)
 
 
 # ── Freelancer Onboarding ─────────────────────────────────────────────────────

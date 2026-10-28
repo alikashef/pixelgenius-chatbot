@@ -106,6 +106,118 @@ export interface FreelancerSession {
   bot_token: string;
 }
 
+// ── Unified session ─────────────────────────────────────────────────────────
+// One sign-in returns a token for every panel the person may open.
+
+export type Role = "customer" | "freelancer" | "admin";
+
+export interface Session {
+  roles: Role[];
+  customer?: { access_token: string; customer_id: string; first_name: string | null } | null;
+  freelancer?: FreelancerSession | null;
+  admin_token?: string | null;
+  needs_phone?: boolean;
+}
+
+export const PANELS: Record<Role, { label: string; href: string; tokenKey: string }> = {
+  customer: { label: "پنل مشتری", href: "/panel", tokenKey: "customer_token" },
+  freelancer: { label: "پنل فریلنسر", href: "/freelancer/dashboard", tokenKey: "freelancer_token" },
+  admin: { label: "پنل ادمین", href: "/admin/dashboard", tokenKey: "admin_token" },
+};
+
+const SESSION_KEYS = [
+  "customer_token", "customer_id", "customer_first_name",
+  "freelancer_token", "freelancer_id", "freelancer_bot_token", "freelancer_name",
+  "admin_token",
+];
+
+export function clearSession() {
+  SESSION_KEYS.forEach((key) => localStorage.removeItem(key));
+}
+
+/** Replaces whatever account was signed in with this session's panels. */
+export function saveSession(session: Session) {
+  clearSession();
+  if (session.customer) {
+    localStorage.setItem("customer_token", session.customer.access_token);
+    localStorage.setItem("customer_id", session.customer.customer_id);
+    if (session.customer.first_name) localStorage.setItem("customer_first_name", session.customer.first_name);
+  }
+  if (session.freelancer) {
+    localStorage.setItem("freelancer_token", session.freelancer.access_token);
+    localStorage.setItem("freelancer_id", session.freelancer.freelancer_id);
+    localStorage.setItem("freelancer_bot_token", session.freelancer.bot_token);
+    if (session.freelancer.name) localStorage.setItem("freelancer_name", session.freelancer.name);
+  }
+  if (session.admin_token) localStorage.setItem("admin_token", session.admin_token);
+}
+
+export function signedInRoles(): Role[] {
+  return (Object.keys(PANELS) as Role[]).filter((role) => localStorage.getItem(PANELS[role].tokenKey));
+}
+
+/** Where a role lands after sign-in; a freelancer who has not finished setup goes to onboarding. */
+export function panelHref(role: Role, session?: Session) {
+  if (role === "freelancer" && session?.freelancer && !session.freelancer.onboarding_completed) return "/freelancer/onboarding";
+  return PANELS[role].href;
+}
+
+export async function passwordLogin(identifier: string, password: string): Promise<Session> {
+  const res = await fetch(`${API_URL}/api/auth/password-login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ identifier, password }),
+  });
+  if (!res.ok) throw new Error(await readDetail(res, "ایمیل یا رمز عبور اشتباه است"));
+  return res.json();
+}
+
+export async function linkFreelancerPhone(freelancerToken: string, phone: string, code: string): Promise<Session> {
+  const res = await fetch(`${API_URL}/api/freelancer/link-phone`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${freelancerToken}` },
+    body: JSON.stringify({ phone, code }),
+  });
+  if (!res.ok) throw new Error(await readDetail(res, "اتصال شماره انجام نشد"));
+  return res.json();
+}
+
+// ── GitHub ──────────────────────────────────────────────────────────────────
+
+export interface GithubStatus {
+  configured: boolean;
+  connected: boolean;
+  login: string | null;
+}
+
+export interface GithubRepo {
+  full_name: string;
+  name: string;
+  owner: string;
+  private: boolean;
+  html_url: string;
+  description: string | null;
+  language: string | null;
+  default_branch: string | null;
+  updated_at: string | null;
+}
+
+async function githubRequest<T>(token: string, path: string, init: RequestInit = {}, fallback = "ارتباط با GitHub ناموفق بود"): Promise<T> {
+  const res = await fetch(`${API_URL}/api/github${path}`, {
+    ...init,
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+  });
+  if (res.status === 401 || res.status === 403) throw new Error("UNAUTHORIZED");
+  if (!res.ok) throw new Error(await readDetail(res, fallback));
+  return res.json();
+}
+
+export const fetchGithubStatus = (token: string) => githubRequest<GithubStatus>(token, "/status");
+export const fetchGithubRepos = (token: string) => githubRequest<GithubRepo[]>(token, "/repos", {}, "دریافت مخزن‌ها ناموفق بود");
+export const disconnectGithub = (token: string) => githubRequest<{ connected: false }>(token, "", { method: "DELETE" });
+export const startGithubConnect = (token: string, returnTo: string) =>
+  githubRequest<{ url: string }>(token, "/connect", { method: "POST", body: JSON.stringify({ return_to: returnTo }) });
+
 // ── Chat ─────────────────────────────────────────────────────────────────────
 export async function createChatSession(botToken?: string): Promise<string> {
   const res = await fetch(`${API_URL}/api/chat/session`, {
@@ -135,13 +247,13 @@ export async function updateChatSession(
   });
 }
 
-export async function freelancerRegister(email: string, password: string, inviteCode: string, name?: string): Promise<FreelancerSession> {
+export async function freelancerRegister(customerToken: string, inviteCode: string, name?: string): Promise<Session> {
   const res = await fetch(`${API_URL}/api/freelancer/register`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password, name, invite_code: inviteCode }),
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${customerToken}` },
+    body: JSON.stringify({ name, invite_code: inviteCode }),
   });
-  if (res.status === 409) throw new Error("این ایمیل قبلاً ثبت شده");
+  if (res.status === 401) throw new Error("UNAUTHORIZED");
   if (!res.ok) throw new Error(await readDetail(res, "خطا در ثبت‌نام"));
   return res.json();
 }
@@ -184,16 +296,6 @@ export const createInvite = (token: string, body: { note: string; max_uses: numb
 export const revokeInvite = (token: string, code: string) =>
   adminRequest<InviteCode>(token, `invites/${encodeURIComponent(code)}`, { method: "DELETE" });
 export const fetchAdminFreelancers = (token: string) => adminRequest<AdminFreelancer[]>(token, "freelancers");
-
-export async function freelancerLogin(email: string, password: string): Promise<FreelancerSession> {
-  const res = await fetch(`${API_URL}/api/freelancer/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
-  });
-  if (!res.ok) throw new Error("ایمیل یا رمز اشتباه است");
-  return res.json();
-}
 
 export interface ChatHandoff {
   version: 1;
@@ -243,7 +345,7 @@ export async function sendOtp(phone: string) {
   return res.json();
 }
 
-export async function verifyOtp(phone: string, code: string) {
+export async function verifyOtp(phone: string, code: string): Promise<Session & { access_token: string; customer_id: string; first_name: string | null }> {
   const res = await fetch(`${API_URL}/api/customer/otp/verify`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -378,16 +480,6 @@ export async function verifyPayment(authority: string, status: string) {
 }
 
 // ── Admin ─────────────────────────────────────────────────────────────────────
-export async function adminLogin(username: string, password: string) {
-  const res = await fetch(`${API_URL}/api/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password }),
-  });
-  if (!res.ok) throw new Error("نام کاربری یا رمز عبور اشتباه است");
-  return res.json();
-}
-
 export async function fetchOrders(token: string): Promise<Order[]> {
   const res = await fetch(`${API_URL}/api/orders`, {
     headers: { Authorization: `Bearer ${token}` },

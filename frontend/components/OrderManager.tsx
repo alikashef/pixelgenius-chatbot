@@ -31,8 +31,8 @@ function formatFileSize(size: number) {
 }
 
 const SCOPE = {
-  admin: { tokenKey: "admin_token", loginPath: "/admin/login" },
-  freelancer: { tokenKey: "freelancer_token", loginPath: "/freelancer/login" },
+  admin: { tokenKey: "admin_token", loginPath: "/login" },
+  freelancer: { tokenKey: "freelancer_token", loginPath: "/login" },
 } as const;
 
 const UPLOADER_LABEL: Record<string, string> = { admin: "ادمین", freelancer: "فریلنسر", customer: "مشتری" };

@@ -7,10 +7,10 @@ from sqlalchemy import select
 
 from database import get_db
 from models import Customer
-from schemas import HandoffCreateIn, HandoffCreateOut, HandoffOut, OtpSendRequest, OtpVerifyRequest, CustomerTokenOut
+from schemas import HandoffCreateIn, HandoffCreateOut, HandoffOut, OtpSendRequest, OtpVerifyRequest, OtpSessionOut
 from otp_store import generate_otp, verify_otp
 from sms import SmsSendError, send_otp
-from auth import create_access_token
+from auth import build_session
 
 router = APIRouter()
 
@@ -63,7 +63,7 @@ async def read_handoff(handoff_id: str):
     return entry[1]
 
 
-@router.post("/customer/otp/verify", response_model=CustomerTokenOut)
+@router.post("/customer/otp/verify", response_model=OtpSessionOut)
 async def verify(body: OtpVerifyRequest, db: AsyncSession = Depends(get_db)):
     phone = body.phone.strip()
 
@@ -79,10 +79,5 @@ async def verify(body: OtpVerifyRequest, db: AsyncSession = Depends(get_db)):
         await db.commit()
         await db.refresh(customer)
 
-    token = create_access_token({"sub": customer.id, "role": "customer"})
-    return CustomerTokenOut(
-        access_token=token,
-        token_type="bearer",
-        customer_id=customer.id,
-        first_name=customer.first_name,
-    )
+    session = await build_session(db, customer=customer)
+    return OtpSessionOut(**session.model_dump(), **session.customer.model_dump())

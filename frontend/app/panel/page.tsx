@@ -17,7 +17,7 @@ import {
   IconChevronLeft,
   IconCalendar,
 } from "@tabler/icons-react";
-import { fetchCustomerProfile, fetchMyOrders, updateCustomerProfile, CustomerProfile, Order } from "@/lib/api";
+import { fetchCustomerProfile, fetchMyOrders, updateCustomerProfile, CustomerProfile, Order, clearSession } from "@/lib/api";
 import AppShell, { ShellLoading } from "@/components/AppShell";
 import McpTour, { isMcpTourDone } from "@/components/McpTour";
 import GuidedTour, { startTour } from "@/components/GuidedTour";
@@ -242,9 +242,7 @@ export default function PanelPage() {
   }, [router]);
 
   function logout() {
-    localStorage.removeItem("customer_token");
-    localStorage.removeItem("customer_id");
-    localStorage.removeItem("customer_first_name");
+    clearSession();
     router.push("/chat");
   }
 

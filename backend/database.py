@@ -45,6 +45,12 @@ async def create_tables():
         await conn.execute(text("ALTER TABLE freelancers ADD COLUMN IF NOT EXISTS widget_settings JSON"))
         await conn.execute(text("ALTER TABLE freelancers ADD COLUMN IF NOT EXISTS knowledge JSON"))
         await conn.execute(text("ALTER TABLE freelancers ADD COLUMN IF NOT EXISTS invite_code VARCHAR(32)"))
+        await conn.execute(text("ALTER TABLE freelancers ADD COLUMN IF NOT EXISTS phone VARCHAR(20)"))
+        await conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_freelancers_phone ON freelancers (phone)"))
+        await conn.execute(text("ALTER TABLE freelancers ALTER COLUMN email DROP NOT NULL"))
+        await conn.execute(text("ALTER TABLE freelancers ALTER COLUMN password_hash DROP NOT NULL"))
+        await conn.execute(text("ALTER TABLE customers ADD COLUMN IF NOT EXISTS github_login VARCHAR(80)"))
+        await conn.execute(text("ALTER TABLE customers ADD COLUMN IF NOT EXISTS github_token TEXT"))
         for key, value in DEFAULT_AI_SETTINGS.items():
             await conn.execute(
                 text(
