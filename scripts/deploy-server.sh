@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Installed as the server bare repository's pre-receive hook.
-# Usage after setup: git push server (deploys local dev; never merges main).
+# Usage after setup: git push server (deploys local main after a reviewed dev merge).
 set -Eeuo pipefail
 umask 077
 
@@ -13,8 +13,8 @@ exec 9>"$STATE/deploy.lock"
 flock -n 9 || { echo 'ERROR: another deployment is running; retry later.' >&2; exit 1; }
 
 read -r old revision ref
-if [[ "$ref" != refs/heads/dev || "$revision" =~ ^0+$ ]] || read -r _; then
-  echo 'ERROR: push exactly one update to dev; deletion and other branches are forbidden.' >&2
+if [[ "$ref" != refs/heads/main || "$revision" =~ ^0+$ ]] || read -r _; then
+  echo 'ERROR: push exactly one update to main; deletion and other branches are forbidden.' >&2
   exit 1
 fi
 git cat-file -e "$revision^{commit}"
@@ -161,4 +161,4 @@ printf '%s\n' "$revision" > "$APP/.deployed-revision"
 rm -rf -- "$STAGE"
 say "SUCCESS: $revision is live at $PUBLIC_URL"
 say "Backup: $BACKUP | Log: $LOG"
-say 'GitHub origin is separate: use git push origin dev to publish the same commit there.'
+say 'GitHub origin is separate: use git push origin main to publish the same commit there.'
