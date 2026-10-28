@@ -3,9 +3,10 @@
 import { useState, useRef, useEffect, FormEvent, KeyboardEvent, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { IconArrowUp, IconBrandGithub, IconCode, IconCloudUpload, IconLayout, IconCheck, IconCoin, IconCopy, IconDownload, IconFileText, IconFileZip, IconMenu2, IconMessage, IconPaperclip, IconPlus, IconRefresh, IconUser, IconWand, IconX } from "@tabler/icons-react";
+import { IconArrowUp, IconBrandGithub, IconChevronLeft, IconCode, IconCloudUpload, IconLayout, IconCheck, IconCoin, IconCopy, IconDownload, IconFileText, IconFileZip, IconMenu2, IconMessage, IconPaperclip, IconPlus, IconRefresh, IconUser, IconWand, IconX } from "@tabler/icons-react";
 import { BrandLogo, BrandMark } from "@/components/Brand";
 import { Button } from "@/components/ui/button";
+import { BUILD_PROMPT, CopyBlock } from "@/components/McpTour";
 import ChatBubble from "@/components/ChatBubble";
 import ChatRobot, { ROBOT_INTRODUCTIONS } from "@/components/ChatRobot";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -261,44 +262,7 @@ function collectMessageAttachments(messages: Message[]) {
   return messages.flatMap((message) => message.attachments || []);
 }
 
-const BUILD_PROMPT =
-  "فایل project-brief.json توی همین پوشه‌ست. کامل بخونش و پروژه رو دقیقاً طبق اون بساز. اگر ابزار deploy_project در دسترسه، در پایان پروژه رو روی سرور منتشر کن، تا آماده شدن وضعیتش رو چک کن، خطاها رو خودت درست کن و آدرس نهایی رو بهم بده. اگر ابزار وصل نیست، دستور اجرای محلی رو بنویس.";
-
 type GuideTool = "claude" | "chatgpt" | "cursor";
-
-function CopyBlock({ text, label, rtl = false }: { text: string; label: string; rtl?: boolean }) {
-  const [copied, setCopied] = useState(false);
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
-    } catch {
-      // clipboard blocked: the text stays selectable
-    }
-  }
-  return (
-    <div className="mt-2 flex items-start gap-2 rounded-xl border border-border bg-background p-2.5">
-      <pre
-        dir={rtl ? "rtl" : "ltr"}
-        className={`min-w-0 flex-1 overflow-x-auto whitespace-pre-wrap text-xs leading-6 text-brand ${
-          rtl ? "text-right font-[inherit]" : "break-all text-left"
-        }`}
-      >
-        {text}
-      </pre>
-      <button
-        type="button"
-        onClick={copy}
-        aria-label={label}
-        className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-border px-2.5 text-xs text-secondary-foreground outline-none transition-colors hover:border-brand-line hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        {copied ? <IconCheck size={14} stroke={2.5} /> : <IconCopy size={14} stroke={2} />}
-        {copied ? "کپی شد" : "کپی"}
-      </button>
-    </div>
-  );
-}
 
 function BriefGuide({ mcpUrl }: { mcpUrl: string }) {
   const [tool, setTool] = useState<GuideTool>("claude");
@@ -341,6 +305,14 @@ function BriefGuide({ mcpUrl }: { mcpUrl: string }) {
             <p className="mt-1 text-[13px] leading-7 text-muted-foreground">
               با این اتصال، هوش مصنوعی پروژه رو خودش روی سرور <b>بیلد و منتشر</b> می‌کنه و یک آدرس موقت بهت می‌ده تا همون لحظه ببینیش. پروژه‌های Next.js، Node، Python و Django با دیتابیس PostgreSQL پشتیبانی می‌شن. اگه بیلد خطا بده، هوش مصنوعی لاگ رو می‌خونه و خودش اصلاح می‌کنه.
             </p>
+
+            <Link
+              href="/panel?tab=connect"
+              className="mt-2 inline-flex items-center gap-1 rounded text-xs font-bold text-brand underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              راهنمای کامل و تست اتصال در پنل
+              <IconChevronLeft size={14} aria-hidden="true" />
+            </Link>
 
             <div role="tablist" aria-label="ابزار" className="mt-3 flex flex-wrap gap-1.5">
               {tabs.map((t) => (

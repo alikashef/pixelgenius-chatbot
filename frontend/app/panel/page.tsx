@@ -7,6 +7,7 @@ import {
   IconPlus,
   IconClipboardList,
   IconLayoutGrid,
+  IconPlugConnected,
   IconMessage,
   IconSettings,
   IconWand,
@@ -18,6 +19,7 @@ import {
 } from "@tabler/icons-react";
 import { fetchCustomerProfile, fetchMyOrders, updateCustomerProfile, CustomerProfile, Order } from "@/lib/api";
 import AppShell, { ShellLoading } from "@/components/AppShell";
+import McpTour, { isMcpTourDone } from "@/components/McpTour";
 import { Button } from "@/components/ui/button";
 
 const STATUS_LABEL: Record<Order["status"], string> = {
@@ -79,6 +81,7 @@ function readChatSessions(customerId: string): ChatSessionListItem[] {
 // Product-design projects (config briefs) and sales orders (priced, paid) are separate workflows.
 const TABS = [
   { key: "design", group: "طراحی محصول", label: "پروژه‌های طراحی", icon: IconWand },
+  { key: "connect", group: "طراحی محصول", label: "اتصال به هوش مصنوعی", icon: IconPlugConnected },
   { key: "orders", group: "فروش", label: "سفارش‌ها", icon: IconClipboardList },
   { key: "chats", group: "حساب کاربری", label: "گفتگوهای ناتمام", icon: IconMessage },
   { key: "account", group: "حساب کاربری", label: "تنظیمات حساب", icon: IconSettings },
@@ -275,6 +278,7 @@ export default function PanelPage() {
   if (loading) return <ShellLoading />;
 
   const designOrders = orders.filter((o) => o.mode === "designer");
+  const tourDone = typeof window !== "undefined" && isMcpTourDone();
   const salesOrders = orders.filter((o) => o.mode !== "designer");
   const listed = activeTab === "design" ? designOrders : activeTab === "orders" ? salesOrders : [];
 
@@ -292,6 +296,10 @@ export default function PanelPage() {
     design: {
       title: "پروژه‌های طراحی محصول",
       description: "کانفیگ‌هایی که با طراح محصول ساختی؛ دانلودشون کن یا فضای پروژه رو باز کن.",
+    },
+    connect: {
+      title: "اتصال به هوش مصنوعی",
+      description: "یک‌بار Claude، ChatGPT یا Cursor رو به FreelioAI وصل کن تا پروژه‌هات رو خودش بسازه و منتشر کنه.",
     },
     orders: {
       title: "سفارش‌های فروش",
@@ -320,7 +328,7 @@ export default function PanelPage() {
         active: activeTab === key,
         onSelect: () => selectTab(key),
         count: key === "design" ? designOrders.length : key === "orders" ? salesOrders.length : key === "chats" ? chatSessions.length : undefined,
-      }, ...(key === "design" ? [{ key: "templates", group, label: "سایت‌های آماده", icon: IconLayoutGrid, comingSoon: true }] : [])])}
+      }, ...(key === "connect" ? [{ key: "templates", group, label: "سایت‌های آماده", icon: IconLayoutGrid, comingSoon: true }] : [])])}
       primaryAction={newProjectLink}
       user={{ name: [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || "کاربر", detail: profile?.phone }}
       onLogout={logout}
@@ -349,6 +357,21 @@ export default function PanelPage() {
           </div>
         );
       })()}
+
+      {activeTab === "connect" && <McpTour designOrders={designOrders} />}
+
+      {activeTab === "design" && designOrders.length > 0 && !tourDone && (
+        <div className="mb-5 flex flex-wrap items-center gap-4 rounded-xl border border-brand-line bg-brand-soft p-4">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-brand-solid text-brand-foreground" aria-hidden="true">
+            <IconPlugConnected size={20} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-foreground">پروژه‌ات رو خودکار بساز و منتشر کن</p>
+            <p className="mt-0.5 text-xs leading-6 text-secondary-foreground">ابزار هوش مصنوعی‌ات رو با یک راهنمای ۳ دقیقه‌ای به FreelioAI وصل کن.</p>
+          </div>
+          <Button size="sm" onClick={() => selectTab("connect")}>شروع راهنما</Button>
+        </div>
+      )}
 
       {(activeTab === "design" || activeTab === "orders") && listed.length > 0 && (
         <div className="space-y-3">

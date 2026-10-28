@@ -727,6 +727,12 @@ async def _handle_message(message) -> dict | None:
     return _rpc_error(msg_id, -32601, f"Method not found: {method}")
 
 
+@router.get("/api/mcp/info")
+async def mcp_info():
+    """Public connection details shown in the customer panel's MCP setup tour."""
+    return {"mcp_server_url": PUBLIC_MCP_URL, "server_name": "FreelioAI"}
+
+
 @router.post("/mcp")
 async def mcp_endpoint(request: Request):
     try:

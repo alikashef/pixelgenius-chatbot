@@ -137,6 +137,7 @@ frontend/
     AppShell.tsx                  ← سایدبار پنل‌ها (client)
     AuthLayout.tsx                ← لِی‌اوت دوبخشی صفحات ورود
     ThemeToggle.tsx               ← سوییچ تم (client)
+    McpTour.tsx                   ← تور آموزشی اتصال MCP در پنل مشتری + CopyBlock و BUILD_PROMPT مشترک
   lib/
     utils.ts                      ← cn() با clsx + tailwind-merge
     api.ts                        ← همه fetch calls به backend
@@ -258,6 +259,7 @@ Utilityها: `glass` (هدر)، `bg-dots` (بافت پنل برند). فیلد �
 | `components/AppShell.tsx` | سایدبار (دسکتاپ) / دراور (موبایل) + عنوان صفحه؛ پنل مشتری، ادمین و فریلنسر |
 | `components/AuthLayout.tsx` | صفحه‌ی دوبخشی ورود: فرم + پنل برند معکوس (variant: customer / freelancer / admin) |
 | `components/ThemeToggle.tsx` | روشن / تیره / سیستم |
+| `components/McpTour.tsx` | تور ۵ مرحله‌ای اتصال ابزار AI به سرور MCP (`/panel?tab=connect`)، پیشرفت در `localStorage.mcp_tour` |
 
 ### قوانین طراحی
 

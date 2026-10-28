@@ -668,3 +668,40 @@ export async function manageAdminSites(token: string, kind?: string, slug?: stri
   if (!response.ok) throw new Error(typeof data.detail === "string" ? data.detail : "عملیات سایت انجام نشد");
   return data;
 }
+
+export interface McpInfo {
+  mcp_server_url: string;
+  server_name: string;
+}
+
+export async function fetchMcpInfo(): Promise<McpInfo> {
+  const res = await fetch(`${API_URL}/api/mcp/info`);
+  if (!res.ok) throw new Error("دریافت آدرس سرور ناموفق بود");
+  return res.json();
+}
+
+async function mcpRpc(url: string, id: number, method: string, params: Record<string, unknown> = {}) {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
+  });
+  if (!res.ok) throw new Error(`سرور پاسخ ${res.status} داد`);
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message || "خطای سرور MCP");
+  return data.result;
+}
+
+/** Runs the same handshake an AI client performs, to confirm the server URL works. */
+export async function checkMcpServer(url: string): Promise<{ serverName: string; tools: string[] }> {
+  const init = await mcpRpc(url, 1, "initialize", {
+    protocolVersion: "2025-06-18",
+    capabilities: {},
+    clientInfo: { name: "freelioai-panel", version: "1.0" },
+  });
+  const list = await mcpRpc(url, 2, "tools/list");
+  return {
+    serverName: init?.serverInfo?.name || "",
+    tools: Array.isArray(list?.tools) ? list.tools.map((t: { name: string }) => t.name) : [],
+  };
+}
