@@ -127,7 +127,7 @@ function LoginContent() {
     // The admin panel is private: it is never offered here, only opened when it is the sole role.
     const visible = next.roles.filter((role) => role !== "admin");
     if (visible.length > 1) return setStep("choose");
-    router.push(visible[0] ? panelHref(visible[0], next) : next.admin_token ? PANELS.admin.href : "/panel");
+    router.push(visible[0] ? panelHref(visible[0], next) : next.admin_token ? PANELS.admin.href : "/account");
   }
 
   async function handlePassword(e: FormEvent) {

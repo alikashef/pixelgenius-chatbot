@@ -3,7 +3,7 @@
 import { ReactNode, useEffect, useState } from "react";
 import Link from "next/link";
 import {
-  IconBrush, IconClipboardList, IconHelp, IconLayoutDashboard, IconLayoutGrid, IconLogout, IconMenu2, IconMessage, IconPlugConnected, IconPlus, IconReceipt, IconWorld,
+  IconBrush, IconClipboardList, IconHelp, IconLayoutDashboard, IconLayoutGrid, IconLogout, IconMenu2, IconMessage, IconPlugConnected, IconReceipt, IconWorld,
   IconSchool, IconSettings, IconWand, IconX, type Icon,
 } from "@tabler/icons-react";
 import { BrandLogo } from "@/components/Brand";
@@ -47,7 +47,7 @@ const ACCOUNT_NAV: (Omit<ShellNavItem, "key"> & { key: CustomerTab })[] = [
 const PRICING_NAV: ShellNavItem = { key: "pricing", group: "حساب کاربری", label: "تعرفه‌ها", icon: IconReceipt, href: "/pricing" };
 
 /**
- * The shared sidebar items. Customer sections link to /panel tabs (or switch tabs in place when
+ * The shared sidebar items. Customer sections link to /account tabs (or switch tabs in place when
  * onCustomerTab is given); the freelancer section only appears for accounts with that permission.
  */
 export function useAccountNav({
@@ -70,7 +70,7 @@ export function useAccountNav({
       ? {}
       : onCustomerTab
         ? { onSelect: () => onCustomerTab(key) }
-        : { href: `/panel?tab=${key}` }),
+        : { href: `/account?tab=${key}` }),
   });
   const customer = roles.includes("customer");
   return [
@@ -81,15 +81,15 @@ export function useAccountNav({
   ];
 }
 
-/** The "new project" button every customer sees at the top of the sidebar. */
+/** The primary button at the top of the panel sidebar: back to the chat. */
 export function NewProjectLink() {
   return (
     <Link
-      href="/chat?new=1"
+      href="/chat"
       className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground outline-none transition-colors hover:bg-primary-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
     >
-      <IconPlus size={17} stroke={2.2} aria-hidden="true" />
-      پروژه جدید
+      <IconMessage size={17} stroke={2.2} aria-hidden="true" />
+      گفتگو
     </Link>
   );
 }

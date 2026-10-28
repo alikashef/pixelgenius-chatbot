@@ -6,7 +6,11 @@ const nextConfig = {
     return [
       { source: "/freelancer/login", destination: "/login", permanent: false },
       { source: "/admin/login", destination: "/login", permanent: false },
+      { source: "/panel", destination: "/account", permanent: false },
     ];
+  },
+  async rewrites() {
+    return [{ source: "/account", destination: "/panel" }];
   },
 };
 

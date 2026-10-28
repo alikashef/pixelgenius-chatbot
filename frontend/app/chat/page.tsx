@@ -14,7 +14,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 import GuidedTour, { startTour } from "@/components/GuidedTour";
 import FreelancerPromo from "@/components/FreelancerPromo";
 import GithubRepoPicker from "@/components/GithubRepoPicker";
-import { fetchBotProfile, BotProfile, fetchOrderBrief, fetchChatProgress, ChatProgressStage, sendChat, sendOtp, submitOrder, uploadChatFile, createChatSession, updateChatSession, ChatMode, ProjectPath, Message, Proposal, LeadAnalysis, OrderFile } from "@/lib/api";
+import { fetchBotProfile, BotProfile, fetchOrderBrief, fetchChatProgress, ChatProgressStage, sendChat, sendOtp, submitOrder, uploadChatFile, createChatSession, updateChatSession, ChatMode, ProjectPath, Message, Proposal, LeadAnalysis, OrderFile, Order, fetchMyOrders } from "@/lib/api";
 
 const WELCOME: Message = {
   role: "assistant",
@@ -311,7 +311,7 @@ function BriefGuide({ mcpUrl }: { mcpUrl: string }) {
             </p>
 
             <Link
-              href="/panel?tab=connect"
+              href="/account?tab=connect"
               className="mt-2 inline-flex items-center gap-1 rounded text-xs font-bold text-brand underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
             >
               راهنمای کامل و تست اتصال در پنل
@@ -457,6 +457,7 @@ function ChatPageInner() {
   const [attachments, setAttachments] = useState<OrderFile[]>([]);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [salesOrders, setSalesOrders] = useState<Order[]>([]);
   const [embedded, setEmbedded] = useState(false);
   const [submittedNotice, setSubmittedNotice] = useState(false);
   const [botProfile, setBotProfile] = useState<BotProfile | null>(null);
@@ -804,7 +805,7 @@ function ChatPageInner() {
       await sendOtp(phone);
       setMessages((prev) => [...prev, { role: "assistant", content: `کد تایید به ${phone} ارسال شد. الان بهتون منتقل می‌کنم تا کد رو وارد کنید...` }]);
       // Inside the embed, come back to the widget chat after login instead of the full panel.
-      const redirect = embedded ? `/chat?${botToken ? `bot=${encodeURIComponent(botToken)}&` : ""}embed=1&submitted=1` : "/panel";
+      const redirect = embedded ? `/chat?${botToken ? `bot=${encodeURIComponent(botToken)}&` : ""}embed=1&submitted=1` : "/account";
       setTimeout(() => router.push(`/login?phone=${encodeURIComponent(phone)}&redirect=${encodeURIComponent(redirect)}`), 1200);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "خطا در ارسال کد");
@@ -855,7 +856,7 @@ function ChatPageInner() {
   ];
 
   const pathPicker = !botToken && mode === "designer" && !briefOrderId && (isFresh || needsProjectPath) ? (
-    <fieldset className="mt-8 text-right" data-tour="path">
+    <fieldset className="mt-8 min-w-0 text-right" data-tour="path">
       <legend className="eyebrow mb-3">مسیر پروژه</legend>
       <div className="grid gap-2.5 sm:grid-cols-3">
         {PROJECT_PATHS.map((path) => {
@@ -879,7 +880,7 @@ function ChatPageInner() {
       </div>
       <p className="mt-3 text-xs leading-6 text-muted-foreground">سؤال‌ها و مراحل پروژه براساس این انتخاب تنظیم می‌شوند و بعد از شروع گفتگو ثابت می‌مانند.</p>
       {projectPath === "source" && (
-        <fieldset className="mt-5 rounded-xl border border-border bg-surface p-4">
+        <fieldset className="mt-5 min-w-0 rounded-xl border border-border bg-surface p-4">
           <legend className="sr-only">سورس پروژه کجاست؟</legend>
           <p className="mb-3 text-sm font-bold text-foreground">سورس پروژه کجاست؟</p>
           <div className="mb-4 grid grid-cols-2 gap-1 rounded-lg bg-surface-2 p-1">
@@ -931,6 +932,13 @@ function ChatPageInner() {
     const last = lastAttemptRef.current;
     if (last) runReply(last.messages, last.attachments, last.finalize);
   }
+
+  useEffect(() => {
+    if (!customerToken) { setSalesOrders([]); return; }
+    fetchMyOrders(customerToken)
+      .then((orders) => setSalesOrders(orders.filter((o) => o.mode !== "designer")))
+      .catch(() => setSalesOrders([]));
+  }, [customerToken]);
 
   const visibleSessions = sessions.filter((s) => s.draft.messages.some((m) => m.role === "user"));
   const showSidebar = !botToken && !embedded;
@@ -1060,11 +1068,35 @@ function ChatPageInner() {
         </button>
       </div>
       <div className="px-3">
-        <button type="button" onClick={startNewChat} disabled={isLoading} className="flex h-10 w-full items-center gap-2 rounded-lg border border-input bg-surface px-3 text-sm font-bold text-foreground outline-none transition-colors hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50">
+        <button type="button" onClick={startNewChat} disabled={isLoading} className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground outline-none transition-colors hover:bg-primary-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50">
           <IconPlus size={17} aria-hidden="true" />
           گفتگوی جدید
         </button>
       </div>
+      {customerToken && salesOrders.length > 0 && (
+        <nav aria-label="فروش" className="mt-6 px-3">
+          <p className="eyebrow mb-2 px-2.5">فروش</p>
+          <ul className="space-y-0.5">
+            {salesOrders.slice(0, 5).map((o) => (
+              <li key={o.id}>
+                <Link
+                  href={`/panel/${o.id}`}
+                  onClick={() => setSidebarOpen(false)}
+                  className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-secondary-foreground outline-none transition-colors hover:bg-foreground/5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <IconCoin size={16} className="shrink-0 text-muted-foreground" aria-hidden="true" />
+                  <span className="truncate">{o.project_name}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+          {salesOrders.length > 5 && (
+            <Link href="/account?tab=orders" onClick={() => setSidebarOpen(false)} className="mt-1 block rounded-lg px-2.5 py-2 text-xs font-bold text-brand outline-none hover:bg-foreground/5 focus-visible:ring-2 focus-visible:ring-ring">
+              مشاهده بیشتر
+            </Link>
+          )}
+        </nav>
+      )}
       <nav aria-label="گفتگوهای اخیر" data-tour="history" className="mt-6 min-h-0 flex-1 overflow-y-auto px-3 pb-4">
         <p className="eyebrow mb-2 px-2.5">گفتگوهای اخیر</p>
         {customerToken ? (
@@ -1096,7 +1128,7 @@ function ChatPageInner() {
       </nav>
       <FreelancerPromo onNavigate={() => setSidebarOpen(false)} />
       <div className="flex items-center gap-2 border-t border-border p-3">
-        <Link href={customerToken ? "/panel" : "/login?redirect=/panel"} data-tour="account" className="flex h-10 min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2 text-sm font-bold text-foreground outline-none transition-colors hover:bg-foreground/5 focus-visible:ring-2 focus-visible:ring-ring">
+        <Link href={customerToken ? "/account" : "/login?redirect=/account"} data-tour="account" className="flex h-10 min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2 text-sm font-bold text-foreground outline-none transition-colors hover:bg-foreground/5 focus-visible:ring-2 focus-visible:ring-ring">
           <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-surface-2 text-muted-foreground">
             <IconUser size={15} aria-hidden="true" />
           </span>
@@ -1186,7 +1218,7 @@ function ChatPageInner() {
                     <div className="min-w-0 flex-1 text-sm leading-7">
                       <p className="font-bold text-foreground">درخواستت ثبت شد</p>
                       <p className="text-secondary-foreground">{botProfile?.name || "تیم"} به‌زودی بررسیش می‌کنه و باهات در تماس خواهد بود.</p>
-                      <a href="/panel" target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex items-center gap-1 font-bold text-brand underline-offset-4 hover:underline">
+                      <a href="/account" target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex items-center gap-1 font-bold text-brand underline-offset-4 hover:underline">
                         پیگیری در پنل کاربری
                         <IconChevronLeft size={14} aria-hidden="true" />
                       </a>

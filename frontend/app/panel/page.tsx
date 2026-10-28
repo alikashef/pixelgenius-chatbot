@@ -205,7 +205,7 @@ export default function PanelPage() {
 
   useEffect(() => {
     const token = localStorage.getItem("customer_token");
-    if (!token) { router.replace("/login?redirect=/panel"); return; }
+    if (!token) { router.replace("/login?redirect=/account"); return; }
     Promise.all([fetchMyOrders(token), fetchCustomerProfile(token)])
       .then(([ordersData, profileData]) => {
         setOrders(ordersData);
@@ -222,7 +222,7 @@ export default function PanelPage() {
       .catch((err) => {
         if (err.message === "UNAUTHORIZED") {
           localStorage.removeItem("customer_token");
-          router.replace("/login?redirect=/panel");
+          router.replace("/login?redirect=/account");
         } else {
           setError(err.message);
         }
@@ -254,7 +254,7 @@ export default function PanelPage() {
     } catch (err: unknown) {
       if (err instanceof Error && err.message === "UNAUTHORIZED") {
         localStorage.removeItem("customer_token");
-        router.replace("/login?redirect=/panel");
+        router.replace("/login?redirect=/account");
       } else {
         setError(err instanceof Error ? err.message : "خطا در ذخیره تنظیمات");
       }
@@ -282,7 +282,7 @@ export default function PanelPage() {
 
   function selectTab(tab: TabKey) {
     setActiveTab(tab);
-    window.history.replaceState(null, "", tab === "design" ? "/panel" : `/panel?tab=${tab}`);
+    window.history.replaceState(null, "", tab === "design" ? "/account" : `/account?tab=${tab}`);
   }
 
   function startChat(mode: "designer" | "sales") {
@@ -349,7 +349,7 @@ export default function PanelPage() {
       {activeTab === "sites" && (
         <HostingSites
           token={localStorage.getItem("customer_token") || ""}
-          onUnauthorized={() => { clearSession(); router.replace("/login?redirect=/panel?tab=sites"); }}
+          onUnauthorized={() => { clearSession(); router.replace("/login?redirect=/account?tab=sites"); }}
         />
       )}
 

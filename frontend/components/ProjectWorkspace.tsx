@@ -145,7 +145,7 @@ export default function ProjectWorkspace({
       err instanceof Error ? err.message : "خطایی رخ داد؛ دوباره تلاش کنید";
     if (message === "UNAUTHORIZED") {
       localStorage.removeItem("customer_token");
-      router.replace(`/login?redirect=/panel/${order.id}`);
+      router.replace(`/login?redirect=/account/${order.id}`);
     } else setError(message);
   }
   async function refresh() {
@@ -395,7 +395,7 @@ export default function ProjectWorkspace({
       <header className="glass sticky top-0 z-20 border-b border-border/70">
         <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 sm:px-6">
           <Link
-            href="/panel"
+            href="/account"
             className="flex min-h-9 items-center gap-1 rounded-lg px-1 text-sm text-muted-foreground outline-none transition-colors hover:text-brand focus-visible:ring-2 focus-visible:ring-ring"
           >
             <IconChevronRight size={17} />

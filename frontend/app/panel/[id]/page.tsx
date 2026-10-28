@@ -48,13 +48,13 @@ export default function OrderDetailPage() {
 
   useEffect(() => {
     const token = localStorage.getItem("customer_token");
-    if (!token) { router.replace("/login?redirect=/panel"); return; }
+    if (!token) { router.replace("/login?redirect=/account"); return; }
     fetchMyOrder(token, id)
       .then(setOrder)
       .catch((err) => {
         if (err.message === "UNAUTHORIZED") {
           localStorage.removeItem("customer_token");
-          router.replace("/login?redirect=/panel");
+          router.replace("/login?redirect=/account");
         } else {
           setError(err.message);
         }
@@ -115,7 +115,7 @@ export default function OrderDetailPage() {
     <div className="min-h-screen bg-background">
       <header className="glass sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-border/70 px-4 sm:px-6">
         <Link
-          href="/panel?tab=orders"
+          href="/account?tab=orders"
           className="flex min-h-9 items-center gap-1 rounded-lg px-2 text-sm text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
         >
           <IconChevronRight size={16} stroke={2.5} aria-hidden="true" />

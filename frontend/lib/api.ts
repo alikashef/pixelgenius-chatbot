@@ -120,7 +120,7 @@ export interface Session {
 }
 
 export const PANELS: Record<Role, { label: string; href: string; tokenKey: string }> = {
-  customer: { label: "پنل مشتری", href: "/panel", tokenKey: "customer_token" },
+  customer: { label: "پنل مشتری", href: "/account", tokenKey: "customer_token" },
   freelancer: { label: "پنل فریلنسر", href: "/freelancer/dashboard", tokenKey: "freelancer_token" },
   admin: { label: "پنل ادمین", href: "/admin/dashboard", tokenKey: "admin_token" },
 };
