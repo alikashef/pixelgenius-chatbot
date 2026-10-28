@@ -9,7 +9,7 @@ import { accentStyle, robotColors } from "@/lib/widget";
 import { Button } from "@/components/ui/button";
 import { BUILD_PROMPT, CopyBlock } from "@/components/McpTour";
 import ChatBubble from "@/components/ChatBubble";
-import ChatRobot, { ROBOT_INTRODUCTIONS } from "@/components/ChatRobot";
+import ChatRobot from "@/components/ChatRobot";
 import ThemeToggle from "@/components/ThemeToggle";
 import GuidedTour, { startTour } from "@/components/GuidedTour";
 import FreelancerPromo from "@/components/FreelancerPromo";
@@ -946,24 +946,6 @@ function ChatPageInner() {
     </span>
   ) : null;
 
-  const introRobot = (
-    <div className="mt-10 rounded-xl border border-border bg-surface p-3 sm:p-5">
-      <ChatRobot
-        {...robotProps}
-        busy={false}
-        stage={null}
-        uploading={false}
-        sendingOtp={false}
-        briefState="idle"
-        failed={false}
-        input=""
-        replyKey=""
-        waitingForPhone={false}
-        introduction={ROBOT_INTRODUCTIONS[activeMode === "sales" ? "sales" : projectPath === "source" ? "source" : "designer"]}
-      />
-    </div>
-  );
-
   const composer = (
     <form onSubmit={handleSubmit} className="w-full" data-tour="composer">
       <div className="rounded-2xl border border-input bg-surface p-2 shadow-elevated transition-[border-color,box-shadow] duration-150 focus-within:border-ring focus-within:shadow-[0_0_0_3px_hsl(var(--ring)/0.16)]">
@@ -1284,7 +1266,6 @@ function ChatPageInner() {
                   )}
                 </div>
 
-                {!needsProjectPath && introRobot}
 
                 {!customerToken && (
                   <p className="mt-6 text-center text-[11px] leading-6 text-muted-foreground">
