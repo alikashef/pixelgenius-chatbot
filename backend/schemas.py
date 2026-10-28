@@ -270,6 +270,37 @@ class FreelancerRegisterIn(BaseModel):
     email: str
     password: str
     name: Optional[str] = None
+    invite_code: str = Field(default="", max_length=32)
+
+
+class InviteCreateIn(BaseModel):
+    note: str = Field(default="", max_length=120)
+    max_uses: int = Field(default=1, ge=1, le=500)
+    expires_days: int | None = Field(default=None, ge=1, le=365)
+
+
+class InviteOut(BaseModel):
+    code: str
+    note: Optional[str] = None
+    max_uses: int
+    used_count: int
+    revoked: bool
+    expires_at: Optional[datetime] = None
+    created_at: datetime
+    active: bool
+
+    model_config = {"from_attributes": True}
+
+
+class AdminFreelancerOut(BaseModel):
+    id: str
+    email: str
+    name: Optional[str] = None
+    position: Optional[str] = None
+    invite_code: Optional[str] = None
+    onboarding_completed: bool
+    created_at: datetime
+    order_count: int
 
 
 class FreelancerLoginIn(BaseModel):

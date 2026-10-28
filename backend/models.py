@@ -44,10 +44,26 @@ class Freelancer(Base):
     onboarding_completed: Mapped[bool] = mapped_column(Boolean, default=False)
     widget_settings: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     knowledge: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    invite_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
     orders: Mapped[list["Order"]] = relationship("Order", back_populates="freelancer")
+
+
+class InviteCode(Base):
+    """Freelancer sign-up is invite-only; an admin issues codes with a use limit."""
+    __tablename__ = "invite_codes"
+
+    code: Mapped[str] = mapped_column(String(32), primary_key=True)
+    note: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    max_uses: Mapped[int] = mapped_column(Integer, default=1)
+    used_count: Mapped[int] = mapped_column(Integer, default=0)
+    revoked: Mapped[bool] = mapped_column(Boolean, default=False)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
 
 
 class ChatSession(Base):

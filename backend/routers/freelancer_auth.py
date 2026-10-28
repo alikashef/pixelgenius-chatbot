@@ -1,15 +1,18 @@
+import secrets
+from datetime import datetime, timedelta, timezone
+
 import bcrypt as _bcrypt
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import func, select, update
 
 from database import get_db
-from models import Freelancer, Order
+from models import Freelancer, InviteCode, Order
 from schemas import (
-    AdminApproveIn, FreelancerRegisterIn, FreelancerLoginIn, FreelancerOnboardingIn,
+    AdminApproveIn, AdminFreelancerOut, InviteCreateIn, InviteOut, FreelancerRegisterIn, FreelancerLoginIn, FreelancerOnboardingIn,
     FreelancerKnowledge, FreelancerTokenOut, OrderOut, BotProfileOut, WidgetSettings,
 )
-from auth import create_access_token, get_current_freelancer
+from auth import create_access_token, get_current_admin, get_current_freelancer
 from routers.orders import add_order_file, approve, load_order, save_proposal, summarize
 
 router = APIRouter()
@@ -37,6 +40,21 @@ def knowledge(freelancer: Freelancer) -> FreelancerKnowledge:
         return FreelancerKnowledge()
 
 
+INVITE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+
+def normalize_code(code: str) -> str:
+    return (code or "").strip().upper()
+
+
+def _invite_out(invite: InviteCode) -> InviteOut:
+    expires = invite.expires_at
+    if expires is not None and expires.tzinfo is None:
+        expires = expires.replace(tzinfo=timezone.utc)
+    active = not invite.revoked and invite.used_count < invite.max_uses and (expires is None or expires > datetime.now(timezone.utc))
+    return InviteOut.model_validate({**{c: getattr(invite, c) for c in ("code", "note", "max_uses", "used_count", "revoked", "created_at")}, "expires_at": expires, "active": active})
+
+
 def _token_out(freelancer: Freelancer, token: str) -> FreelancerTokenOut:
     return FreelancerTokenOut(
         access_token=token,
@@ -54,10 +72,27 @@ async def register(body: FreelancerRegisterIn, db: AsyncSession = Depends(get_db
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="این ایمیل قبلاً ثبت شده")
 
+    code = normalize_code(body.invite_code)
+    # Claim one use atomically so two sign-ups cannot both take the last use of a code.
+    claimed = await db.execute(
+        update(InviteCode)
+        .where(
+            InviteCode.code == code,
+            InviteCode.revoked.is_(False),
+            InviteCode.used_count < InviteCode.max_uses,
+            (InviteCode.expires_at.is_(None)) | (InviteCode.expires_at > datetime.now(timezone.utc)),
+        )
+        .values(used_count=InviteCode.used_count + 1)
+    )
+    if not code or claimed.rowcount != 1:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="کد دعوت نامعتبر است یا ظرفیتش تمام شده")
+
     freelancer = Freelancer(
         email=body.email,
         password_hash=_hash_password(body.password),
         name=body.name,
+        invite_code=code,
     )
     db.add(freelancer)
     await db.commit()
@@ -225,3 +260,58 @@ async def update_knowledge(
     freelancer.knowledge = body.model_dump()
     await db.commit()
     return body
+
+
+# ── Invite-only sign-up, managed by the admin ────────────────────────────────
+@router.get("/admin/invites", response_model=list[InviteOut])
+async def list_invites(db: AsyncSession = Depends(get_db), _: dict = Depends(get_current_admin)):
+    result = await db.execute(select(InviteCode).order_by(InviteCode.created_at.desc()))
+    return [_invite_out(invite) for invite in result.scalars().all()]
+
+
+@router.post("/admin/invites", response_model=InviteOut, status_code=201)
+async def create_invite(body: InviteCreateIn, db: AsyncSession = Depends(get_db), _: dict = Depends(get_current_admin)):
+    code = "FRL-" + "".join(secrets.choice(INVITE_ALPHABET) for _ in range(8))
+    invite = InviteCode(
+        code=code,
+        note=body.note.strip() or None,
+        max_uses=body.max_uses,
+        expires_at=datetime.now(timezone.utc) + timedelta(days=body.expires_days) if body.expires_days else None,
+    )
+    db.add(invite)
+    await db.commit()
+    await db.refresh(invite)
+    return _invite_out(invite)
+
+
+@router.delete("/admin/invites/{code}", response_model=InviteOut)
+async def revoke_invite(code: str, db: AsyncSession = Depends(get_db), _: dict = Depends(get_current_admin)):
+    invite = await db.get(InviteCode, normalize_code(code))
+    if not invite:
+        raise HTTPException(status_code=404, detail="کد دعوت پیدا نشد")
+    invite.revoked = True
+    await db.commit()
+    await db.refresh(invite)
+    return _invite_out(invite)
+
+
+@router.get("/admin/freelancers", response_model=list[AdminFreelancerOut])
+async def list_freelancers(db: AsyncSession = Depends(get_db), _: dict = Depends(get_current_admin)):
+    counts = (
+        select(Order.freelancer_id, func.count(Order.id).label("n"))
+        .where(Order.freelancer_id.is_not(None))
+        .group_by(Order.freelancer_id)
+        .subquery()
+    )
+    result = await db.execute(
+        select(Freelancer, func.coalesce(counts.c.n, 0))
+        .outerjoin(counts, counts.c.freelancer_id == Freelancer.id)
+        .order_by(Freelancer.created_at.desc())
+    )
+    return [
+        AdminFreelancerOut(
+            id=f.id, email=f.email, name=f.name, position=f.position, invite_code=f.invite_code,
+            onboarding_completed=f.onboarding_completed, created_at=f.created_at, order_count=n,
+        )
+        for f, n in result.all()
+    ]

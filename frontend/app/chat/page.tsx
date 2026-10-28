@@ -12,6 +12,7 @@ import ChatBubble from "@/components/ChatBubble";
 import ChatRobot, { ROBOT_INTRODUCTIONS } from "@/components/ChatRobot";
 import ThemeToggle from "@/components/ThemeToggle";
 import GuidedTour, { startTour } from "@/components/GuidedTour";
+import FreelancerPromo from "@/components/FreelancerPromo";
 import { fetchBotProfile, BotProfile, fetchOrderBrief, fetchChatProgress, ChatProgressStage, sendChat, sendOtp, submitOrder, uploadChatFile, createChatSession, updateChatSession, ChatMode, ProjectPath, Message, Proposal, LeadAnalysis, OrderFile } from "@/lib/api";
 
 const WELCOME: Message = {
@@ -1097,6 +1098,7 @@ function ChatPageInner() {
           </div>
         )}
       </nav>
+      <FreelancerPromo onNavigate={() => setSidebarOpen(false)} />
       <div className="flex items-center gap-2 border-t border-border p-3">
         <Link href={customerToken ? "/panel" : "/login?redirect=/panel"} data-tour="account" className="flex h-10 min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2 text-sm font-bold text-foreground outline-none transition-colors hover:bg-foreground/5 focus-visible:ring-2 focus-visible:ring-ring">
           <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-surface-2 text-muted-foreground">

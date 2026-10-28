@@ -135,16 +135,55 @@ export async function updateChatSession(
   });
 }
 
-export async function freelancerRegister(email: string, password: string, name?: string): Promise<FreelancerSession> {
+export async function freelancerRegister(email: string, password: string, inviteCode: string, name?: string): Promise<FreelancerSession> {
   const res = await fetch(`${API_URL}/api/freelancer/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password, name }),
+    body: JSON.stringify({ email, password, name, invite_code: inviteCode }),
   });
   if (res.status === 409) throw new Error("این ایمیل قبلاً ثبت شده");
-  if (!res.ok) throw new Error("خطا در ثبت‌نام");
+  if (!res.ok) throw new Error(await readDetail(res, "خطا در ثبت‌نام"));
   return res.json();
 }
+
+export interface InviteCode {
+  code: string;
+  note: string | null;
+  max_uses: number;
+  used_count: number;
+  revoked: boolean;
+  expires_at: string | null;
+  created_at: string;
+  active: boolean;
+}
+
+export interface AdminFreelancer {
+  id: string;
+  email: string;
+  name: string | null;
+  position: string | null;
+  invite_code: string | null;
+  onboarding_completed: boolean;
+  created_at: string;
+  order_count: number;
+}
+
+async function adminRequest<T>(token: string, path: string, init: RequestInit = {}): Promise<T> {
+  const res = await fetch(`${API_URL}/api/admin/${path}`, {
+    ...init,
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, ...(init.headers || {}) },
+  });
+  if (res.status === 401 || res.status === 403) throw new Error("UNAUTHORIZED");
+  if (!res.ok) throw new Error(await readDetail(res, "درخواست ناموفق بود"));
+  return res.json();
+}
+
+export const fetchInvites = (token: string) => adminRequest<InviteCode[]>(token, "invites");
+export const createInvite = (token: string, body: { note: string; max_uses: number; expires_days: number | null }) =>
+  adminRequest<InviteCode>(token, "invites", { method: "POST", body: JSON.stringify(body) });
+export const revokeInvite = (token: string, code: string) =>
+  adminRequest<InviteCode>(token, `invites/${encodeURIComponent(code)}`, { method: "DELETE" });
+export const fetchAdminFreelancers = (token: string) => adminRequest<AdminFreelancer[]>(token, "freelancers");
 
 export async function freelancerLogin(email: string, password: string): Promise<FreelancerSession> {
   const res = await fetch(`${API_URL}/api/freelancer/login`, {

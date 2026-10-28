@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { freelancerRegister } from "@/lib/api";
@@ -12,16 +12,22 @@ export default function FreelancerRegisterPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
+
+  useEffect(() => {
+    const invite = new URLSearchParams(window.location.search).get("invite");
+    if (invite) setInviteCode(invite.toUpperCase());
+  }, []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!email || !password) return;
+    if (!email || !password || !inviteCode.trim()) return;
     setLoading(true);
     setError("");
     try {
-      const data = await freelancerRegister(email, password, name || undefined);
+      const data = await freelancerRegister(email, password, inviteCode.trim(), name || undefined);
       localStorage.setItem("freelancer_token", data.access_token);
       localStorage.setItem("freelancer_id", data.freelancer_id);
       localStorage.setItem("freelancer_bot_token", data.bot_token);
@@ -38,7 +44,7 @@ export default function FreelancerRegisterPage() {
     <AuthLayout
       variant="freelancer"
       title="چت‌بات هوشمند خودت رو بساز"
-      description="در کمتر از سه دقیقه دستیاری داشته باش که با مشتری‌هات نیازسنجی کنه."
+      description="ثبت‌نام فعلاً فقط با کد دعوته. کدت رو وارد کن و در کمتر از سه دقیقه دستیاری داشته باش که با مشتری‌هات نیازسنجی کنه."
       footer={
         <>
           قبلاً ثبت‌نام کردی؟{" "}
@@ -47,6 +53,20 @@ export default function FreelancerRegisterPage() {
       }
     >
       <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label htmlFor="fl-invite" className="field-label">کد دعوت</label>
+          <input
+            id="fl-invite"
+            value={inviteCode}
+            onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+            placeholder="FRL-XXXXXXXX"
+            dir="ltr"
+            required
+            autoComplete="off"
+            spellCheck={false}
+            className="field min-h-12 text-left font-mono tracking-wider"
+          />
+        </div>
         <div>
           <label htmlFor="fl-name" className="field-label">اسم <span className="font-normal text-muted-foreground">(اختیاری)</span></label>
           <input id="fl-name" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="مثلاً علی رضایی" className="field min-h-12" />
@@ -61,7 +81,7 @@ export default function FreelancerRegisterPage() {
         </div>
         {error && <p role="alert" className="rounded-lg border border-danger/25 bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
         <Button type="submit" disabled={loading} className="h-12 w-full">
-          {loading ? "در حال ثبت‌نام..." : "ثبت‌نام رایگان"}
+          {loading ? "در حال ثبت‌نام..." : "ثبت‌نام"}
         </Button>
       </form>
     </AuthLayout>

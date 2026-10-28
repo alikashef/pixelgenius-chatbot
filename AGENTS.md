@@ -141,6 +141,8 @@ frontend/
     McpTour.tsx                   ← تور آموزشی اتصال MCP در پنل مشتری + CopyBlock و BUILD_PROMPT مشترک
     OrderManager.tsx              ← بررسی/قیمت‌گذاری سفارش؛ مشترک ادمین و فریلنسر (scope)
     GuidedTour.tsx                ← تور خوش‌آمد (اسپات‌لایت + روبات راهنما + صدا)
+    FreelancerPromo.tsx           ← بنر جذب فریلنسر در سایدبار صفحه اصلی (قابل بستن برای ۷ روز)
+    admin/FreelancerInvites.tsx   ← ادمین: ساخت/لغو کد دعوت + لیست فریلنسرها (`/admin/dashboard?tab=freelancers`)
   lib/tours.json                  ← متن مراحل تورها (منبع مشترک UI و تولید صدا)
   lib/widget.ts                   ← پالت رنگ ویجت و رنگ روبات فریلنسر
   app/freelancer/settings/        ← آموزش دستیار (حوزه، خدمات و قیمت، روش کار، FAQ)
@@ -337,6 +339,8 @@ ELEVENLABS_API_KEY=... python3 scripts/generate_tour_audio.py
 - ظاهر ویجت در `freelancers.widget_settings`؛ پروفایل عمومی: `GET /api/bot/{token}`
 - سفارش‌ها با `bot_token` به فریلنسر نسبت داده می‌شوند (در proposal/handoff)؛ فریلنسر فقط سفارش‌های خودش را از `/api/freelancer/orders/*` می‌بیند
 - نصب: `<script src="https://APP/embed.js" data-bot="TOKEN" async></script>`
+- ثبت‌نام فریلنسر **فقط با کد دعوت** (جدول `invite_codes`، کد `FRL-XXXXXXXX`، مصرف اتمیک با `used_count < max_uses`)؛ لینک دعوت: `/freelancer/register?invite=CODE`
+- ادمین: `GET/POST /api/admin/invites`، `DELETE /api/admin/invites/{code}` (لغو)، `GET /api/admin/freelancers`
 
 ### قبل از هر commit
 

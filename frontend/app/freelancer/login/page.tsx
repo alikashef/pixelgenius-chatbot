@@ -40,7 +40,7 @@ export default function FreelancerLoginPage() {
       footer={
         <>
           هنوز ثبت‌نام نکردی؟{" "}
-          <Link href="/freelancer/register" className="font-bold text-brand underline-offset-4 hover:underline">ثبت‌نام رایگان</Link>
+          <Link href="/freelancer/register" className="font-bold text-brand underline-offset-4 hover:underline">ثبت‌نام با کد دعوت</Link>
         </>
       }
     >

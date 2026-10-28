@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import SkillsManager from "@/components/admin/SkillsManager";
 import DesignerSettings from "@/components/admin/DesignerSettings";
+import FreelancerInvites from "@/components/admin/FreelancerInvites";
 import {
   AdminSite,
   manageAdminSites,
@@ -15,7 +16,7 @@ import {
   Order,
 } from "@/lib/api";
 import AppShell, { ShellLoading } from "@/components/AppShell";
-import { IconAdjustments, IconCheck, IconClipboardList, IconPalette, IconWand, IconWorld, IconX } from "@tabler/icons-react";
+import { IconAdjustments, IconCheck, IconClipboardList, IconPalette, IconUsers, IconWand, IconWorld, IconX } from "@tabler/icons-react";
 
 const STATUS_LABEL: Record<Order["status"], string> = {
   pending_review: "در انتظار بررسی",
@@ -33,7 +34,7 @@ const STATUS_CLASS: Record<Order["status"], string> = {
   cancelled: "bg-danger/10 text-danger",
 };
 
-type AdminTab = "orders" | "settings" | "design" | "sites" | "skills";
+type AdminTab = "orders" | "settings" | "design" | "sites" | "skills" | "freelancers";
 
 // Sales orders (priced, paid) and product-design projects (config briefs) are separate workflows.
 const ADMIN_TABS: { key: AdminTab; group: string; label: string; title: string; description: string; icon: typeof IconClipboardList }[] = [
@@ -42,6 +43,7 @@ const ADMIN_TABS: { key: AdminTab; group: string; label: string; title: string; 
   { key: "design", group: "طراحی محصول", label: "پروژه‌ها", title: "پروژه‌های طراحی محصول", description: "کانفیگ‌هایی که طراح محصول برای کاربران ساخته؛ بدون قیمت‌گذاری و پرداخت.", icon: IconWand },
   { key: "sites", group: "طراحی محصول", label: "سایت‌های منتشرشده", title: "سایت‌های منتشرشده", description: "پیش‌نمایش‌ها و انتشارهای فعال پروژه‌های طراحی؛ تمدید یا حذفشان کن.", icon: IconWorld },
   { key: "skills", group: "طراحی محصول", label: "تنظیمات طراح محصول", title: "تنظیمات طراح محصول", description: "استک‌ها، مهارت‌ها و تنظیمات تولید تصویر طراح محصول.", icon: IconPalette },
+  { key: "freelancers", group: "فریلنسرها", label: "دعوت و اعضا", title: "فریلنسرها", description: "ثبت‌نام فریلنسر فقط با دعوت‌نامه است؛ کد دعوت بساز و اعضا را ببین.", icon: IconUsers },
 ];
 
 function isAdminTab(value: string | null): value is AdminTab {
@@ -327,6 +329,10 @@ export default function AdminDashboard() {
               </ul>
             )}
           </div>
+        )}
+
+        {activeTab === "freelancers" && (
+          <FreelancerInvites getToken={getToken} onUnauthorized={() => { localStorage.removeItem("admin_token"); router.push("/admin/login"); }} />
         )}
 
         {activeTab === "skills" && (
