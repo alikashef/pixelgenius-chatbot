@@ -115,8 +115,8 @@ export default function AppShell({
     <div className="flex h-full flex-col">
       <div className="flex h-16 shrink-0 items-center justify-between gap-2 px-4">
         <div className="flex min-w-0 items-center gap-2">
-          <BrandLogo />
-          {area && <span className="truncate rounded-full bg-foreground/[0.06] px-2 py-0.5 text-[11px] font-bold text-muted-foreground">{area}</span>}
+          <BrandLogo size="sm" />
+          {area && <span className="shrink-0 rounded-full bg-foreground/[0.06] px-2 py-0.5 text-[11px] font-bold text-muted-foreground">{area}</span>}
         </div>
         <button
           type="button"
