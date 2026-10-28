@@ -1,4 +1,18 @@
 services:
+  preview-gateway:
+    image: caddy:2-alpine
+    profiles:
+      - gateway
+    restart: unless-stopped
+    environment:
+      APP_DOMAIN: http://localhost:8081
+      PREVIEW_DOMAIN: preview.localhost
+      CADDY_EMAIL: ${CADDY_EMAIL:-admin@pixelgenius.ir}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+      - backend
+
   caddy:
     image: caddy:2-alpine
     profiles:
@@ -61,6 +75,7 @@ services:
       LIARA_API_TOKEN: ${LIARA_API_TOKEN:-}
       LIARA_TTL_HOURS: ${LIARA_TTL_HOURS:-}
       LIARA_MAX_APPS: ${LIARA_MAX_APPS:-}
+      LIARA_MIN_BALANCE: ${LIARA_MIN_BALANCE:-50000}
       LIARA_PLAN: ${LIARA_PLAN:-}
       LIARA_BUNDLE_PLAN: ${LIARA_BUNDLE_PLAN:-}
     volumes:

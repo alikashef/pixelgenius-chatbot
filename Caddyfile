@@ -55,9 +55,10 @@
 			reverse_proxy {http.request.header.X-Preview-Upstream}:443 {
 				header_up Host {http.request.header.X-Preview-Upstream}
 				header_up X-Forwarded-Host {hostport}
+				header_up X-Forwarded-Proto https
 				header_up -X-Preview-Upstream
 				header_up -X-Preview-Kind
-				header_down Location `(?i)^https?://(?:[a-z0-9-]+\.)+liara\.(?:run|space)(?::[0-9]+)?(.*)$` "{scheme}://{hostport}$1"
+				header_down Location `(?i)^https?://(?:[a-z0-9-]+\.)+liara\.(?:run|space)(?::[0-9]+)?(.*)$` "https://{hostport}$1"
 				header_down Set-Cookie `(?i);\s*Domain=\.?(?:[a-z0-9-]+\.)*liara\.(?:run|space)(;|$)` "$1"
 				flush_interval -1
 				transport http {
@@ -70,6 +71,11 @@
 			reverse_proxy backend:8000
 		}
 	}
+}
+
+# Internal entry point when an existing reverse proxy terminates public TLS.
+http://:8080 {
+	import preview_routes
 }
 
 *.{$PREVIEW_DOMAIN:preview.localhost} {

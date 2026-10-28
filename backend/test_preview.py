@@ -108,6 +108,54 @@ class PreviewDomainTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(data['versions'][0]['url'], expected)
         self.assertEqual(data['deployments'][0]['url'], expected)
 
+    async def test_admin_sites_require_admin_and_hide_private_metadata(self):
+        from auth import create_access_token
+        self.metadata(database='private-db', password='hidden', env={'TOKEN': 'hidden'})
+        url = '/api/admin/sites'
+        self.assertIn((await self.client.get(url)).status_code, (401, 403))
+        customer = create_access_token({'sub': 'customer', 'role': 'customer'})
+        self.assertEqual((await self.client.get(url, headers={'Authorization': 'Bearer '+customer})).status_code, 403)
+        admin = create_access_token({'sub': 'admin', 'role': 'admin'})
+        with patch.object(liara, 'release_status', AsyncMock(return_value={'state': 'READY'})):
+            response = await self.client.get(url, headers={'Authorization': 'Bearer '+admin})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['sites'][0]['state'], 'READY')
+        self.assertNotIn('hidden', response.text)
+        self.assertNotIn('private-db', response.text)
+
+    async def test_admin_extend_and_remote_delete_failure_can_be_retried(self):
+        from auth import create_access_token
+        headers = {'Authorization': 'Bearer '+create_access_token({'sub': 'admin', 'role': 'admin'})}
+        meta = self.metadata(database='qa-db')
+        url = f'/api/admin/sites/dynamic/{self.slug}'
+        response = await self.client.post(url+'/extend', json={'hours': 24}, headers=headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(liara.read_meta(self.slug)['expires_at'], meta['expires_at']+86400)
+        for hours in (0, -1, 8761, 1.5, True):
+            self.assertEqual((await self.client.post(url+'/extend', json={'hours': hours}, headers=headers)).status_code, 422)
+        with patch.object(liara, 'delete_app', AsyncMock()) as app_delete, patch.object(liara, 'delete_database', AsyncMock(side_effect=liara.LiaraError('failed'))):
+            response = await self.client.delete(url, headers=headers)
+            self.assertEqual(response.status_code, 502)
+            app_delete.assert_awaited_once_with(self.name)
+            self.assertIsNotNone(liara.read_meta(self.slug))
+        with patch.object(liara, 'delete_app', AsyncMock()), patch.object(liara, 'delete_database', AsyncMock()) as db_delete:
+            self.assertEqual((await self.client.delete(url, headers=headers)).status_code, 200)
+            db_delete.assert_awaited_once_with('qa-db')
+        self.assertIsNone(liara.read_meta(self.slug))
+        self.assertEqual((await self.client.get('/api/preview/route', params={'domain': self.domain})).status_code, 404)
+
+    async def test_static_admin_extension_and_delete(self):
+        from auth import create_access_token
+        headers = {'Authorization': 'Bearer '+create_access_token({'sub': 'admin', 'role': 'admin'})}
+        self.static.joinpath(self.slug).mkdir()
+        self.static.joinpath(self.slug, '.meta.json').write_text('{"expires_at": 1, "files": ["index.html"]}')
+        url = f'/api/admin/sites/static/{self.slug}'
+        response = await self.client.post(url+'/extend', json={'hours': 2}, headers=headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertGreater(response.json()['expires_at'], time.time()+7100)
+        self.assertEqual((await self.client.delete(url, headers=headers)).status_code, 200)
+        self.assertFalse(self.static.joinpath(self.slug).exists())
+
 
 if __name__ == '__main__':
     unittest.main()

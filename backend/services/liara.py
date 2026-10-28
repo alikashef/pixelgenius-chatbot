@@ -404,6 +404,13 @@ async def delete_app(name: str) -> None:
         raise _fail(response, "Deleting the app")
 
 
+_site_locks: dict[str, asyncio.Lock] = {}
+
+
+def site_lock(slug: str) -> asyncio.Lock:
+    return _site_locks.setdefault(slug, asyncio.Lock())
+
+
 async def cleanup_expired() -> int:
     removed = 0
     for path in META_DIR.glob("*.json"):
@@ -412,16 +419,18 @@ async def cleanup_expired() -> int:
         except Exception:
             path.unlink(missing_ok=True)
             continue
-        if meta.get("expires_at", 0) > time.time():
-            continue
-        try:
-            await delete_app(meta["app"])
-            if meta.get("database"):
-                await delete_database(meta["database"])
-            path.unlink(missing_ok=True)
-            removed += 1
-        except Exception as e:
-            logger.warning("Could not delete expired Liara app %s: %s", meta.get("app"), e)
+        async with site_lock(path.stem):
+            meta = read_meta(path.stem)
+            if not meta or meta.get("expires_at", 0) > time.time():
+                continue
+            try:
+                await delete_app(meta["app"])
+                if meta.get("database"):
+                    await delete_database(meta["database"])
+                path.unlink(missing_ok=True)
+                removed += 1
+            except Exception as e:
+                logger.warning("Could not delete expired Liara app %s: %s", meta.get("app"), e)
     return removed
 
 

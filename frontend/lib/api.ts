@@ -642,3 +642,29 @@ export async function fetchChatProgress(id: string, signal: AbortSignal): Promis
   const result = await res.json();
   return result.stage;
 }
+
+export interface AdminSite {
+  slug: string;
+  kind: "static" | "dynamic";
+  url: string;
+  app: string | null;
+  order_id: string | null;
+  platform: string;
+  state: string;
+  expires_at: number;
+  has_database: boolean;
+}
+
+export async function manageAdminSites(token: string, kind?: string, slug?: string, hours?: number, remove = false) {
+  const path = kind && slug ? `/${kind}/${slug}${remove ? "" : "/extend"}` : "";
+  const response = await fetch(`${API_URL}/api/admin/sites${path}`, {
+    method: remove ? "DELETE" : path ? "POST" : "GET",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    ...(hours === undefined ? {} : { body: JSON.stringify({ hours }) }),
+    cache: "no-store",
+  });
+  if (response.status === 401 || response.status === 403) throw new Error("UNAUTHORIZED");
+  const data = await response.json();
+  if (!response.ok) throw new Error(typeof data.detail === "string" ? data.detail : "عملیات سایت انجام نشد");
+  return data;
+}

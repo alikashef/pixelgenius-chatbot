@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import SkillsManager from "@/components/admin/SkillsManager";
 import DesignerSettings from "@/components/admin/DesignerSettings";
 import {
+  AdminSite,
+  manageAdminSites,
   fetchOrders,
   fetchStats,
   approveOrder,
@@ -69,7 +71,7 @@ export default function AdminDashboard() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [selected, setSelected] = useState<Order | null>(null);
-  const [activeTab, setActiveTab] = useState<"orders" | "settings" | "skills">("orders");
+  const [activeTab, setActiveTab] = useState<"orders" | "settings" | "skills" | "sites">("orders");
   const [settings, setSettings] = useState<Record<string, unknown>>({});
   const [savingSettings, setSavingSettings] = useState(false);
   const [savedToast, setSavedToast] = useState(false);
@@ -216,12 +218,13 @@ export default function AdminDashboard() {
         <div className="flex gap-2 border-b border-[hsl(var(--border))]">
           {[
             ["orders", "سفارشات"],
+            ["sites", "سایت‌های منتشرشده"],
             ["settings", "تنظیمات فروش و AI"],
             ["skills", "طراحی محصول (استک، مهارت، تصویر)"],
           ].map(([key, label]) => (
             <button
               key={key}
-              onClick={() => setActiveTab(key as "orders" | "settings" | "skills")}
+              onClick={() => setActiveTab(key as "orders" | "settings" | "skills" | "sites")}
               className={`px-4 py-3 text-sm transition-colors ${
                 activeTab === key ? "border-b-2 border-[--violet] text-violet-300" : "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
               }`}
@@ -230,6 +233,8 @@ export default function AdminDashboard() {
             </button>
           ))}
         </div>
+
+        {activeTab === "sites" && <PublishedSites orders={orders} />}
 
         {activeTab === "orders" && stats && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -649,4 +654,81 @@ function SettingsTextarea({ title, value, onChange }: { title: string; value: st
       <textarea value={value} onChange={(e) => onChange(e.target.value)} className="admin-textarea min-h-[180px]" />
     </section>
   );
+}
+
+
+function PublishedSites({ orders }: { orders: Order[] }) {
+  const [sites, setSites] = useState<AdminSite[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState("");
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [hours, setHours] = useState<Record<string, string>>({});
+  const [deleting, setDeleting] = useState<AdminSite | null>(null);
+  const [now, setNow] = useState(Date.now());
+  async function load() {
+    setLoading(true);
+    setError("");
+    try {
+      const data = await manageAdminSites(localStorage.getItem("admin_token") || "");
+      setSites(data.sites);
+    } catch (e) { setError(e instanceof Error ? e.message : "دریافت سایت‌ها ناموفق بود"); }
+    finally { setLoading(false); }
+  }
+  useEffect(() => {
+    load();
+    const timer = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(timer);
+  }, []);
+  async function act(site: AdminSite, remove: boolean) {
+    const key = `${site.kind}:${site.slug}`;
+    const extension = Number(hours[key] || "24");
+    if (!remove && (!Number.isInteger(extension) || extension < 1 || extension > 8760)) {
+      setError("زمان تمدید باید بین ۱ تا ۸۷۶۰ ساعت باشد"); return;
+    }
+    setBusy(key); setError(""); setNotice("");
+    try {
+      const data = await manageAdminSites(localStorage.getItem("admin_token") || "", site.kind, site.slug, remove ? undefined : extension, remove);
+      setSites((previous) => remove ? previous.filter((item) => `${item.kind}:${item.slug}` !== key) : previous.map((item) => `${item.kind}:${item.slug}` === key ? { ...item, expires_at: data.expires_at } : item));
+      setDeleting(null);
+      setNotice(remove ? "سایت حذف شد." : "زمان فعال‌بودن سایت تمدید شد.");
+    } catch (e) { setError(e instanceof Error ? e.message : "عملیات انجام نشد"); }
+    finally { setBusy(""); }
+  }
+  const states: Record<string, string> = { READY: "فعال", BUILDING: "در حال ساخت", PREPARING: "آماده‌سازی", UPLOADING: "در حال بارگذاری", FAILED: "ناموفق", EXPIRED: "منقضی‌شده", UNKNOWN: "وضعیت در دسترس نیست", UNHEALTHY: "ناسالم", CANCELED: "لغوشده", TIMEDOUT: "پایان مهلت ساخت" };
+  return <section className="space-y-5">
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <div><h2 className="text-xl font-bold">سایت‌های منتشرشده</h2><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">تمدید به زمان باقی‌مانده اضافه می‌شود. سایت‌های لیارا پس از انقضا به‌صورت خودکار پاک می‌شوند؛ تمدید زمان، هزینه میزبانی را ادامه می‌دهد.</p></div>
+      <button disabled={loading || !!busy} onClick={load} className="rounded-xl border border-[--violet-border] px-4 py-2 text-violet-300 disabled:opacity-50">به‌روزرسانی</button>
+    </div>
+    {error && <p role="alert" className="text-red-400">{error === "UNAUTHORIZED" ? "نشست ادمین منقضی شده؛ دوباره وارد شوید." : error}</p>}
+    {notice && <p role="status" className="text-violet-300">{notice}</p>}
+    {loading ? <p role="status">در حال دریافت سایت‌ها…</p> : sites.length === 0 ? <p>هنوز سایتی منتشر نشده است.</p> : <div className="grid gap-4 md:grid-cols-2">{sites.map((site) => {
+      const key = `${site.kind}:${site.slug}`;
+      const order = orders.find((item) => item.id === site.order_id);
+      const remaining = Math.max(0, Math.ceil((site.expires_at * 1000 - now) / 60000));
+      return <article key={key} className="space-y-4 rounded-2xl border border-[hsl(var(--border))] bg-[--surface] p-5">
+        <div className="flex items-start justify-between gap-3"><h3 className="font-bold">{order?.project_name || site.slug}</h3><span className="text-sm text-violet-300">{remaining === 0 ? "منقضی‌شده" : states[site.state] || site.state}</span></div>
+        <a href={site.url} target="_blank" rel="noopener noreferrer" dir="ltr" className="block break-all text-sm text-violet-300 underline">{site.url}</a>
+        <dl className="space-y-2 text-sm text-[hsl(var(--muted-foreground))]">
+          <div>میزبان: {site.kind === "dynamic" ? `لیارا · ${site.platform}` : "فایل‌سرور استاتیک"}</div>
+          {site.app && <div dir="ltr">{site.app}</div>}
+          <div>انقضا: {new Date(site.expires_at * 1000).toLocaleString("fa-IR", { timeZone: "Asia/Tehran" })} (تهران)</div>
+          <div>باقی‌مانده: {Math.floor(remaining / 60).toLocaleString("fa-IR")} ساعت و {(remaining % 60).toLocaleString("fa-IR")} دقیقه</div>
+        </dl>
+        {site.order_id && <a className="block text-sm text-violet-300 underline" href={`/admin/orders/${site.order_id}`}>مشاهده پروژه</a>}
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="text-sm">افزایش زمان (ساعت)<input aria-label={`ساعت تمدید ${site.slug}`} type="number" min="1" max="8760" step="1" value={hours[key] || "24"} onChange={(e) => setHours((old) => ({ ...old, [key]: e.target.value }))} className="mt-2 block w-28 rounded-xl border border-[hsl(var(--border))] bg-[--background] p-2" /></label>
+          <button disabled={!!busy} onClick={() => act(site, false)} className="rounded-xl bg-violet-600 px-4 py-2 disabled:opacity-50">{busy === key ? "در حال انجام…" : "تمدید"}</button>
+          <button disabled={!!busy} onClick={() => { setDeleting(site); setError(""); }} className="rounded-xl border border-red-500/30 px-4 py-2 text-red-400 disabled:opacity-50">{site.kind === "dynamic" ? "حذف از لیارا" : "حذف سایت"}</button>
+        </div>
+      </article>;
+    })}</div>}
+    {deleting && <div className="fixed inset-0 z-50 flex items-center justify-center bg-[--background]/90 p-4"><div role="dialog" aria-modal="true" aria-labelledby="delete-site-title" className="w-full max-w-md space-y-4 rounded-2xl border border-[hsl(var(--border))] bg-[--surface] p-6">
+      <h3 id="delete-site-title" className="font-bold">حذف دائمی سایت</h3>
+      <p className="break-all" dir="ltr">{deleting.url}</p>
+      <p>{deleting.kind === "dynamic" ? `اپلیکیشن${deleting.has_database ? " و دیتابیس وابسته" : ""} از لیارا پاک می‌شود و سایت از دسترس خارج می‌شود.` : "فایل‌های سایت پاک می‌شوند و سایت از دسترس خارج می‌شود."} این عملیات قابل بازگشت نیست؛ اطلاعات سفارش حفظ می‌شود.</p>
+      <div className="flex gap-3"><button disabled={!!busy} onClick={() => act(deleting, true)} className="rounded-xl bg-red-600 px-4 py-2 disabled:opacity-50">{busy ? "در حال حذف…" : "حذف دائمی"}</button><button disabled={!!busy} onClick={() => setDeleting(null)} className="rounded-xl border border-[hsl(var(--border))] px-4 py-2">انصراف</button></div>
+    </div></div>}
+  </section>;
 }

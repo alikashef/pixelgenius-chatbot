@@ -13,17 +13,17 @@ import httpx
 from pathlib import Path, PurePosixPath
 from urllib.parse import urlsplit, urlunsplit
 
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Request, HTTPException, Depends
 from fastapi.responses import JSONResponse, Response
 from jose import JWTError, jwt
 
-from auth import ALGORITHM, JWT_SECRET
+from auth import ALGORITHM, JWT_SECRET, get_current_admin
 from services import liara, workspace
 from database import SessionLocal
 from models import Order
 from sqlalchemy import select
 from schemas import WorkspaceOutputIn, WorkspaceCredentialsIn, WorkspaceCommentStatusIn
-from pydantic import ValidationError
+from pydantic import ValidationError, BaseModel, Field
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -256,6 +256,76 @@ async def preview_route(domain: str = ""):
     return Response(status_code=204, headers={**headers, "X-Preview-Upstream": origin, "X-Preview-Kind": "dynamic"})
 
 
+class SiteExtensionIn(BaseModel):
+    hours: int = Field(strict=True, ge=1, le=8760)
+
+
+def _admin_site(slug: str, kind: str) -> dict:
+    if not SLUG_RE.fullmatch(slug) or kind not in ("static", "dynamic"):
+        raise HTTPException(404, "سایت پیدا نشد")
+    meta = liara.read_meta(slug) if kind == "dynamic" else _read_meta(slug)
+    if not meta or (kind == "dynamic" and meta.get("app") != liara.app_name_for_slug(slug)):
+        raise HTTPException(404, "سایت پیدا نشد")
+    return meta
+
+
+@router.get("/api/admin/sites")
+async def admin_sites(_: dict = Depends(get_current_admin)):
+    sites = []
+    candidates = [(p.stem, "dynamic") for p in liara.META_DIR.glob("site-*.json")]
+    candidates += [(p.name, "static") for p in SITES_DIR.glob("*/") if not p.name.startswith(".")]
+    for slug, kind in candidates:
+        try:
+            meta = _admin_site(slug, kind)
+        except HTTPException:
+            continue
+        state = meta.get("state", "UNKNOWN") if kind == "dynamic" else "READY"
+        if _expired(meta):
+            state = "EXPIRED"
+        elif kind == "dynamic" and meta.get("release_id"):
+            try:
+                status = await asyncio.wait_for(liara.release_status(meta["release_id"]), timeout=8)
+                state = status.get("state") or "UNKNOWN"
+            except (liara.LiaraError, httpx.HTTPError, TimeoutError):
+                state = "UNKNOWN"
+        sites.append({"slug": slug, "kind": kind, "url": public_site_url(slug),
+                      "app": meta.get("app"), "order_id": meta.get("order_id"),
+                      "platform": meta.get("platform", "static"), "state": state,
+                      "expires_at": meta.get("expires_at"), "has_database": bool(meta.get("database"))})
+    return JSONResponse({"sites": sorted(sites, key=lambda x: x["expires_at"] or 0),
+                         "default_dynamic_hours": liara.TTL_SECONDS / 3600,
+                         "default_static_hours": SITE_TTL_SECONDS / 3600}, headers={"Cache-Control": "no-store"})
+
+
+@router.post("/api/admin/sites/{kind}/{slug}/extend")
+async def admin_extend_site(kind: str, slug: str, body: SiteExtensionIn, _: dict = Depends(get_current_admin)):
+    async with liara.site_lock(slug):
+        meta = _admin_site(slug, kind)
+        meta["expires_at"] = int(max(time.time(), meta.get("expires_at", 0))) + body.hours * 3600
+        if kind == "dynamic":
+            liara.write_meta(slug, meta)
+        else:
+            (_site_dir(slug) / ".meta.json").write_text(json.dumps(meta))
+    return {"expires_at": meta["expires_at"]}
+
+
+@router.delete("/api/admin/sites/{kind}/{slug}")
+async def admin_delete_site(kind: str, slug: str, _: dict = Depends(get_current_admin)):
+    async with liara.site_lock(slug):
+        meta = _admin_site(slug, kind)
+        if kind == "dynamic":
+            try:
+                await liara.delete_app(meta["app"])
+                if meta.get("database"):
+                    await liara.delete_database(meta["database"])
+            except (liara.LiaraError, httpx.HTTPError):
+                raise HTTPException(502, "حذف کامل از لیارا انجام نشد؛ دوباره تلاش کنید.")
+            (liara.META_DIR / f"{slug}.json").unlink(missing_ok=True)
+        else:
+            shutil.rmtree(_site_dir(slug))
+    return {"deleted": True}
+
+
 def make_deploy_info(order_id: str, workspace_enabled: bool = True) -> dict:
     slug = slug_for_order(order_id)
     token = jwt.encode(
@@ -396,6 +466,12 @@ def _tool_delete(args: dict) -> dict:
 
 async def _tool_deploy(args: dict) -> dict:
     slug = _slug_from_token(args.get("token", ""))
+    async with liara.site_lock(slug):
+        return await _tool_deploy_locked(args)
+
+
+async def _tool_deploy_locked(args: dict) -> dict:
+    slug = _slug_from_token(args.get("token", ""))
     async with SessionLocal() as db:
         order = await _workspace_agent_order(db, args, designer_only=False)
         version_id = None
@@ -517,6 +593,12 @@ async def _origin_url(app_name: str) -> str:
 
 
 async def _tool_delete_deploy(args: dict) -> dict:
+    slug = _slug_from_token(args.get("token", ""))
+    async with liara.site_lock(slug):
+        return await _tool_delete_deploy_locked(args)
+
+
+async def _tool_delete_deploy_locked(args: dict) -> dict:
     slug = _slug_from_token(args.get("token", ""))
     meta = liara.read_meta(slug)
     if meta:
