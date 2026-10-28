@@ -444,6 +444,7 @@ function ChatPageInner() {
   const [sourceUrl, setSourceUrl] = useState("");
   const [sourceType, setSourceType] = useState<"github" | "zip" | undefined>();
   const [sourceArchive, setSourceArchive] = useState<OrderFile | undefined>();
+  const [reviewRepo, setReviewRepo] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [briefOrderId, setBriefOrderId] = useState("");
   const [brief, setBrief] = useState<Record<string, unknown> | null>(null);
@@ -745,7 +746,8 @@ function ChatPageInner() {
     lastAttemptRef.current = { messages: newMessages, attachments: currentAttachments, finalize };
     const requestProgressId = crypto.randomUUID();
     setProgressId(requestProgressId);
-    setProgressStage("thinking");
+    const firstSourceTurn = activeMode === "designer" && projectPath === "source" && sourceType === "github" && newMessages.filter((m) => m.role === "user").length === 1;
+    setProgressStage(firstSourceTurn ? "reviewing" : "thinking");
     setLoading(true);
     setError("");
     const abort = new AbortController();
@@ -759,7 +761,7 @@ function ChatPageInner() {
       }
 
       const apiMessages = newMessages.slice(1);
-      const reply = await sendChat(apiMessages, currentAttachments, activeMode, botToken, finalize, activeMode === "designer" ? projectPath : undefined, activeMode === "designer" && projectPath === "source" && sourceType === "github" ? sourceUrl : "", activeMode === "designer" && projectPath === "source" ? sourceType : undefined, activeMode === "designer" && projectPath === "source" && sourceType === "zip" ? sourceArchive : undefined, requestProgressId, abort.signal);
+      const reply = await sendChat(apiMessages, currentAttachments, activeMode, botToken, finalize, activeMode === "designer" ? projectPath : undefined, activeMode === "designer" && projectPath === "source" && sourceType === "github" ? sourceUrl : "", activeMode === "designer" && projectPath === "source" ? sourceType : undefined, activeMode === "designer" && projectPath === "source" && sourceType === "zip" ? sourceArchive : undefined, requestProgressId, abort.signal, customerToken || undefined);
       // Past this point the answer is being applied (and maybe an order created), so it can no longer be stopped.
       replyAbortRef.current = null;
       setStoppable(false);
@@ -859,6 +861,16 @@ function ChatPageInner() {
   const activeMode: ChatMode = botToken || embedded ? "sales" : mode;
   const isFresh = messages.length <= 1 && !loading && !briefOrderId;
 
+  // Picking a repository on a fresh chat starts the conversation: the server reads the source and the assistant opens with its review.
+  useEffect(() => {
+    if (!reviewRepo || !sourceReady || loading) return;
+    setReviewRepo(false);
+    if (messages.length > 1 || sourceType !== "github") return;
+    const name = sourceUrl.replace(/^https:\/\/(www\.)?github\.com\//, "").split("/").slice(0, 2).join("/");
+    void submit(`مخزن ${name} را اضافه کردم؛ سورسش را بررسی کن.`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reviewRepo, sourceReady, loading]);
+
   function handleTextareaKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing) return;
     e.preventDefault();
@@ -931,7 +943,7 @@ function ChatPageInner() {
           </div>
           {!sourceType && <p className="text-xs leading-6 text-muted-foreground">یکی از دو روش بالا را انتخاب کن.</p>}
           {sourceType === "github" && (
-            <GithubRepoPicker token={customerToken} value={sourceUrl} onChange={(url) => { setSourceUrl(url); setError(""); }} />
+            <GithubRepoPicker token={customerToken} value={sourceUrl} onChange={(url) => { setSourceUrl(url); setError(""); if (url) setReviewRepo(true); }} />
           )}
           {sourceType === "zip" && (
             <div className="rounded-lg border border-dashed border-input bg-surface-2 p-4">
@@ -1317,7 +1329,7 @@ function ChatPageInner() {
                 <div className="mt-8">
                   {composer}
                   <p className="mt-3 text-center text-xs text-muted-foreground">
-                    {needsProjectPath ? "با انتخاب مسیر پروژه، گفتگو فعال می‌شود." : projectPath === "source" && mode === "designer" ? sourceReady ? "سورس ثبت شد؛ حالا درباره پروژه و هدفت از انتشار بنویس." : "ابتدا لینک GitHub یا فایل ZIP سورس را اضافه کن." : "یا با یکی از نمونه‌ها شروع کن:"}
+                    {needsProjectPath ? "با انتخاب مسیر پروژه، گفتگو فعال می‌شود." : projectPath === "source" && mode === "designer" ? sourceReady ? sourceType === "github" ? "مخزن را بررسی می‌کنم و گفتگو را شروع می‌کنم." : "سورس ثبت شد؛ حالا درباره پروژه و هدفت از انتشار بنویس." : "ابتدا لینک GitHub یا فایل ZIP سورس را اضافه کن." : "یا با یکی از نمونه‌ها شروع کن:"}
                   </p>
                   {!(activeMode === "designer" && projectPath === "source") && (
                     <div className="mt-3 flex flex-wrap justify-center gap-2" data-tour="chips">

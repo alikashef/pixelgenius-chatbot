@@ -187,7 +187,7 @@ backend/
     customer.py                   ← GET/PATCH /api/customer/profile
     customer_auth.py              ← POST /api/customer/otp/send + verify (خروجی: نشست واحد با همه‌ی نقش‌ها)
     hosting.py                    ← /api/customer/sites: لیست سایت‌ها، renew رایگان، دامنه‌ی اختصاصی (add/verify/delete)
-    github.py                     ← /api/github/status|connect|callback|repos + DELETE (توکن رمزشده روی customers)
+    github.py                     ← /api/github/status|connect|callback|repos + DELETE (توکن رمزشده روی customers)؛ `review_repository` سورس مخزن انتخاب‌شده را (ساختار، زبان‌ها، فایل‌های کلیدی) با کش ۳۰ دقیقه‌ای در کانتکس چت می‌گذارد؛ مرحله‌ی progress: `reviewing`
     settings.py                   ← تنظیمات AI
   services/
     ai_settings.py

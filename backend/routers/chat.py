@@ -11,11 +11,14 @@ from zipfile import ZipFile, BadZipFile
 from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Body, Depends, HTTPException, UploadFile, File
+from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from auth import _decode, optional_bearer
 from database import get_db
 from lib.ai.analyze_lead import analyze_lead
-from models import ChatSession, Freelancer
+from models import ChatSession, Customer, Freelancer
+from routers.github import review_repository
 from services import workspace
 from schemas import ChatAttachmentIn, ChatRequest, ChatResponse, ChatSessionCreateIn, ChatSessionCreateOut, ChatSessionUpdateIn, OrderFileOut
 from services.ai_settings import get_ai_settings
@@ -223,7 +226,11 @@ def _merge_attachments(messages: list[dict], attachments: list[ChatAttachmentIn]
 
 
 @router.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
+async def chat(
+    request: ChatRequest,
+    db: AsyncSession = Depends(get_db),
+    credentials: HTTPAuthorizationCredentials | None = Depends(optional_bearer),
+):
     if request.mode == "designer" and not request.bot_token and not request.project_path:
         raise HTTPException(422, "ابتدا مسیر پروژه را انتخاب کنید")
     workspace.url(request.source_url)
@@ -243,6 +250,18 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
             settings["project_path"] = request.project_path
             settings["project_source_url"] = request.source_url if source_kind == "github" else ""
             settings["project_source_type"] = source_kind
+            if source_kind == "github":
+                # Read the repository (with the customer's GitHub access for private ones) so the assistant knows the source.
+                _set_progress(progress_id, "reviewing")
+                customer = None
+                if credentials:
+                    try:
+                        claims = _decode(credentials.credentials)
+                        customer = await db.get(Customer, claims.get("sub")) if claims.get("role") == "customer" else None
+                    except HTTPException:
+                        customer = None
+                settings["project_source_context"] = await review_repository(customer, request.source_url)
+                _set_progress(progress_id, "thinking")
         if request.bot_token:
             result = await db.execute(select(Freelancer).where(Freelancer.bot_token == request.bot_token))
             freelancer = result.scalar_one_or_none()

@@ -50,6 +50,8 @@ export function deriveRobotMood(activity: RobotActivity): {
   if (activity.preparingBrief)
     return { state: "working", label: "دارم کانفیگ پروژه‌ات را آماده می‌کنم" };
   if (activity.busy) {
+    if (activity.stage === "reviewing")
+      return { state: "searching", label: "در حال بررسی سورس مخزنت" };
     if (activity.stage === "searching")
       return {
         state: "searching",

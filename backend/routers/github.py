@@ -1,8 +1,10 @@
 """Connect a customer's GitHub account (OAuth app) and list their repositories for the source picker."""
+import asyncio
 import base64
 import hashlib
 import os
 import secrets
+import time
 from urllib.parse import urlencode, urlsplit
 
 import httpx
@@ -152,6 +154,81 @@ async def repos(db: AsyncSession = Depends(get_db), payload: dict = Depends(get_
         for repo in response.json()
         if not repo.get("archived")
     ]
+
+
+REVIEW_TTL_SECONDS = 1800
+SKIP_DIRS = {"node_modules", ".git", ".next", "dist", "build", "vendor", "__pycache__", ".venv", "venv", "coverage"}
+KEY_FILES = (
+    "package.json", "requirements.txt", "pyproject.toml", "Dockerfile", "docker-compose.yml", "compose.yml",
+    "README.md", "readme.md", ".env.example", "next.config.js", "next.config.mjs", "next.config.ts",
+    "vite.config.ts", "vite.config.js", "nuxt.config.ts", "composer.json", "go.mod", "manage.py", "Procfile",
+)
+_reviews: dict[tuple[str, str], tuple[float, str]] = {}
+
+
+def _repo_path(url: str) -> str | None:
+    parts = urlsplit(url or "")
+    segments = parts.path.strip("/").removesuffix(".git").split("/")
+    if parts.hostname not in ("github.com", "www.github.com") or len(segments) < 2:
+        return None
+    return f"{segments[0]}/{segments[1].removesuffix('.git')}"
+
+
+async def review_repository(customer: Customer | None, url: str) -> str:
+    """A compact snapshot of a repository (stack, tree, key files) for the assistant's context; "" when unreachable."""
+    full_name = _repo_path(url)
+    if not full_name:
+        return ""
+    key = (str(customer.id) if customer else "", full_name.lower())
+    cached = _reviews.get(key)
+    if cached and time.monotonic() - cached[0] < REVIEW_TTL_SECONDS:
+        return cached[1]
+    token = _token(customer) if customer else None
+    headers = {"Accept": "application/vnd.github+json", **({"Authorization": f"Bearer {token}"} if token else {})}
+    try:
+        base = f"{API}/repos/{full_name}"
+        async with httpx.AsyncClient(headers=headers, timeout=15) as client:
+            meta, languages = await asyncio.gather(client.get(base), client.get(f"{base}/languages"))
+            if not meta.is_success:
+                return ""
+            repo = meta.json()
+            branch = repo.get("default_branch") or "main"
+            tree = await client.get(f"{base}/git/trees/{branch}", params={"recursive": "1"})
+            paths = [
+                item["path"] for item in (tree.json().get("tree", []) if tree.is_success else [])
+                if item.get("type") == "blob" and not SKIP_DIRS.intersection(item["path"].split("/"))
+            ]
+            # Prefer the shallowest copy of each key file (the root over a nested example).
+            picked: dict[str, str] = {}
+            for path in sorted(paths, key=lambda p: (p.count("/"), p)):
+                name = path.rsplit("/", 1)[-1]
+                if name in KEY_FILES and name not in picked and path.count("/") <= 1:
+                    picked[name] = path
+            chosen = list(picked.values())[:8]
+            raw = {"Accept": "application/vnd.github.raw+json"}
+            files = await asyncio.gather(*(client.get(f"{base}/contents/{path}", params={"ref": branch}, headers=raw) for path in chosen))
+    except (httpx.HTTPError, ValueError):
+        return ""
+    lang_text = ", ".join(languages.json().keys()) if languages.is_success else repo.get("language") or ""
+    blocks = [
+        f"مخزن: {repo.get('full_name')} ({'خصوصی' if repo.get('private') else 'عمومی'})، شاخه‌ی پیش‌فرض: {branch}",
+        f"توضیح: {repo.get('description') or '—'}",
+        f"زبان‌ها: {lang_text or '—'}",
+        f"تعداد فایل‌ها: {len(paths)}",
+        "فهرست فایل‌ها:\n" + "\n".join(paths[:300])[:5000],
+    ]
+    remaining = 16000
+    for path, response in zip(chosen, files):
+        if not response.is_success or remaining <= 0:
+            continue
+        text = response.text[: min(remaining, 4000)]
+        blocks.append(f"فایل {path}:\n{text}")
+        remaining -= len(text)
+    summary = "\n\n".join(blocks)
+    if len(_reviews) >= 200:
+        _reviews.pop(next(iter(_reviews)))
+    _reviews[key] = (time.monotonic(), summary)
+    return summary
 
 
 @router.delete("/github")

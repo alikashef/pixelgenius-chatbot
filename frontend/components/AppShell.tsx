@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   IconBrush, IconClipboardList, IconHelp, IconLayoutDashboard, IconLayoutGrid, IconLogout, IconMenu2, IconMessage, IconPlugConnected, IconReceipt, IconWorld,
   IconSchool, IconSettings, IconWand, IconX, type Icon,
-  IconBriefcase, IconArrowRight,
+  IconBriefcase, IconArrowRight, IconMovie,
 } from "@tabler/icons-react";
 import { BrandLogo } from "@/components/Brand";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -29,11 +29,12 @@ export interface ShellNavItem {
 type CustomerTab = "design" | "sites" | "connect" | "orders" | "chats" | "account";
 
 // One sidebar for every signed-in account: its sections follow the account's permissions.
-const CUSTOMER_NAV: (Omit<ShellNavItem, "key"> & { key: CustomerTab | "templates" })[] = [
+const CUSTOMER_NAV: (Omit<ShellNavItem, "key"> & { key: CustomerTab | "templates" | "video" })[] = [
   { key: "design", group: "طراحی محصول", label: "پروژه‌های طراحی", icon: IconWand },
   { key: "sites", group: "طراحی محصول", label: "سایت‌ها و دامنه", icon: IconWorld },
   { key: "connect", group: "طراحی محصول", label: "اتصال به هوش مصنوعی", icon: IconPlugConnected },
   { key: "templates", group: "طراحی محصول", label: "سایت‌های آماده", icon: IconLayoutGrid, comingSoon: true },
+  { key: "video", group: "طراحی محصول", label: "ویدیوساز", icon: IconMovie, comingSoon: true },
   { key: "orders", group: "فروش", label: "سفارش‌ها", icon: IconClipboardList },
 ];
 const FREELANCER_NAV: ShellNavItem[] = [
@@ -76,12 +77,12 @@ export function useAccountNav({
   onCustomerTab?: (tab: CustomerTab) => void;
 }): ShellNavItem[] {
   const roles = useRoles();
-  const customerItem = ({ key, ...item }: Omit<ShellNavItem, "key"> & { key: CustomerTab | "templates" }): ShellNavItem => ({
+  const customerItem = ({ key, ...item }: Omit<ShellNavItem, "key"> & { key: CustomerTab | "templates" | "video" }): ShellNavItem => ({
     ...item,
     key,
     active: active === key,
     count: counts[key],
-    ...(item.comingSoon || key === "templates"
+    ...(item.comingSoon || key === "templates" || key === "video"
       ? {}
       : onCustomerTab
         ? { onSelect: () => onCustomerTab(key) }

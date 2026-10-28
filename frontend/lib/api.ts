@@ -318,11 +318,13 @@ export async function sendChat(
   sourceFile?: OrderFile,
   progressId?: string,
   signal?: AbortSignal,
+  customerToken?: string,
 ): Promise<string> {
   const res = await fetch(`${API_URL}/api/chat`, {
     signal,
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    // The signed-in customer's token lets the server read their private GitHub repository.
+    headers: { "Content-Type": "application/json", ...(customerToken ? { Authorization: `Bearer ${customerToken}` } : {}) },
     body: JSON.stringify({ messages, attachments, mode, bot_token: botToken || null, finalize, project_path: projectPath || null, source_url: sourceUrl, source_type: sourceType || null, source_file: sourceFile || null, progress_id: progressId || null }),
   });
   if (!res.ok) {
@@ -892,7 +894,7 @@ export async function workspaceRequest<T>(token: string, id: string, path = "", 
 }
 
 
-export type ChatProgressStage = "thinking" | "searching" | "working" | "done" | "error";
+export type ChatProgressStage = "thinking" | "reviewing" | "searching" | "working" | "done" | "error";
 
 export async function fetchChatProgress(id: string, signal: AbortSignal): Promise<ChatProgressStage | null> {
   const res = await fetch(`${API_URL}/api/chat/progress/${encodeURIComponent(id)}`, { cache: "no-store", signal });
