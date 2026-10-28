@@ -166,10 +166,10 @@ TOOLS = [
 
 
 for _name, _description, _schema in [
-    ("get_workspace", "Read project path, configuration, versioned outputs, approvals and feedback. Never approve on the owner's behalf.", {"properties": {}}),
+    ("get_workspace", "Read project path, configuration, versioned outputs, approvals and feedback. `tasks` lists the owner's open annotations (page, element or point, request) to fix. Never approve on the owner's behalf.", {"properties": {}}),
     ("report_output", "Register a design or development version for owner review. Include complete html for element-level preview comments, plus url when available. Development requires approved design on the design path.", WorkspaceOutputIn.model_json_schema()),
     ("report_activity", "Append a short progress report to the project activity feed. Do not include secrets.", {"properties": {"text": {"type": "string", "maxLength": 5000}}, "required": ["text"]}),
-    ("update_feedback", "Update feedback progress. Only the owner can approve. Use open, in_progress or review.", {"properties": {"comment_id": {"type": "string"}, "status": {"type": "string", "enum": ["open", "in_progress", "review"]}}, "required": ["comment_id", "status"]}),
+    ("update_feedback", "Update a task's progress: in_progress when you start, review when it is fixed (include a short `note` of what you changed). Only the owner can approve.", {"properties": {"comment_id": {"type": "string"}, "status": {"type": "string", "enum": ["open", "in_progress", "review"]}, "note": {"type": "string", "maxLength": 2000}}, "required": ["comment_id", "status"]}),
     ("save_admin_credentials", "Save the deployed application's actual admin URL, username and password encrypted for the project owner. Never invent credentials or include them in reports, URLs or logs.", WorkspaceCredentialsIn.model_json_schema()),
 ]:
     TOOLS.append({"name": _name, "description": _description, "inputSchema": {
@@ -646,7 +646,14 @@ async def _tool_workspace(args: dict, action: str) -> dict:
         if action == "get":
             # Credentials are write-only to agents, and never included in brief downloads.
             canonicalize_workspace_urls(order.id, data)
-            return {**data, "configuration": order.project_brief, "runner_connected": False}
+            site = public_site_url(slug_for_order(order.id))
+            return {
+                **data,
+                "tasks": workspace.agent_tasks(data, site),
+                "task_workflow": "Each task is an owner annotation on a preview. Work through them in order: call update_feedback with status in_progress when you start, fix it, then status review with a short note of what you changed. Only the owner approves.",
+                "configuration": order.project_brief,
+                "runner_connected": False,
+            }
         if action == "output":
             workspace.add_output(data, WorkspaceOutputIn.model_validate(args).model_dump(), "agent")
         elif action == "activity":
@@ -656,7 +663,7 @@ async def _tool_workspace(args: dict, action: str) -> dict:
             workspace.event(data, text, "agent")
         elif action == "comment":
             body = WorkspaceCommentStatusIn.model_validate(args)
-            workspace.change_comment(data, args.get("comment_id"), body.status, "agent")
+            workspace.change_comment(data, args.get("comment_id"), body.status, "agent", body.note)
         elif action == "credentials":
             body = WorkspaceCredentialsIn.model_validate(args)
             order.workspace_credentials = workspace.encrypt_credentials(body.model_dump())
@@ -782,7 +789,58 @@ SITE_HEADERS = {
 }
 
 
-def serve_site(slug: str, url_path: str, indexable: bool = False) -> Response:
+# Review mode (?pg_review=1, only inside the project workspace) loads the element picker into the page.
+REVIEW_PARAM = "pg_review"
+_BODY_END = re.compile(rb"</body\s*>", re.IGNORECASE)
+
+
+def inject_review(body: bytes) -> bytes:
+    tag = f'<script src="{APP_ORIGIN}/review-bridge.js" async></script>'.encode()
+    matches = list(_BODY_END.finditer(body))
+    if not matches:
+        return body + tag
+    at = matches[-1].start()
+    return body[:at] + tag + body[at:]
+
+
+async def review_proxy(slug: str, request: Request) -> Response | None:
+    """Fetch a full-stack preview page from its origin and add the review script; None if the site is not dynamic."""
+    kind, meta = _preview_target(slug)
+    if kind != "dynamic" or not meta.get("release_id"):
+        return None
+    pattern = re.escape(meta["app"]) + r"(?:\.[a-z0-9-]+)?\.liara\.(?:run|space)"
+    origin = meta.get("upstream_host", "")
+    if not re.fullmatch(pattern, origin):
+        try:
+            origin = await _origin_url(meta["app"])
+        except (liara.LiaraError, httpx.HTTPError):
+            return Response("اتصال به پروژه ممکن نشد.", status_code=502)
+    query = "&".join(p for p in request.url.query.split("&") if p and not p.startswith(REVIEW_PARAM + "="))
+    skip = {"host", "accept-encoding", "content-length", "connection", "x-preview-upstream", "x-preview-kind"}
+    headers = {k: v for k, v in request.headers.items() if k.lower() not in skip}
+    headers.update({"Host": origin, "X-Forwarded-Host": request.headers.get("host", ""), "X-Forwarded-Proto": "https", "Accept-Encoding": "identity"})
+    try:
+        async with httpx.AsyncClient(timeout=30, follow_redirects=False) as client:
+            upstream = await client.request(request.method, f"https://{origin}{request.url.path}" + (f"?{query}" if query else ""), headers=headers, content=await request.body())
+    except httpx.HTTPError:
+        return Response("اتصال به پروژه ممکن نشد.", status_code=502)
+    body = upstream.content
+    if "text/html" in upstream.headers.get("content-type", ""):
+        body = inject_review(body)
+    response = Response(body, status_code=upstream.status_code)
+    for key, value in upstream.headers.multi_items():
+        lower = key.lower()
+        if lower in ("content-length", "content-encoding", "transfer-encoding", "connection", "server") or lower.startswith("x-liara"):
+            continue
+        if lower == "location":
+            value = re.sub(r"(?i)^https?://(?:[a-z0-9-]+\.)+liara\.(?:run|space)(?::\d+)?", "https://" + request.headers.get("host", ""), value)
+        if lower == "set-cookie":
+            value = re.sub(r"(?i);\s*domain=\.?(?:[a-z0-9-]+\.)*liara\.(?:run|space)", "", value)
+        response.headers.append(key, value)
+    return response
+
+
+def serve_site(slug: str, url_path: str, indexable: bool = False, review: bool = False) -> Response:
     """Serve a static site; preview hosts stay out of search engines, custom domains are indexable."""
     if not SLUG_RE.match(slug):
         return Response("Not found", status_code=404)
@@ -805,5 +863,8 @@ def serve_site(slug: str, url_path: str, indexable: bool = False) -> Response:
             content_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
             if content_type.startswith("text/") or content_type in ("application/javascript", "application/json"):
                 content_type += "; charset=utf-8"
-            return Response(path.read_bytes(), media_type=content_type, headers=headers)
+            body = path.read_bytes()
+            if review and content_type.startswith("text/html"):
+                body = inject_review(body)
+            return Response(body, media_type=content_type, headers=headers)
     return Response("صفحه پیدا نشد.", status_code=404, headers=headers)

@@ -97,18 +97,48 @@ def approve(data: dict, version_id: str) -> None:
     event(data, "طراحی تأیید شد" if stage == "design" else "توسعه تأیید شد")
 
 
-def change_comment(data: dict, comment_id: str, status: str, actor: str) -> None:
+def change_comment(data: dict, comment_id: str, status: str, actor: str, note: str = "") -> None:
     comment = next((c for c in data["comments"] if c["id"] == comment_id), None)
     if not comment:
         raise HTTPException(404, "بازخورد یافت نشد")
     if actor == "agent" and status == "approved":
         raise HTTPException(403, "تأیید بازخورد فقط توسط صاحب پروژه انجام می‌شود")
     comment["status"] = status
+    comment["updated_at"] = now()
+    comment["updated_by"] = actor
+    if actor == "agent" and note.strip():
+        comment["agent_note"] = note.strip()
     if status != "approved":
         data["approvals"].pop(comment["stage"], None)
         if comment["stage"] == "design":
             data["approvals"].pop("development", None)
     event(data, "وضعیت بازخورد تغییر کرد", actor)
+
+
+def agent_tasks(data: dict, site_url: str = "") -> list[dict]:
+    """Owner annotations as a to-do list for the coding agent, numbered as in the owner's table."""
+    versions = {v["id"]: v for v in data["versions"]}
+    counters: dict[str, int] = {}
+    tasks = []
+    for c in data["comments"]:
+        number = counters[c["version_id"]] = counters.get(c["version_id"], 0) + 1
+        if c["status"] == "approved":
+            continue
+        version = versions.get(c["version_id"], {})
+        tasks.append({
+            "comment_id": c["id"],
+            "number": number,
+            "version": version.get("number"),
+            "stage": c.get("stage"),
+            "preview_url": version.get("url") or ("" if version.get("html") else site_url),
+            "page": c.get("page", "/"),
+            "selector": c.get("selector", ""),
+            "html": c.get("html") or c.get("element", ""),
+            "request": c["text"],
+            "status": c["status"],
+            "agent_note": c.get("agent_note", ""),
+        })
+    return tasks
 
 
 def require_deploy_approval(data: dict) -> None:

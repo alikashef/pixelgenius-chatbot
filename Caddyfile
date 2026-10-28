@@ -50,6 +50,11 @@
 			header_up Host backend:8000
 			copy_headers X-Preview-Upstream X-Preview-Kind
 		}
+		# Workspace review mode: the backend adds the element picker to the page.
+		@review query pg_review=1
+		handle @review {
+			reverse_proxy backend:8000
+		}
 		@dynamic header X-Preview-Kind dynamic
 		handle @dynamic {
 			reverse_proxy {http.request.header.X-Preview-Upstream}:443 {

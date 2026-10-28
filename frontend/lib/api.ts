@@ -828,14 +828,17 @@ export interface WorkspaceComment {
   stage: string;
   page: string;
   selector: string;
-  /** Short label of the pinned element (tag and text). */
+  /** The pinned element's HTML tag (attributes and short text), sent to the agent with the task. */
+  html?: string;
+  /** Older notes: a short element label. */
   element?: string;
-  /** Pin position on the preview, in percent. */
-  x?: number | null;
-  y?: number | null;
   text: string;
   status: "open" | "in_progress" | "review" | "approved";
   created_at: string;
+  updated_at?: string;
+  updated_by?: "owner" | "agent";
+  /** What the agent reports it changed, sent with update_feedback over MCP. */
+  agent_note?: string;
 }
 export interface WorkspaceDeployment {
   id: string;

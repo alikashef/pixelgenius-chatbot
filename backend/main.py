@@ -50,7 +50,13 @@ async def serve_preview_sites(request: Request, call_next):
     host = request.headers.get("host", "").split(":")[0].lower()
     suffix = "." + PREVIEW_BASE_DOMAIN
     if host.endswith(suffix) and host != PREVIEW_BASE_DOMAIN:
-        return site_mcp.serve_site(host[: -len(suffix)], request.url.path)
+        slug = host[: -len(suffix)]
+        review = site_mcp.REVIEW_PARAM in request.query_params
+        if review:
+            proxied = await site_mcp.review_proxy(slug, request)
+            if proxied is not None:
+                return proxied
+        return site_mcp.serve_site(slug, request.url.path, review=review)
     if host in site_mcp.CUSTOM_DOMAINS:
         return site_mcp.serve_site(site_mcp.CUSTOM_DOMAINS[host], request.url.path, indexable=True)
     return await call_next(request)

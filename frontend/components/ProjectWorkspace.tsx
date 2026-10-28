@@ -783,6 +783,7 @@ export default function ProjectWorkspace({
                       </p>
                     )}
                     <PreviewReview
+                      projectName={order.project_name}
                       version={version}
                       url={safeUrl(version.url) || safeUrl(deployment?.url)}
                       comments={data.comments.filter((c) => c.version_id === version.id)}

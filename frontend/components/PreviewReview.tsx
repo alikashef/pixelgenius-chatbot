@@ -2,7 +2,11 @@
 
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
+  IconArrowBackUp,
   IconArrowUpRight,
+  IconCheck,
+  IconCopy,
+  IconRobot,
   IconDeviceDesktop,
   IconDeviceMobile,
   IconDeviceTablet,
@@ -16,14 +20,15 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { WorkspaceComment, WorkspaceVersion } from "@/lib/api";
 
+/** A task pinned to an element: its page, CSS selector and HTML tag go to the agent with the request. */
 export interface NewComment {
   page: string;
   selector: string;
-  element: string;
-  x: number;
-  y: number;
+  html: string;
   text: string;
 }
+
+type Draft = Omit<NewComment, "text"> & { x: number; y: number };
 
 const DEVICES = [
   { id: "desktop", label: "دسکتاپ", icon: IconDeviceDesktop, width: "100%" },
@@ -31,45 +36,39 @@ const DEVICES = [
   { id: "mobile", label: "موبایل", icon: IconDeviceMobile, width: "390px" },
 ] as const;
 
+// Agent-driven lifecycle: open (queued for the agent) → in_progress → review (owner checks) → approved.
 const STATUS: Record<WorkspaceComment["status"], { label: string; tone: string }> = {
-  open: { label: "باز", tone: "text-warning" },
-  in_progress: { label: "در حال اصلاح", tone: "text-info" },
-  review: { label: "آماده‌ی بازبینی", tone: "text-brand" },
-  approved: { label: "تأییدشده", tone: "text-success" },
+  open: { label: "در صف ایجنت", tone: "bg-warning/10 text-warning" },
+  in_progress: { label: "ایجنت در حال اصلاح", tone: "bg-info/10 text-info" },
+  review: { label: "منتظر بازبینی تو", tone: "bg-brand-soft text-brand" },
+  approved: { label: "تأییدشده", tone: "bg-success/10 text-success" },
 };
 
-// Runs inside the sandboxed HTML preview (opaque origin): hover highlight, click-to-pin and
-// numbered markers that follow their elements while the page scrolls.
-const BRIDGE = `<script>(function(){
-var on=false,pins=[],layer,hl;
-function sel(el){var parts=[];while(el&&el.tagName!=='HTML'){var s=el.tagName.toLowerCase();if(el.id){s+='#'+CSS.escape(el.id);parts.unshift(s);break;}var p=el.parentElement;if(p){var sib=Array.from(p.children).filter(function(x){return x.tagName===el.tagName});if(sib.length>1)s+=':nth-of-type('+(sib.indexOf(el)+1)+')';}parts.unshift(s);el=p;}return parts.join(' > ');}
-function label(el){var t=(el.innerText||el.getAttribute('alt')||el.getAttribute('aria-label')||'').trim().replace(/\\s+/g,' ').slice(0,60);return el.tagName.toLowerCase()+(t?' · '+t:'');}
-function box(){if(!layer){layer=document.createElement('div');layer.style.cssText='position:absolute;left:0;top:0;width:0;height:0;z-index:2147483647;pointer-events:none';document.body.appendChild(layer);hl=document.createElement('div');hl.style.cssText='position:absolute;display:none;border:2px solid #7c3aed;background:rgba(124,58,237,.08);border-radius:4px;transition:all .08s';layer.appendChild(hl);}return layer;}
-function place(node,r){node.style.left=(r.left+scrollX)+'px';node.style.top=(r.top+scrollY)+'px';node.style.width=r.width+'px';node.style.height=r.height+'px';}
-function draw(){var l=box();Array.from(l.querySelectorAll('[data-pin]')).forEach(function(n){n.remove()});pins.forEach(function(p){var el;try{el=document.querySelector(p.selector)}catch(e){}if(!el)return;var r=el.getBoundingClientRect();var b=document.createElement('div');b.setAttribute('data-pin','');b.textContent=p.n;b.style.cssText='position:absolute;width:22px;height:22px;border-radius:11px;color:#fff;font:700 11px/22px system-ui;text-align:center;box-shadow:0 0 0 2px #fff,0 2px 6px rgba(0,0,0,.25);background:'+(p.active?'#f59e0b':'#7c3aed');b.style.left=(r.left+scrollX-11)+'px';b.style.top=(r.top+scrollY-11)+'px';l.appendChild(b);if(p.active){var o=document.createElement('div');o.setAttribute('data-pin','');o.style.cssText='position:absolute;border:2px solid #f59e0b;border-radius:4px';place(o,r);l.appendChild(o);}});}
-document.addEventListener('mousemove',function(e){if(!on)return;var el=e.target;if(!(el instanceof Element)||layer&&layer.contains(el))return;box();hl.style.display='block';place(hl,el.getBoundingClientRect());},true);
-document.addEventListener('click',function(e){if(!on)return;e.preventDefault();e.stopPropagation();var el=e.target;if(!(el instanceof Element))return;parent.postMessage({type:'workspace-element',selector:sel(el),element:label(el),x:e.clientX/innerWidth*100,y:e.clientY/innerHeight*100},'*');},true);
-addEventListener('message',function(e){var d=e.data||{};if(d.type!=='workspace-annotate')return;on=!!d.on;pins=d.pins||[];document.documentElement.style.cursor=on?'crosshair':'';box();if(!on)hl.style.display='none';draw();});
-addEventListener('scroll',draw,true);addEventListener('resize',draw);
-parent.postMessage({type:'workspace-ready'},'*');
-})();</script>`;
-
-function htmlDocument(version: WorkspaceVersion) {
-  const policy = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' https:; style-src 'unsafe-inline' https:; img-src https: data: http:; font-src https: data:; connect-src 'none'; form-action 'none'; base-uri 'none'">`;
-  return `<!doctype html><html><head>${policy}</head><body>${version.html}${BRIDGE}</body></html>`;
+// The same review bridge (public/review-bridge.js) runs in HTML versions and, via ?pg_review=1, on live previews.
+function htmlDocument(version: WorkspaceVersion, origin: string) {
+  const policy = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' https: ${origin}; style-src 'unsafe-inline' https:; img-src https: data: http:; font-src https: data:; connect-src 'none'; form-action 'none'; base-uri 'none'">`;
+  return `<!doctype html><html><head>${policy}</head><body>${version.html}<script src="${origin}/review-bridge.js"></script></body></html>`;
 }
 
-function pathOf(url: string) {
+function reviewUrl(url: string) {
   try {
     const u = new URL(url);
-    return u.pathname || "/";
+    u.searchParams.set("pg_review", "1");
+    return u.toString();
   } catch {
-    return "/";
+    return url;
   }
 }
 
-/** Review a version like a design tool: the app loads by itself, annotate mode pins notes on it, notes list in a table. */
+/** Review a version like a design tool: the app loads by itself, annotate mode pins tasks on elements, tasks list in a table. */
+/** What the owner pastes into the same AI chat that built the project; the agent then reads the tasks over MCP. */
+function agentPrompt(projectName: string, versionNumber: number) {
+  return `تغییراتی که برای پروژه‌ی «${projectName}» (نسخه ${versionNumber}) توی PixelGenius ثبت کردم رو بخون و درستش کن.
+با get_workspace از سرور PixelGenius لیست tasks رو بگیر و یکی‌یکی اصلاح کن: اول update_feedback با in_progress، بعد از اصلاح update_feedback با review و یک note کوتاه از کاری که کردی. آخر کار نسخه‌ی جدید رو با report_output ثبت کن.`;
+}
+
 export default function PreviewReview({
+  projectName,
   version,
   url,
   comments,
@@ -84,34 +83,58 @@ export default function PreviewReview({
   busy: boolean;
   onAdd: (comment: NewComment) => Promise<boolean>;
   onStatus: (id: string, status: WorkspaceComment["status"]) => void;
+  projectName: string;
 }) {
   const frame = useRef<HTMLIFrameElement>(null);
   const [device, setDevice] = useState<(typeof DEVICES)[number]["id"]>("desktop");
   const [annotating, setAnnotating] = useState(false);
-  const [draft, setDraft] = useState<Omit<NewComment, "text"> | null>(null);
+  const [draft, setDraft] = useState<Draft | null>(null);
+  const [bridge, setBridge] = useState<"loading" | "ready" | "missing">("loading");
+  const [origin, setOrigin] = useState("");
   const [text, setText] = useState("");
   const [activeId, setActiveId] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
+  const [copied, setCopied] = useState(false);
+
+  async function copyPrompt() {
+    try {
+      await navigator.clipboard.writeText(agentPrompt(projectName, version.number));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard blocked: nothing to undo.
+    }
+  }
   const htmlMode = Boolean(version.html);
-  const page = htmlMode ? "/" : pathOf(url || "");
   const width = DEVICES.find((d) => d.id === device)!.width;
 
   const numbered = useMemo(() => comments.map((c, i) => ({ ...c, n: i + 1 })), [comments]);
 
-  // Keep the in-frame bridge in sync with annotate mode and the pins.
+  useEffect(() => setOrigin(window.location.origin), []);
+
+  // Element picking needs the bridge inside the preview; without it (a site that blocks scripts) annotate stays off.
   useEffect(() => {
-    if (!htmlMode) return;
-    const pins = numbered.filter((c) => c.selector).map((c) => ({ n: c.n, selector: c.selector, active: c.id === activeId }));
+    setBridge("loading");
+    const timer = setTimeout(() => setBridge((b) => (b === "ready" ? b : "missing")), 6000);
+    return () => clearTimeout(timer);
+  }, [version.id, reloadKey, url]);
+
+  // Keep the bridge in sync with annotate mode and the pins.
+  useEffect(() => {
+    const pins = numbered.filter((c) => c.selector).map((c) => ({ n: c.n, selector: c.selector, page: htmlMode ? "" : c.page, active: c.id === activeId }));
     const send = () => frame.current?.contentWindow?.postMessage({ type: "workspace-annotate", on: annotating && !draft, pins }, "*");
     send();
     const receive = (event: MessageEvent) => {
       if (event.source !== frame.current?.contentWindow) return;
-      if (event.data?.type === "workspace-ready") send();
+      if (event.data?.type === "workspace-ready") {
+        setBridge("ready");
+        send();
+      }
       if (event.data?.type === "workspace-element" && annotating && typeof event.data.selector === "string") {
         setDraft({
-          page: "/",
+          page: htmlMode ? "/" : String(event.data.page || "/").slice(0, 2000),
           selector: event.data.selector.slice(0, 1000),
-          element: String(event.data.element || "").slice(0, 200),
+          html: String(event.data.html || "").slice(0, 2000),
           x: Math.min(100, Math.max(0, Number(event.data.x) || 0)),
           y: Math.min(100, Math.max(0, Number(event.data.y) || 0)),
         });
@@ -127,21 +150,11 @@ export default function PreviewReview({
     setActiveId("");
   }, [version.id]);
 
-  function pinFromOverlay(e: React.MouseEvent<HTMLDivElement>) {
-    const r = e.currentTarget.getBoundingClientRect();
-    setDraft({
-      page,
-      selector: "",
-      element: "",
-      x: Math.round(((e.clientX - r.left) / r.width) * 1000) / 10,
-      y: Math.round(((e.clientY - r.top) / r.height) * 1000) / 10,
-    });
-  }
-
   async function submit(e?: FormEvent) {
     e?.preventDefault();
     if (!draft || !text.trim()) return;
-    if (await onAdd({ ...draft, text: text.trim() })) {
+    const { page, selector, html } = draft;
+    if (await onAdd({ page, selector, html, text: text.trim() })) {
       setDraft(null);
       setText("");
     }
@@ -152,8 +165,7 @@ export default function PreviewReview({
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void submit();
   }
 
-  const canPreview = htmlMode || Boolean(url);
-  const viewportPins = htmlMode ? [] : numbered.filter((c) => c.x != null && c.y != null);
+  const canPreview = (htmlMode && Boolean(origin)) || Boolean(url);
 
   return (
     <div className="space-y-5">
@@ -209,7 +221,8 @@ export default function PreviewReview({
             type="button"
             size="sm"
             variant={annotating ? "default" : "outline"}
-            disabled={!canPreview}
+            disabled={!canPreview || bridge !== "ready"}
+            title={bridge === "missing" ? "انتخاب المان روی این پیش‌نمایش در دسترس نیست" : undefined}
             onClick={() => {
               setAnnotating((v) => !v);
               setDraft(null);
@@ -224,7 +237,12 @@ export default function PreviewReview({
         {annotating && (
           <p className="flex items-center gap-2 border-b border-border bg-brand-soft px-4 py-2 text-xs text-brand">
             <IconPointer size={15} aria-hidden="true" />
-            {htmlMode ? "روی هر المانی که می‌خوای تغییر کنه کلیک کن." : "روی هر جای صفحه که می‌خوای تغییر کنه کلیک کن. برای اسکرول، یادداشت‌گذاری رو موقتاً خاموش کن."}
+            روی هر المانی که می‌خوای تغییر کنه کلیک کن؛ تگ HTML همون المان با تسک برای ایجنت فرستاده می‌شه.
+          </p>
+        )}
+        {bridge === "missing" && canPreview && (
+          <p className="border-b border-border bg-warning/10 px-4 py-2 text-xs text-warning">
+            این پیش‌نمایش اجازه‌ی انتخاب المان نمی‌ده؛ صفحه رو دوباره بارگذاری کن یا بعد از انتشار نسخه‌ی جدید امتحان کن.
           </p>
         )}
 
@@ -236,29 +254,11 @@ export default function PreviewReview({
                 ref={frame}
                 title={`پیش‌نمایش نسخه ${version.number}`}
                 {...(htmlMode
-                  ? { srcDoc: htmlDocument(version), sandbox: "allow-scripts" }
-                  : { src: url, sandbox: "allow-scripts allow-forms allow-same-origin allow-popups" })}
+                  ? { srcDoc: htmlDocument(version, origin), sandbox: "allow-scripts" }
+                  : { src: reviewUrl(url!), sandbox: "allow-scripts allow-forms allow-same-origin allow-popups" })}
                 referrerPolicy="no-referrer"
                 className="block h-[680px] w-full rounded-xl border border-border bg-background shadow-card"
               />
-              {!htmlMode && annotating && !draft && (
-                <div role="button" tabIndex={-1} aria-label="ثبت یادداشت روی این نقطه" onClick={pinFromOverlay} className="absolute inset-0 cursor-crosshair rounded-xl" />
-              )}
-              {viewportPins.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => setActiveId(c.id === activeId ? "" : c.id)}
-                  aria-label={`یادداشت ${c.n}`}
-                  style={{ left: `${c.x}%`, top: `${c.y}%` }}
-                  className={cn(
-                    "absolute z-10 grid h-6 w-6 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full text-[11px] font-bold shadow-elevated ring-2 ring-background transition-colors",
-                    c.id === activeId ? "bg-accent-solid text-accent-foreground" : "bg-brand-solid text-brand-foreground"
-                  )}
-                >
-                  {c.n.toLocaleString("fa-IR")}
-                </button>
-              ))}
               {draft && (
                 <form
                   onSubmit={submit}
@@ -273,12 +273,16 @@ export default function PreviewReview({
                   <div className="mb-2 flex items-center justify-between gap-2">
                     <p className="min-w-0 truncate text-xs font-bold text-foreground">
                       یادداشت {(numbered.length + 1).toLocaleString("fa-IR")}
-                      {draft.element && <span dir="ltr" className="mr-1.5 font-mono font-normal text-muted-foreground">{draft.element}</span>}
                     </p>
                     <button type="button" onClick={() => setDraft(null)} aria-label="لغو" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-foreground/5 hover:text-foreground">
                       <IconX size={15} aria-hidden="true" />
                     </button>
                   </div>
+                  {draft.html && (
+                    <code dir="ltr" className="mb-2 block truncate rounded-md bg-surface-2 px-2 py-1 font-mono text-[11px] text-secondary-foreground" title={draft.html}>
+                      {draft.html}
+                    </code>
+                  )}
                   <textarea
                     autoFocus
                     rows={3}
@@ -296,15 +300,6 @@ export default function PreviewReview({
                   </div>
                 </form>
               )}
-              {draft && !htmlMode && (
-                <span
-                  aria-hidden="true"
-                  style={{ left: `${draft.x}%`, top: `${draft.y}%` }}
-                  className="absolute z-10 grid h-6 w-6 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-accent-solid text-[11px] font-bold text-accent-foreground shadow-elevated ring-2 ring-background"
-                >
-                  {(numbered.length + 1).toLocaleString("fa-IR")}
-                </span>
-              )}
             </div>
           ) : (
             <div className="grid h-[420px] place-items-center text-center">
@@ -320,15 +315,35 @@ export default function PreviewReview({
 
       <section aria-labelledby="notes-title" className="overflow-hidden rounded-2xl border border-border bg-surface shadow-card">
         <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-3.5">
-          <h3 id="notes-title" className="text-sm font-bold text-foreground">
-            یادداشت‌های نسخه {version.number.toLocaleString("fa-IR")}
-            <span className="mr-2 rounded-full bg-foreground/[0.06] px-2 text-[11px] font-bold leading-5 text-muted-foreground">
-              {numbered.length.toLocaleString("fa-IR")}
-            </span>
-          </h3>
-          <span className="text-xs text-muted-foreground">
-            {numbered.filter((c) => c.status !== "approved").length.toLocaleString("fa-IR")} مورد باز
-          </span>
+          <div>
+            <h3 id="notes-title" className="text-sm font-bold text-foreground">
+              تسک‌های نسخه {version.number.toLocaleString("fa-IR")}
+              <span className="mr-2 rounded-full bg-foreground/[0.06] px-2 text-[11px] font-bold leading-5 text-muted-foreground">
+                {numbered.length.toLocaleString("fa-IR")}
+              </span>
+            </h3>
+            <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+              <IconRobot size={14} aria-hidden="true" />
+              یادداشت‌ها رو ثبت کن، بعد پیام رو توی همون چتی که پروژه رو ساخته بفرست؛ Claude با MCP تسک‌ها رو می‌خونه و وضعیت‌ها این‌جا به‌روز می‌شن.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold">
+            {(["open", "in_progress", "review"] as const).map((key) => {
+              const count = numbered.filter((c) => c.status === key).length;
+              return count ? (
+                <span key={key} className={cn("rounded-full px-2 leading-6", STATUS[key].tone)}>
+                  {STATUS[key].label}
+                  <span className="mr-1.5">{count.toLocaleString("fa-IR")}</span>
+                </span>
+              ) : null;
+            })}
+            {numbered.some((c) => c.status === "open") && (
+              <Button type="button" size="sm" variant="outline" onClick={copyPrompt} className="mr-1">
+                {copied ? <IconCheck size={15} className="text-success" aria-hidden="true" /> : <IconCopy size={15} aria-hidden="true" />}
+                {copied ? "کپی شد؛ توی چت Claude بفرست" : "کپی پیام برای Claude"}
+              </Button>
+            )}
+          </div>
         </div>
         {numbered.length === 0 ? (
           <p className="px-5 py-10 text-center text-sm text-muted-foreground">
@@ -340,10 +355,10 @@ export default function PreviewReview({
               <thead>
                 <tr className="border-b border-border bg-surface-2/70 text-right text-xs text-muted-foreground">
                   <th scope="col" className="w-12 px-4 py-2.5 font-bold">#</th>
-                  <th scope="col" className="px-4 py-2.5 font-bold">یادداشت</th>
-                  <th scope="col" className="px-4 py-2.5 font-bold">موقعیت</th>
-                  <th scope="col" className="w-40 px-4 py-2.5 font-bold">وضعیت</th>
-                  <th scope="col" className="w-32 px-4 py-2.5 font-bold">زمان</th>
+                  <th scope="col" className="px-4 py-2.5 font-bold">تسک</th>
+                  <th scope="col" className="px-4 py-2.5 font-bold">المان</th>
+                  <th scope="col" className="w-44 px-4 py-2.5 font-bold">وضعیت</th>
+                  <th scope="col" className="w-28 px-4 py-2.5 font-bold">به‌روزرسانی</th>
                 </tr>
               </thead>
               <tbody>
@@ -358,29 +373,47 @@ export default function PreviewReview({
                         {c.n.toLocaleString("fa-IR")}
                       </span>
                     </td>
-                    <td className="max-w-[340px] whitespace-pre-wrap break-words px-4 py-3 leading-7 text-foreground">{c.text}</td>
+                    <td className="max-w-[360px] px-4 py-3">
+                      <p className="whitespace-pre-wrap break-words leading-7 text-foreground">{c.text}</p>
+                      {c.agent_note && (
+                        <p className="mt-1.5 flex items-start gap-1.5 rounded-md bg-surface-2 px-2 py-1.5 text-xs leading-6 text-secondary-foreground">
+                          <IconRobot size={14} className="mt-1 shrink-0 text-brand" aria-hidden="true" />
+                          <span className="break-words">{c.agent_note}</span>
+                        </p>
+                      )}
+                    </td>
                     <td className="px-4 py-3">
-                      <span dir="ltr" className="block max-w-[220px] truncate font-mono text-[11px] text-muted-foreground" title={c.selector || undefined}>
-                        {c.page}
-                        {c.element ? ` · ${c.element}` : c.selector ? ` · ${c.selector}` : c.x != null ? ` · ${Math.round(c.x)}%, ${Math.round(c.y ?? 0)}%` : ""}
-                      </span>
+                      <code dir="ltr" className="block max-w-[260px] truncate rounded-md bg-surface-2 px-2 py-1 font-mono text-[11px] text-secondary-foreground" title={c.html || c.selector}>
+                        {c.html || c.element || c.selector || "—"}
+                      </code>
+                      {c.page && c.page !== "/" && <span dir="ltr" className="mt-1 block font-mono text-[11px] text-muted-foreground">{c.page}</span>}
                     </td>
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                      <label className="sr-only" htmlFor={`status-${c.id}`}>وضعیت یادداشت {c.n}</label>
-                      <select
-                        id={`status-${c.id}`}
-                        value={c.status}
-                        disabled={busy}
-                        onChange={(e) => onStatus(c.id, e.target.value as WorkspaceComment["status"])}
-                        className={cn("h-8 w-full rounded-md border border-input bg-surface px-2 text-xs font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring", STATUS[c.status].tone)}
-                      >
-                        {Object.entries(STATUS).map(([key, s]) => (
-                          <option key={key} value={key}>{s.label}</option>
-                        ))}
-                      </select>
+                      <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 text-[11px] font-bold leading-6", STATUS[c.status].tone)}>
+                        <span className={cn("h-1.5 w-1.5 rounded-full bg-current", c.status === "in_progress" && "motion-safe:animate-pulse")} aria-hidden="true" />
+                        {STATUS[c.status].label}
+                      </span>
+                      {c.status === "review" && (
+                        <div className="mt-2 flex gap-1">
+                          <Button type="button" size="sm" className="h-7 px-2 text-xs" disabled={busy} onClick={() => onStatus(c.id, "approved")}>
+                            <IconCheck size={14} aria-hidden="true" />
+                            تأیید
+                          </Button>
+                          <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-xs" disabled={busy} onClick={() => onStatus(c.id, "open")}>
+                            <IconArrowBackUp size={14} aria-hidden="true" />
+                            برگشت
+                          </Button>
+                        </div>
+                      )}
+                      {c.status === "approved" && (
+                        <button type="button" disabled={busy} onClick={() => onStatus(c.id, "open")} className="mt-1.5 block rounded text-[11px] font-bold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+                          بازگشایی
+                        </button>
+                      )}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
-                      {new Date(c.created_at).toLocaleString("fa-IR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                      {new Date(c.updated_at || c.created_at).toLocaleString("fa-IR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                      {c.updated_by === "agent" && <span className="mt-0.5 block text-[11px] text-brand">توسط ایجنت</span>}
                     </td>
                   </tr>
                 ))}
