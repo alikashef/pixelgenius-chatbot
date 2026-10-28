@@ -8,6 +8,7 @@ import {
   IconArrowUpRight,
   IconCheck,
   IconClockHour4,
+  IconListDetails,
   IconCopy,
   IconDeviceDesktop,
   IconDeviceMobile,
@@ -102,6 +103,27 @@ export default function PreviewReview({
   onStatus: (id: string, status: WorkspaceComment["status"]) => void;
 }) {
   const frame = useRef<HTMLIFrameElement>(null);
+  const tasksDialog = useRef<HTMLDialogElement>(null);
+  const [tasksOpen, setTasksOpen] = useState(false);
+  const [wideScreen, setWideScreen] = useState(false);
+
+  useEffect(() => {
+    const query = window.matchMedia("(min-width: 1441px)");
+    const update = () => { setWideScreen(query.matches); setTasksOpen(false); };
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+
+  useEffect(() => {
+    const dialog = tasksDialog.current;
+    if (tasksOpen && !wideScreen) dialog?.showModal();
+    else dialog?.close();
+    if (!tasksOpen || wideScreen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = previous; };
+  }, [tasksOpen, wideScreen]);
   const [device, setDevice] = useState<(typeof DEVICES)[number]["id"]>("desktop");
   const [annotating, setAnnotating] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -208,9 +230,62 @@ export default function PreviewReview({
   const iconButton =
     "grid h-9 w-9 shrink-0 place-items-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-foreground/5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring";
 
+  const tasksPanel = (
+    <section aria-labelledby="notes-title">
+      <div className="space-y-3 border-b border-border px-4 py-4">
+        <h3 id="notes-title" className="flex items-center gap-2 text-sm font-bold text-foreground">
+          <IconListDetails size={17} aria-hidden="true" />
+          تسک‌ها{version ? ` · نسخه ${version.number.toLocaleString("fa-IR")}` : ""}
+          <span className="mr-auto rounded-full bg-surface-2 px-2 text-xs leading-6 text-muted-foreground">{numbered.length.toLocaleString("fa-IR")}</span>
+        </h3>
+        <p className="text-xs leading-6 text-muted-foreground">تسک‌ها را ثبت کن و پیام را در چتی که پروژه را ساخته بفرست؛ ایجنت با MCP آن‌ها را می‌خواند و وضعیت را به‌روز می‌کند.</p>
+        {openCount > 0 && (
+          <Button type="button" size="sm" className="h-auto min-h-9 w-full whitespace-normal" disabled={!version} onClick={copyPrompt}>
+            {copied ? <IconCheck size={15} aria-hidden="true" /> : <IconCopy size={15} aria-hidden="true" />}
+            {copied ? "کپی شد؛ در چت ایجنت بفرست" : `کپی پیام برای ایجنت (${openCount.toLocaleString("fa-IR")} تسک)`}
+          </Button>
+        )}
+      </div>
+      {numbered.length === 0 ? (
+        <div className="px-5 py-10 text-center">
+          <IconMessageCirclePlus size={26} stroke={1.5} className="mx-auto mb-2 text-muted-foreground" aria-hidden="true" />
+          <p className="text-sm leading-7 text-muted-foreground">هنوز تسکی نیست. «یادداشت‌گذاری» را بزن و روی المان سایت کلیک کن.</p>
+        </div>
+      ) : (
+        <ol className="divide-y divide-border">
+          {numbered.map((c) => (
+            <li key={c.id} className={cn("space-y-3 p-4 transition-colors duration-150", c.id === activeId && "bg-brand-soft")}>
+              <button type="button" aria-pressed={c.id === activeId} onClick={() => { setActiveId(c.id === activeId ? "" : c.id); setTasksOpen(false); }} className="flex w-full items-start gap-2 rounded-lg text-right outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-brand-soft text-[11px] font-bold text-brand">{c.n.toLocaleString("fa-IR")}</span>
+                <span className="min-w-0 whitespace-pre-wrap break-words text-sm leading-7 text-foreground">{c.text}</span>
+              </button>
+              {(c.html || c.element || c.selector) && <code dir="ltr" className="block truncate rounded-lg bg-surface-2 px-2 py-1.5 text-left font-mono text-[11px] text-secondary-foreground" title={c.html || c.selector}>{c.html || c.element || c.selector}</code>}
+              {c.page && c.page !== "/" && <span dir="ltr" className="block truncate font-mono text-[11px] text-muted-foreground">{c.page}</span>}
+              {c.agent_note && <p className="flex items-start gap-1.5 rounded-lg bg-surface-2 px-2 py-1.5 text-xs leading-6 text-secondary-foreground"><IconRobot size={14} className="mt-1 shrink-0 text-brand" aria-hidden="true" /><span className="min-w-0 break-words">{c.agent_note}</span></p>}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2 text-[11px] font-bold leading-6", STATUS[c.status].tone)}>
+                  <span className={cn("h-1.5 w-1.5 rounded-full bg-current", c.status === "in_progress" && "motion-safe:animate-pulse")} aria-hidden="true" />{STATUS[c.status].label}
+                </span>
+                {c.status === "review" ? (
+                  <>
+                    <Button type="button" size="sm" className="h-8 px-2 text-xs" disabled={busy} onClick={() => onStatus(c.id, "approved")}><IconCheck size={14} aria-hidden="true" />تأیید</Button>
+                    <Button type="button" size="sm" variant="outline" className="h-8 px-2 text-xs" disabled={busy} onClick={() => onStatus(c.id, "open")}><IconArrowBackUp size={14} aria-hidden="true" />برگشت</Button>
+                  </>
+                ) : (
+                  <button type="button" disabled={busy} onClick={() => onStatus(c.id, c.status === "approved" ? "open" : "approved")} className="min-h-8 rounded-lg px-2 text-xs font-bold text-secondary-foreground outline-none hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40">{c.status === "approved" ? "بازگشایی" : "تأیید دستی"}</button>
+                )}
+              </div>
+              <p className="text-[11px] text-muted-foreground">{new Date(c.updated_at || c.created_at).toLocaleString("fa-IR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}{c.updated_by === "agent" && <span className="mr-2 text-brand">توسط ایجنت</span>}</p>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
+  );
+
   return (
-    <div className="space-y-5">
-      <section aria-label="پیش‌نمایش سایت" className="overflow-hidden rounded-2xl border border-border bg-surface shadow-card">
+    <div className="min-w-0 pb-20 min-[1441px]:grid min-[1441px]:grid-cols-[minmax(0,1fr)_360px] min-[1441px]:items-start min-[1441px]:gap-5 min-[1441px]:pb-0">
+      <section aria-label="پیش‌نمایش سایت" className="min-w-0 overflow-hidden rounded-2xl border border-border bg-surface shadow-card">
         {header && <div className="border-b border-border px-4 py-3 sm:px-5">{header}</div>}
 
         <div className="flex flex-wrap items-center gap-2 border-b border-border bg-surface-2/60 px-3 py-2">
@@ -413,109 +488,41 @@ export default function PreviewReview({
         </div>
       </section>
 
-      <section aria-labelledby="notes-title" className="overflow-hidden rounded-2xl border border-border bg-surface shadow-card">
-        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-5 py-3.5">
-          <div className="min-w-0 flex-1">
-            <h3 id="notes-title" className="flex items-center gap-2 text-sm font-bold text-foreground">
-              تسک‌ها{version ? ` · نسخه ${version.number.toLocaleString("fa-IR")}` : ""}
-              <span className="rounded-full bg-foreground/[0.06] px-2 text-[11px] leading-5 text-muted-foreground">{numbered.length.toLocaleString("fa-IR")}</span>
-            </h3>
-            <p className="mt-1 flex items-start gap-1.5 text-xs leading-6 text-muted-foreground">
-              <IconRobot size={14} className="mt-1 shrink-0" aria-hidden="true" />
-              تسک‌ها رو ثبت کن، بعد پیام رو توی همون چتی که پروژه رو ساخته بفرست؛ Claude با MCP تسک‌ها رو می‌خونه و وضعیت‌ها این‌جا به‌روز می‌شن.
-            </p>
-          </div>
-          {openCount > 0 && (
-            <Button type="button" size="sm" onClick={copyPrompt}>
-              {copied ? <IconCheck size={15} aria-hidden="true" /> : <IconCopy size={15} aria-hidden="true" />}
-              {copied ? "کپی شد؛ توی چت Claude بفرست" : `کپی پیام برای Claude (${openCount.toLocaleString("fa-IR")} تسک)`}
+      {wideScreen ? (
+        <aside aria-label="تسک‌های بازبینی" className="sticky top-20 min-w-0 max-h-[calc(100dvh-7rem)] overflow-y-auto overscroll-contain rounded-2xl border border-border bg-surface shadow-card">
+          {tasksPanel}
+        </aside>
+      ) : (
+        <>
+          <div className="fixed inset-x-4 bottom-[calc(env(safe-area-inset-bottom)+1rem)] z-30 flex justify-center">
+            <Button type="button" onClick={() => setTasksOpen(true)} aria-haspopup="dialog" aria-expanded={tasksOpen} aria-controls="review-tasks-sheet" className="h-12 gap-2 rounded-full px-5 shadow-elevated">
+              <IconListDetails size={18} aria-hidden="true" />
+              تسک‌ها
+              <span className="rounded-full bg-primary-foreground/15 px-2 text-xs">{numbered.length.toLocaleString("fa-IR")}</span>
             </Button>
-          )}
-        </div>
-        {numbered.length === 0 ? (
-          <div className="px-5 py-10 text-center">
-            <IconMessageCirclePlus size={26} stroke={1.5} className="mx-auto mb-2 text-muted-foreground" aria-hidden="true" />
-            <p className="text-sm text-muted-foreground">هنوز تسکی نیست. «یادداشت‌گذاری» رو بزن و روی هر المان سایت کلیک کن.</p>
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[680px] text-sm">
-              <thead>
-                <tr className="border-b border-border bg-surface-2/70 text-right text-xs text-muted-foreground">
-                  <th scope="col" className="w-12 px-4 py-2.5 font-bold">#</th>
-                  <th scope="col" className="px-4 py-2.5 font-bold">تسک</th>
-                  <th scope="col" className="px-4 py-2.5 font-bold">المان</th>
-                  <th scope="col" className="w-44 px-4 py-2.5 font-bold">وضعیت</th>
-                  <th scope="col" className="w-28 px-4 py-2.5 font-bold">به‌روزرسانی</th>
-                </tr>
-              </thead>
-              <tbody>
-                {numbered.map((c) => (
-                  <tr
-                    key={c.id}
-                    onClick={() => setActiveId(c.id === activeId ? "" : c.id)}
-                    aria-selected={c.id === activeId}
-                    className={cn("cursor-pointer border-b border-border align-top transition-colors last:border-0 hover:bg-foreground/[0.03]", c.id === activeId && "bg-accent-soft/60")}
-                  >
-                    <td className="px-4 py-3">
-                      <span className={cn("grid h-6 w-6 place-items-center rounded-full text-[11px] font-bold", c.id === activeId ? "bg-accent-solid text-accent-foreground" : "bg-brand-soft text-brand")}>
-                        {c.n.toLocaleString("fa-IR")}
-                      </span>
-                    </td>
-                    <td className="max-w-[360px] px-4 py-3">
-                      <p className="whitespace-pre-wrap break-words leading-7 text-foreground">{c.text}</p>
-                      {c.agent_note && (
-                        <p className="mt-1.5 flex items-start gap-1.5 rounded-md bg-surface-2 px-2 py-1.5 text-xs leading-6 text-secondary-foreground">
-                          <IconRobot size={14} className="mt-1 shrink-0 text-brand" aria-hidden="true" />
-                          <span className="break-words">{c.agent_note}</span>
-                        </p>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <code dir="ltr" className="block max-w-[260px] truncate rounded-md bg-surface-2 px-2 py-1 text-left font-mono text-[11px] text-secondary-foreground" title={c.html || c.selector}>
-                        {c.html || c.element || c.selector || "—"}
-                      </code>
-                      {c.page && c.page !== "/" && <span dir="ltr" className="mt-1 block font-mono text-[11px] text-muted-foreground">{c.page}</span>}
-                    </td>
-                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                      <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 text-[11px] font-bold leading-6", STATUS[c.status].tone)}>
-                        <span className={cn("h-1.5 w-1.5 rounded-full bg-current", c.status === "in_progress" && "motion-safe:animate-pulse")} aria-hidden="true" />
-                        {STATUS[c.status].label}
-                      </span>
-                      {c.status === "review" && (
-                        <div className="mt-2 flex gap-1">
-                          <Button type="button" size="sm" className="h-7 px-2 text-xs" disabled={busy} onClick={() => onStatus(c.id, "approved")}>
-                            <IconCheck size={14} aria-hidden="true" />
-                            تأیید
-                          </Button>
-                          <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-xs" disabled={busy} onClick={() => onStatus(c.id, "open")}>
-                            <IconArrowBackUp size={14} aria-hidden="true" />
-                            برگشت
-                          </Button>
-                        </div>
-                      )}
-                      {(c.status === "open" || c.status === "in_progress") && (
-                        <button type="button" disabled={busy} onClick={() => onStatus(c.id, "approved")} title="اگر ایجنت اصلاح را تمام نکرده یا نیازی به اصلاح نیست، خودت تأییدش کن" className="mt-1.5 block rounded text-[11px] font-bold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
-                          تأیید دستی
-                        </button>
-                      )}
-                      {c.status === "approved" && (
-                        <button type="button" disabled={busy} onClick={() => onStatus(c.id, "open")} className="mt-1.5 block rounded text-[11px] font-bold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
-                          بازگشایی
-                        </button>
-                      )}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
-                      {new Date(c.updated_at || c.created_at).toLocaleString("fa-IR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                      {c.updated_by === "agent" && <span className="mt-0.5 block text-[11px] text-brand">توسط ایجنت</span>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+          <dialog
+            id="review-tasks-sheet"
+            ref={tasksDialog}
+            aria-labelledby="notes-title"
+            onCancel={() => setTasksOpen(false)}
+            onClose={() => setTasksOpen(false)}
+            onClick={(event) => { if (event.target === event.currentTarget) setTasksOpen(false); }}
+            className="fixed inset-x-0 bottom-0 top-auto m-0 max-h-[85dvh] w-full max-w-none overflow-hidden rounded-t-2xl border border-border bg-surface p-0 text-foreground shadow-elevated backdrop:bg-foreground/40 open:animate-in open:slide-in-from-bottom-8 open:fade-in duration-200 motion-reduce:animate-none"
+          >
+            <div className="flex max-h-[85dvh] flex-col pb-[env(safe-area-inset-bottom)]" onClick={(event) => event.stopPropagation()}>
+              <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-2">
+                <span className="w-9" aria-hidden="true" />
+                <span className="h-1 w-10 rounded-full bg-muted-foreground/30" aria-hidden="true" />
+                <button type="button" autoFocus onClick={() => setTasksOpen(false)} aria-label="بستن تسک‌ها" className={iconButton}>
+                  <IconX size={18} aria-hidden="true" />
+                </button>
+              </div>
+              <div className="min-h-0 overflow-y-auto overscroll-contain">{tasksPanel}</div>
+            </div>
+          </dialog>
+        </>
+      )}
     </div>
   );
 }

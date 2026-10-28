@@ -366,7 +366,7 @@ export default function ProjectWorkspace({
           <ThemeToggle className="max-sm:mr-auto" />
         </div>
       </header>
-      <main className="mx-auto max-w-7xl px-4 py-7 sm:px-6 sm:py-10">
+      <main className={cn("mx-auto px-4 py-7 sm:px-6 sm:py-10", tab === "preview" ? "max-w-[1920px]" : "max-w-7xl")}>
         <div className="mb-7 flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="mb-2 text-xs font-semibold text-brand">

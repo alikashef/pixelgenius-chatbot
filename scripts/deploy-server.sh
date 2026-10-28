@@ -41,7 +41,8 @@ sync_code() {
     --exclude='docker-compose.override.yml' --exclude='node_modules' --exclude='.next' "$1/" "$APP/"
 }
 proxy_reload() {
-  compose exec -T preview-gateway caddy reload --config /etc/caddy/Caddyfile
+  # rsync can replace the Caddyfile inode; recreate to refresh its file bind mount.
+  compose up -d --no-build --no-deps --force-recreate preview-gateway
   docker exec nginx-proxy-manager nginx -t
   docker exec nginx-proxy-manager nginx -s reload
 }
