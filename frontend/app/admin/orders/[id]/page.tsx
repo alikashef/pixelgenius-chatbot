@@ -141,17 +141,22 @@ export default function AdminOrderPage() {
   }
 
   const payAmount = finalPrice && payPercent ? Math.round(parseInt(finalPrice) * parseInt(payPercent) / 100) : null;
+  const isDesigner = order.mode === "designer";
 
   return (
     <div className="min-h-screen bg-background">
       <header className="glass sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-border/70 px-4 sm:px-6">
-        <button onClick={() => router.push("/admin/dashboard")} className="flex min-h-9 items-center gap-1 rounded-lg px-2 text-sm text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+        <button onClick={() => router.push(isDesigner ? "/admin/dashboard?tab=design" : "/admin/dashboard")} className="flex min-h-9 items-center gap-1 rounded-lg px-2 text-sm text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
           <IconChevronRight size={16} stroke={2.5} aria-hidden="true" />
           برگشت
         </button>
         <span className="h-4 w-px bg-border" aria-hidden="true" />
         <h1 className="truncate font-bold text-foreground">{order.project_name}</h1>
-        <span className={`mr-auto shrink-0 rounded-full px-3 py-1 text-xs font-bold ${STATUS_CLASS[order.status]}`}>{STATUS_LABEL[order.status]}</span>
+        {isDesigner ? (
+          <span className="mr-auto shrink-0 rounded-full bg-foreground/[0.06] px-3 py-1 text-xs font-bold text-secondary-foreground">طراحی محصول</span>
+        ) : (
+          <span className={`mr-auto shrink-0 rounded-full px-3 py-1 text-xs font-bold ${STATUS_CLASS[order.status]}`}>{STATUS_LABEL[order.status]}</span>
+        )}
         <ThemeToggle />
       </header>
 
@@ -210,6 +215,33 @@ export default function AdminOrderPage() {
           </div>
         </section>
 
+        {isDesigner ? (
+          <aside className="space-y-5">
+            <div className="rounded-2xl border border-border bg-surface p-5 shadow-card">
+              <p className="mb-4 font-semibold text-foreground">مشخصات طراحی</p>
+              <dl className="space-y-3 text-sm">
+                <div>
+                  <dt className="text-xs text-muted-foreground">استک پیشنهادی</dt>
+                  <dd className="mt-1 text-foreground" dir="auto">{order.tech_stack || "—"}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted-foreground">زمان تخمینی ساخت</dt>
+                  <dd className="mt-1 text-foreground">{order.delivery_days ? `${order.delivery_days.toLocaleString("fa-IR")} روز` : "—"}</dd>
+                </div>
+              </dl>
+              {(order.features || []).length > 0 && (
+                <ul className="mt-4 space-y-2 border-t border-border pt-4 text-sm leading-7 text-secondary-foreground">
+                  {order.features.map((feature) => (
+                    <li key={feature}>{feature}</li>
+                  ))}
+                </ul>
+              )}
+              <p className="mt-4 rounded-lg bg-surface-2 px-3 py-2.5 text-xs leading-6 text-muted-foreground">
+                پروژه‌های طراحی محصول قیمت‌گذاری و پرداخت ندارند؛ خروجی آن‌ها کانفیگ پروژه است.
+              </p>
+            </div>
+          </aside>
+        ) : (
         <aside className="space-y-5">
           <div className="rounded-2xl border border-border bg-surface p-5 shadow-card">
             <p className="mb-4 font-semibold text-foreground">تایید و مبلغ</p>
@@ -282,6 +314,7 @@ export default function AdminOrderPage() {
             <input ref={proposalRef} type="file" accept=".pdf,.doc,.docx" className="hidden" onChange={(e) => handleProposalUpload(e.target.files?.[0])} />
           </div>
         </aside>
+        )}
       </main>
     </div>
   );

@@ -15,6 +15,8 @@ export interface ShellNavItem {
   onSelect?: () => void;
   active?: boolean;
   count?: number;
+  /** Items sharing a group are listed under that heading. */
+  group?: string;
 }
 
 interface AppShellProps {
@@ -112,8 +114,13 @@ export default function AppShell({
       </div>
       {primaryAction && <div className="px-3 pb-2">{primaryAction}</div>}
       <nav aria-label="منوی اصلی" className="mt-3 min-h-0 flex-1 space-y-0.5 overflow-y-auto px-3">
-        {nav.map((item) => (
-          <NavLink key={item.key} item={item} onNavigate={() => setOpen(false)} />
+        {nav.map((item, i) => (
+          <div key={item.key}>
+            {item.group && item.group !== nav[i - 1]?.group && (
+              <p className={cn("eyebrow px-3 pb-1.5", i > 0 && "mt-5")}>{item.group}</p>
+            )}
+            <NavLink item={item} onNavigate={() => setOpen(false)} />
+          </div>
         ))}
       </nav>
       <div className="border-t border-border p-3">

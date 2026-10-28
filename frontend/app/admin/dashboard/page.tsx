@@ -8,7 +8,6 @@ import {
   AdminSite,
   manageAdminSites,
   fetchOrders,
-  fetchStats,
   approveOrder,
   uploadProposal,
   fetchAISettings,
@@ -16,14 +15,7 @@ import {
   Order,
 } from "@/lib/api";
 import AppShell, { ShellLoading } from "@/components/AppShell";
-import { IconAdjustments, IconCheck, IconClipboardList, IconPalette, IconWorld, IconX } from "@tabler/icons-react";
-
-interface Stats {
-  total_orders: number;
-  paid_orders: number;
-  pending_review: number;
-  total_revenue: number;
-}
+import { IconAdjustments, IconCheck, IconClipboardList, IconPalette, IconWand, IconWorld, IconX } from "@tabler/icons-react";
 
 const STATUS_LABEL: Record<Order["status"], string> = {
   pending_review: "در انتظار بررسی",
@@ -41,14 +33,20 @@ const STATUS_CLASS: Record<Order["status"], string> = {
   cancelled: "bg-danger/10 text-danger",
 };
 
-type AdminTab = "orders" | "settings" | "skills" | "sites";
+type AdminTab = "orders" | "settings" | "design" | "sites" | "skills";
 
-const ADMIN_TABS: { key: AdminTab; label: string; title: string; description: string; icon: typeof IconClipboardList }[] = [
-  { key: "orders", label: "سفارشات", title: "سفارشات", description: "درخواست‌های ثبت‌شده را بررسی کن، قیمت نهایی بده و وضعیت پرداخت را دنبال کن.", icon: IconClipboardList },
-  { key: "sites", label: "سایت‌های منتشرشده", title: "سایت‌های منتشرشده", description: "پیش‌نمایش‌ها و انتشارهای فعال؛ تمدید یا حذفشان کن.", icon: IconWorld },
-  { key: "settings", label: "تنظیمات فروش و AI", title: "تنظیمات فروش و AI", description: "رفتار مشاور فروش، شرایط پرداخت و دانش قیمت‌گذاری.", icon: IconAdjustments },
-  { key: "skills", label: "طراحی محصول", title: "طراحی محصول", description: "استک‌ها، مهارت‌ها و تنظیمات تولید تصویر طراح محصول.", icon: IconPalette },
+// Sales orders (priced, paid) and product-design projects (config briefs) are separate workflows.
+const ADMIN_TABS: { key: AdminTab; group: string; label: string; title: string; description: string; icon: typeof IconClipboardList }[] = [
+  { key: "orders", group: "فروش", label: "سفارش‌ها", title: "سفارش‌های فروش", description: "درخواست‌های مشاور فروش را بررسی کن، قیمت نهایی بده و وضعیت پرداخت را دنبال کن.", icon: IconClipboardList },
+  { key: "settings", group: "فروش", label: "تنظیمات فروش و AI", title: "تنظیمات فروش و AI", description: "رفتار مشاور فروش، شرایط پرداخت و دانش قیمت‌گذاری.", icon: IconAdjustments },
+  { key: "design", group: "طراحی محصول", label: "پروژه‌ها", title: "پروژه‌های طراحی محصول", description: "کانفیگ‌هایی که طراح محصول برای کاربران ساخته؛ بدون قیمت‌گذاری و پرداخت.", icon: IconWand },
+  { key: "sites", group: "طراحی محصول", label: "سایت‌های منتشرشده", title: "سایت‌های منتشرشده", description: "پیش‌نمایش‌ها و انتشارهای فعال پروژه‌های طراحی؛ تمدید یا حذفشان کن.", icon: IconWorld },
+  { key: "skills", group: "طراحی محصول", label: "تنظیمات طراح محصول", title: "تنظیمات طراح محصول", description: "استک‌ها، مهارت‌ها و تنظیمات تولید تصویر طراح محصول.", icon: IconPalette },
 ];
+
+function isAdminTab(value: string | null): value is AdminTab {
+  return ADMIN_TABS.some((t) => t.key === value);
+}
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("fa-IR", {
@@ -80,9 +78,8 @@ function fromLines(value: string) {
 export default function AdminDashboard() {
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
-  const [stats, setStats] = useState<Stats | null>(null);
   const [selected, setSelected] = useState<Order | null>(null);
-  const [activeTab, setActiveTab] = useState<"orders" | "settings" | "skills" | "sites">("orders");
+  const [activeTab, setActiveTab] = useState<AdminTab>("orders");
   const [settings, setSettings] = useState<Record<string, unknown>>({});
   const [savingSettings, setSavingSettings] = useState(false);
   const [savedToast, setSavedToast] = useState(false);
@@ -105,9 +102,8 @@ export default function AdminDashboard() {
     const token = getToken();
     if (!token) { router.replace("/admin/login"); return; }
     try {
-      const [o, s, aiSettings] = await Promise.all([fetchOrders(token), fetchStats(token), fetchAISettings(token)]);
+      const [o, aiSettings] = await Promise.all([fetchOrders(token), fetchAISettings(token)]);
       setOrders(o);
-      setStats(s);
       setSettings(aiSettings);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "";
@@ -118,7 +114,25 @@ export default function AdminDashboard() {
     }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    const tab = new URLSearchParams(window.location.search).get("tab");
+    if (isAdminTab(tab)) setActiveTab(tab);
+    load();
+  }, []);
+
+  function selectTab(tab: AdminTab) {
+    setActiveTab(tab);
+    window.history.replaceState(null, "", tab === "orders" ? "/admin/dashboard" : `/admin/dashboard?tab=${tab}`);
+  }
+
+  const salesOrders = orders.filter((o) => o.mode !== "designer");
+  const designOrders = orders.filter((o) => o.mode === "designer");
+  const salesStats = {
+    total: salesOrders.length,
+    pending: salesOrders.filter((o) => o.status === "pending_review").length,
+    paid: salesOrders.filter((o) => o.status === "paid").length,
+    revenue: salesOrders.filter((o) => o.status === "paid").reduce((sum, o) => sum + (o.payment_amount || 0), 0),
+  };
 
   function openOrder(order: Order) {
     setSelected(order);
@@ -213,7 +227,15 @@ export default function AdminDashboard() {
       <AppShell
         area="ادمین"
         width="wide"
-        nav={ADMIN_TABS.map(({ key, label, icon }) => ({ key, label, icon, active: activeTab === key, onSelect: () => setActiveTab(key) }))}
+        nav={ADMIN_TABS.map(({ key, group, label, icon }) => ({
+          key,
+          group,
+          label,
+          icon,
+          active: activeTab === key,
+          onSelect: () => selectTab(key),
+          count: key === "orders" ? salesOrders.length || undefined : key === "design" ? designOrders.length || undefined : undefined,
+        }))}
         user={{ name: "مدیر سیستم" }}
         onLogout={() => { localStorage.removeItem("admin_token"); router.push("/admin/login"); }}
         title={ADMIN_TABS.find((t) => t.key === activeTab)?.title}
@@ -224,12 +246,12 @@ export default function AdminDashboard() {
 
         {activeTab === "sites" && <PublishedSites orders={orders} />}
 
-        {activeTab === "orders" && stats && (
+        {activeTab === "orders" && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <StatCard label="کل سفارشات" value={stats.total_orders.toLocaleString("fa-IR")} />
-            <StatCard label="در انتظار" value={stats.pending_review.toLocaleString("fa-IR")} warn />
-            <StatCard label="پرداخت‌شده" value={stats.paid_orders.toLocaleString("fa-IR")} accent />
-            <StatCard label="درآمد (ریال)" value={(stats.total_revenue).toLocaleString("fa-IR")} />
+            <StatCard label="کل سفارش‌ها" value={salesStats.total.toLocaleString("fa-IR")} />
+            <StatCard label="در انتظار بررسی" value={salesStats.pending.toLocaleString("fa-IR")} warn />
+            <StatCard label="پرداخت‌شده" value={salesStats.paid.toLocaleString("fa-IR")} accent />
+            <StatCard label="درآمد (ریال)" value={salesStats.revenue.toLocaleString("fa-IR")} />
           </div>
         )}
 
@@ -237,8 +259,8 @@ export default function AdminDashboard() {
           <div className="border-b border-border px-5 py-4">
             <h2 className="font-bold text-foreground">همه سفارش‌ها</h2>
           </div>
-          {orders.length === 0 ? (
-            <p className="text-muted-foreground text-center py-12">هیچ سفارشی ثبت نشده</p>
+          {salesOrders.length === 0 ? (
+            <p className="text-muted-foreground text-center py-12">هیچ سفارش فروشی ثبت نشده</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -250,7 +272,7 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {orders.map((order) => (
+                  {salesOrders.map((order) => (
                     <tr key={order.id} className="border-b border-border transition-colors last:border-0 hover:bg-foreground/[0.02]">
                       <td className="max-w-[220px] truncate px-5 py-4 text-sm font-bold text-foreground">{order.project_name}</td>
                       <td className="px-5 py-4 text-sm text-muted-foreground">{order.price_label}</td>
@@ -276,6 +298,36 @@ export default function AdminDashboard() {
             </div>
           )}
         </div>}
+
+        {activeTab === "design" && (
+          <div className="overflow-hidden rounded-xl border border-border bg-surface">
+            <div className="border-b border-border px-5 py-4">
+              <h2 className="font-bold text-foreground">همه پروژه‌های طراحی</h2>
+            </div>
+            {designOrders.length === 0 ? (
+              <p className="py-12 text-center text-muted-foreground">هنوز پروژه‌ی طراحی محصولی ساخته نشده</p>
+            ) : (
+              <ul className="divide-y divide-border">
+                {designOrders.map((order) => (
+                  <li key={order.id} className="flex items-center gap-4 px-5 py-4 transition-colors hover:bg-foreground/[0.02]">
+                    <span className="hidden h-10 w-10 shrink-0 place-items-center rounded-lg bg-surface-2 text-muted-foreground sm:grid" aria-hidden="true">
+                      <IconWand size={19} stroke={1.8} />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold text-foreground">{order.project_name}</p>
+                      <p className="mt-0.5 truncate text-xs text-muted-foreground" dir="auto">
+                        {[order.tech_stack, formatDate(order.created_at)].filter(Boolean).join(" · ")}
+                      </p>
+                    </div>
+                    <button onClick={() => router.push(`/admin/orders/${order.id}`)} className="inline-flex min-h-8 shrink-0 items-center rounded-lg border border-border px-3 text-xs font-bold text-foreground outline-none transition-colors hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ring">
+                      مشاهده
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
 
         {activeTab === "skills" && (
           <div className="space-y-8">
