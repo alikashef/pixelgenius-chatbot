@@ -1,0 +1,18 @@
+{
+  "chat/welcome": "chat-welcome-34c9365ade.mp3",
+  "chat/mode": "chat-mode-79155edbf3.mp3",
+  "chat/path": "chat-path-cdd9b28312.mp3",
+  "chat/composer": "chat-composer-4cc21387c2.mp3",
+  "chat/chips": "chat-chips-b684716ec7.mp3",
+  "chat/history": "chat-history-bc1688da61.mp3",
+  "chat/account": "chat-account-7131458765.mp3",
+  "chat/done": "chat-done-211d231982.mp3",
+  "panel/welcome": "panel-welcome-8c51280090.mp3",
+  "panel/new-project": "panel-new-project-41fc3b640d.mp3",
+  "panel/design": "panel-design-e8dfa089d1.mp3",
+  "panel/connect": "panel-connect-a5ba228379.mp3",
+  "panel/orders": "panel-orders-65b77c0e3f.mp3",
+  "panel/chats": "panel-chats-205bc9472e.mp3",
+  "panel/footer": "panel-footer-fd3cad451b.mp3",
+  "panel/done": "panel-done-db50731d2a.mp3"
+}
