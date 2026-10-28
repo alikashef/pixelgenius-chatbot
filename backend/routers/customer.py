@@ -22,7 +22,7 @@ from sms import send_notification
 from lib.ai.analyze_lead import generate_project_brief
 from routers.site_mcp import make_deploy_info, canonical_project_url, canonicalize_workspace_urls, _tool_deploy_status as read_deployment, _tool_get as read_static_site
 from services import workspace
-from schemas import WorkspaceOutputIn, WorkspaceCommentIn, WorkspaceCommentStatusIn, WorkspaceApproveIn, WorkspaceCredentialsIn
+from schemas import WorkspaceCommentIn, WorkspaceCommentStatusIn, WorkspaceApproveIn, WorkspaceCredentialsIn
 from routers.chat import validate_project_source
 from schemas import ChatAttachmentIn
 from services.ai_settings import get_ai_settings
@@ -260,16 +260,6 @@ async def get_workspace(order_id: str, db: AsyncSession = Depends(get_db), paylo
     data = workspace.state(order)
     canonicalize_workspace_urls(order_id, data)
     return JSONResponse({**data, "has_credentials": bool(order.workspace_credentials), "configuration": order.project_brief}, headers={"Cache-Control": "no-store"})
-
-
-@router.post("/customer/orders/{order_id}/workspace/outputs")
-async def add_workspace_output(order_id: str, body: WorkspaceOutputIn, db: AsyncSession = Depends(get_db), payload: dict = Depends(get_current_customer)):
-    order = await _workspace_order(db, order_id, payload["sub"])
-    data = workspace.state(order)
-    workspace.add_output(data, body.model_dump(), "owner")
-    order.workspace = data
-    await db.commit()
-    return data
 
 
 @router.post("/customer/orders/{order_id}/workspace/comments")

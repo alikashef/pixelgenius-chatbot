@@ -779,12 +779,25 @@ async def preview_allow(domain: str = ""):
     return Response(status_code=404)
 
 
+def _frame_ancestors() -> str:
+    """Who may frame a site: the app (under any of its configured addresses), for the workspace review preview."""
+    origins = ["'self'", APP_ORIGIN]
+    mcp = urlsplit(PUBLIC_MCP_URL)
+    origins.append(f"{mcp.scheme}://{mcp.netloc}")
+    labels = PREVIEW_BASE_DOMAIN.split(".")
+    if len(labels) >= 3:
+        # preview.example.com → the app on example.com or any of its subdomains (chat., www.).
+        parent = ".".join(labels[1:])
+        origins += [f"https://{parent}", f"https://*.{parent}"]
+    return "frame-ancestors " + " ".join(dict.fromkeys(origins))
+
+
+FRAME_ANCESTORS = _frame_ancestors()
 SITE_HEADERS = {
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "no-referrer",
     "X-Robots-Tag": "noindex, nofollow",
-    # Only the app itself may frame a site, for the review preview in the project workspace.
-    "Content-Security-Policy": f"frame-ancestors 'self' {APP_ORIGIN}",
+    "Content-Security-Policy": FRAME_ANCESTORS,
     "Cache-Control": "no-cache",
 }
 
@@ -792,10 +805,14 @@ SITE_HEADERS = {
 # Review mode (?pg_review=1, only inside the project workspace) loads the element picker into the page.
 REVIEW_PARAM = "pg_review"
 _BODY_END = re.compile(rb"</body\s*>", re.IGNORECASE)
+# Inlined rather than linked so the picker never depends on the app's address or the site's script policy.
+REVIEW_BRIDGE = (Path(__file__).resolve().parent.parent / "review_bridge.js").read_bytes()
+# A site's own framing and script policies would block the preview or the picker; review mode replaces them.
+_REVIEW_DROP_HEADERS = {"x-frame-options", "content-security-policy", "content-security-policy-report-only"}
 
 
 def inject_review(body: bytes) -> bytes:
-    tag = f'<script src="{APP_ORIGIN}/review-bridge.js" async></script>'.encode()
+    tag = b"<script>" + REVIEW_BRIDGE.replace(b"</script", b"<\\/script") + b"</script>"
     matches = list(_BODY_END.finditer(body))
     if not matches:
         return body + tag
@@ -830,13 +847,14 @@ async def review_proxy(slug: str, request: Request) -> Response | None:
     response = Response(body, status_code=upstream.status_code)
     for key, value in upstream.headers.multi_items():
         lower = key.lower()
-        if lower in ("content-length", "content-encoding", "transfer-encoding", "connection", "server") or lower.startswith("x-liara"):
+        if lower in ("content-length", "content-encoding", "transfer-encoding", "connection", "server") or lower in _REVIEW_DROP_HEADERS or lower.startswith("x-liara"):
             continue
         if lower == "location":
             value = re.sub(r"(?i)^https?://(?:[a-z0-9-]+\.)+liara\.(?:run|space)(?::\d+)?", "https://" + request.headers.get("host", ""), value)
         if lower == "set-cookie":
             value = re.sub(r"(?i);\s*domain=\.?(?:[a-z0-9-]+\.)*liara\.(?:run|space)", "", value)
         response.headers.append(key, value)
+    response.headers["Content-Security-Policy"] = FRAME_ANCESTORS
     return response
 
 

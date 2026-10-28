@@ -140,8 +140,8 @@ frontend/
     McpTour.tsx                   ← تور آموزشی اتصال MCP در پنل مشتری + CopyBlock و BUILD_PROMPT مشترک
     OrderManager.tsx              ← بررسی/قیمت‌گذاری سفارش؛ مشترک ادمین و فریلنسر (scope)
     GuidedTour.tsx                ← تور خوش‌آمد (اسپات‌لایت + روبات راهنما + صدا)
-    PreviewReview.tsx             ← بازبینی نسخه در فضای پروژه: پیش‌نمایش خودکار، «یادداشت‌گذاری» با انتخاب المان (تگ HTML + selector) و جدول تسک‌ها؛ تسک‌ها با MCP (`get_workspace.tasks`، `update_feedback` با `note`) به ایجنت می‌رسند
-    public/review-bridge.js       ← اسکریپت انتخاب المان داخل پیش‌نمایش؛ فقط در حالت بازبینی (`?pg_review=1`) توسط backend به سایت تزریق می‌شود
+    PreviewReview.tsx             ← تب «پیش‌نمایش و بازبینی» فضای پروژه: فقط سایت منتشرشده‌ی همان پروژه (بدون ثبت URL/HTML دستی)؛ «یادداشت‌گذاری» با انتخاب المان (outline آبی + باکس تسک روی گوشه‌ی المان، تگ HTML + selector) و جدول تسک‌ها؛ تسک‌ها با MCP (`get_workspace.tasks`، `update_feedback` با `note`) به ایجنت می‌رسند
+    (backend/review_bridge.js)    ← اسکریپت انتخاب المان؛ فقط در حالت بازبینی (`?pg_review=1`) backend آن را inline در سایت می‌گذارد و X-Frame-Options/CSP سایت را با `frame-ancestors` خودمان (`site_mcp.FRAME_ANCESTORS`) عوض می‌کند
     SalesOrders.tsx               ← سفارش‌های فروش مشتری (فیلتر، بنر «نیاز به اقدام»، جدول/کارت) + `OrderSteps` و `toman()` (مبالغ در DB ریال‌اند، به مشتری تومان نمایش بده)
     HostingSites.tsx              ← تب «سایت‌ها و دامنه» پنل: مهلت، تمدید رایگان، اتصال دامنه‌ی اختصاصی
     GithubRepoPicker.tsx          ← اتصال OAuth به GitHub و انتخاب مخزن در مسیر «انتشار سورس آماده»

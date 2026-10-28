@@ -55,7 +55,7 @@ const PATHS = [
 ] as const;
 const TABS = [
   { id: "overview", label: "نمای کلی", icon: IconLayout },
-  { id: "preview", label: "طراحی و Preview", icon: IconCode },
+  { id: "preview", label: "پیش‌نمایش و بازبینی", icon: IconCode },
   { id: "documents", label: "اسناد و فایل‌ها", icon: IconFileText },
   { id: "activity", label: "فعالیت ایجنت", icon: IconHistory },
   { id: "deployment", label: "انتشار و دسترسی", icon: IconWorld },
@@ -100,14 +100,6 @@ export default function ProjectWorkspace({
   const [deploymentError, setDeploymentError] = useState("");
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState("");
-  const [showOutput, setShowOutput] = useState(false);
-  const [output, setOutput] = useState({
-    stage: "development",
-    title: "",
-    url: "",
-    html: "",
-    notes: "",
-  });
   const [credentials, setCredentials] = useState<AdminCredentials | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [notice, setNotice] = useState("");
@@ -562,7 +554,7 @@ export default function ProjectWorkspace({
                         ? "مسیر این پروژه قدیمی ثبت نشده؛ برای پروژه جدید، مسیر را پیش از گفتگو انتخاب کن."
                         : !data.versions.length
                           ? "کانفیگ را به ایجنت بده تا اولین خروجی را برای بازبینی ثبت کند."
-                          : "آخرین نسخه و بازخوردها را در بخش طراحی و Preview بررسی کن."}
+                          : "آخرین نسخه و بازخوردها را در بخش «پیش‌نمایش و بازبینی» بررسی کن."}
                     </p>
                     <p className="mt-4 border-t border-border pt-4 text-xs leading-6 text-muted-foreground">
                       اجرای خودکار ایجنت هنوز متصل نیست. ایجنت بیرونی می‌تواند
@@ -573,227 +565,67 @@ export default function ProjectWorkspace({
               </div>
             )}
             {tab === "preview" && (
-              <div className="space-y-5">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <h2 className="font-bold">خروجی‌های قابل بازبینی</h2>
-                    <p className="mt-1 text-xs leading-6 text-muted-foreground">
-                      هر بازخورد به نسخه، صفحه و المان همان خروجی متصل می‌شود.
-                    </p>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={!data.path}
-                    onClick={() => {
-                      setOutput((o) => ({
-                        ...o,
-                        stage:
-                          data.path === "design" && !data.approvals.design
-                            ? "design"
-                            : "development",
-                      }));
-                      setShowOutput(!showOutput);
-                    }}
-                  >
-                    <IconPlus size={15} />
-                    ثبت نسخه
-                  </Button>
-                </div>
-                {showOutput && (
-                  <form
-                    className={cn(panelClass, "grid gap-4 sm:grid-cols-2")}
-                    onSubmit={async (e) => {
-                      e.preventDefault();
-                      if (await mutate("/outputs", output)) {
-                        setShowOutput(false);
-                        setOutput({
-                          stage: "development",
-                          title: "",
-                          url: "",
-                          html: "",
-                          notes: "",
-                        });
-                        setSelected("");
-                      }
-                    }}
-                  >
-                    <label className="space-y-2 text-xs">
-                      مرحله
-                      <select
-                        className={inputClass}
-                        value={output.stage}
-                        onChange={(e) =>
-                          setOutput({ ...output, stage: e.target.value })
-                        }
-                      >
-                        {data.path === "design" && (
-                          <option value="design">طراحی</option>
-                        )}
-                        <option
-                          value="development"
-                          disabled={
-                            data.path === "design" && !data.approvals.design
-                          }
-                        >
-                          توسعه
-                        </option>
-                      </select>
-                    </label>
-                    <label className="space-y-2 text-xs">
-                      عنوان نسخه
-                      <input
-                        required
-                        maxLength={200}
-                        className={inputClass}
-                        value={output.title}
-                        onChange={(e) =>
-                          setOutput({ ...output, title: e.target.value })
-                        }
-                      />
-                    </label>
-                    <label className="space-y-2 text-xs sm:col-span-2">
-                      آدرس Preview
-                      <input
-                        type="url"
-                        dir="ltr"
-                        className={inputClass}
-                        value={output.url}
-                        onChange={(e) =>
-                          setOutput({ ...output, url: e.target.value })
-                        }
-                        placeholder="https://…"
-                      />
-                    </label>
-                    <label className="space-y-2 text-xs sm:col-span-2">
-                      HTML پیش‌نمایش برای انتخاب مستقیم المان
-                      <textarea
-                        rows={5}
-                        dir="ltr"
-                        className={inputClass}
-                        value={output.html}
-                        onChange={(e) =>
-                          setOutput({ ...output, html: e.target.value })
-                        }
-                        maxLength={500000}
-                      />
-                      <input
-                        type="file"
-                        accept=".html,.htm"
-                        className="block w-full text-xs"
-                        onChange={async (e) => {
-                          const file = e.target.files?.[0];
-                          if (file && file.size <= 500000)
-                            setOutput({ ...output, html: await file.text() });
-                          else if (file)
-                            setError(
-                              "فایل HTML باید کمتر از ۵۰۰ کیلوبایت باشد",
-                            );
-                        }}
-                      />
-                    </label>
-                    <label className="space-y-2 text-xs sm:col-span-2">
-                      توضیح خروجی
-                      <textarea
-                        className={inputClass}
-                        rows={2}
-                        value={output.notes}
-                        onChange={(e) =>
-                          setOutput({ ...output, notes: e.target.value })
-                        }
-                      />
-                    </label>
-                    <div className="flex gap-2 sm:col-span-2">
-                      <Button disabled={busy}>ثبت برای بازبینی</Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={() => setShowOutput(false)}
-                      >
-                        بستن
-                      </Button>
-                    </div>
-                  </form>
-                )}
-                {!version ? (
-                  <section className={cn(panelClass, "py-16 text-center")}>
-                    <IconLayout
-                      size={38}
-                      className="mx-auto mb-4 text-brand"
-                    />
-                    <h3 className="font-semibold">اولین خروجی هنوز ثبت نشده</h3>
-                    <p className="mx-auto mt-3 max-w-lg text-sm leading-7 text-muted-foreground">
-                      ایجنت می‌تواند خروجی را با MCP ثبت کند. اگر خروجی آماده
-                      داری، از «ثبت نسخه» آدرس یا فایل HTML را اضافه کن.
-                    </p>
-                  </section>
-                ) : (
-                  <>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <label htmlFor="version" className="text-sm">
-                        نسخه
-                      </label>
-                      <select
-                        id="version"
-                        className={cn(
-                          inputClass,
-                          "w-auto min-w-48 flex-1 sm:flex-none",
-                        )}
-                        value={version.id}
-                        onChange={(e) => setSelected(e.target.value)}
-                      >
-                        {[...data.versions].reverse().map((v) => (
-                          <option value={v.id} key={v.id}>
-                            نسخه {v.number.toLocaleString("fa-IR")} ·{" "}
-                            {v.stage === "design" ? "طراحی" : "توسعه"} ·{" "}
-                            {v.title}
-                          </option>
-                        ))}
-                      </select>
-                      {data.approvals[version.stage]?.version_id ===
-                      version.id ? (
-                        <span className="flex items-center gap-1 text-xs text-brand">
-                          <IconLock size={15} />
-                          تأیید شده در{" "}
-                          {date(data.approvals[version.stage]!.approved_at)}
-                        </span>
-                      ) : (
-                        <Button
-                          size="sm"
-                          disabled={
-                            busy ||
-                            data.versions
-                              .filter((v) => v.stage === version.stage)
-                              .at(-1)?.id !== version.id
-                          }
-                          onClick={() =>
-                            void mutate("/approve", { version_id: version.id })
-                          }
-                        >
-                          <IconCheck size={16} />
-                          {version.stage === "design"
-                            ? "تأیید صریح طراحی"
-                            : "تأیید صریح توسعه"}
-                        </Button>
-                      )}
-                    </div>
-                    {version.notes && (
-                      <p className="whitespace-pre-wrap text-sm leading-7 text-muted-foreground">
-                        {version.notes}
+              <PreviewReview
+                projectName={order.project_name}
+                version={version}
+                url={state === "READY" ? safeUrl(deployment?.url) : undefined}
+                siteState={state}
+                expiresAt={deployment?.expires_at}
+                comments={version ? data.comments.filter((c) => c.version_id === version.id) : []}
+                busy={busy}
+                onAdd={(note) => (version ? mutate("/comments", { version_id: version.id, ...note }) : Promise.resolve(false))}
+                onStatus={(id, status) => void mutate(`/comments/${id}`, { status }, "PATCH")}
+                header={
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <h2 className="font-bold">پیش‌نمایش و بازبینی</h2>
+                      <p className="mt-0.5 text-xs leading-6 text-muted-foreground">
+                        سایت منتشرشده‌ی همین پروژه؛ روی هر المان تسک بگذار تا ایجنت اصلاحش کنه.
                       </p>
+                    </div>
+                    {version ? (
+                      <div className="flex flex-wrap items-center gap-2">
+                        {data.versions.length > 1 ? (
+                          <select
+                            aria-label="نسخه"
+                            className={cn(inputClass, "h-9 w-auto min-w-44 py-0 text-sm")}
+                            value={version.id}
+                            onChange={(e) => setSelected(e.target.value)}
+                          >
+                            {[...data.versions].reverse().map((v) => (
+                              <option value={v.id} key={v.id}>
+                                نسخه {v.number.toLocaleString("fa-IR")} · {v.stage === "design" ? "طراحی" : "توسعه"} · {v.title}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className="rounded-lg bg-surface-2 px-3 py-1.5 text-xs font-bold text-secondary-foreground">
+                            نسخه {version.number.toLocaleString("fa-IR")} · {version.title}
+                          </span>
+                        )}
+                        {data.approvals[version.stage]?.version_id === version.id ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-3 text-xs font-bold leading-8 text-success">
+                            <IconLock size={14} aria-hidden="true" />
+                            تأییدشده · {date(data.approvals[version.stage]!.approved_at)}
+                          </span>
+                        ) : (
+                          <Button
+                            size="sm"
+                            className="h-9"
+                            disabled={busy || data.versions.filter((v) => v.stage === version.stage).at(-1)?.id !== version.id}
+                            onClick={() => void mutate("/approve", { version_id: version.id })}
+                          >
+                            <IconCheck size={16} aria-hidden="true" />
+                            {version.stage === "design" ? "تأیید طراحی" : "تأیید توسعه"}
+                          </Button>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">ایجنت هنوز نسخه‌ای ثبت نکرده</span>
                     )}
-                    <PreviewReview
-                      projectName={order.project_name}
-                      version={version}
-                      url={safeUrl(version.url) || safeUrl(deployment?.url)}
-                      comments={data.comments.filter((c) => c.version_id === version.id)}
-                      busy={busy}
-                      onAdd={(note) => mutate("/comments", { version_id: version.id, ...note })}
-                      onStatus={(id, status) => void mutate(`/comments/${id}`, { status }, "PATCH")}
-                    />
-                  </>
-                )}
-              </div>
+                  </div>
+                }
+              />
             )}
             {tab === "documents" && (
               <div className="grid items-start gap-5 lg:grid-cols-2">
