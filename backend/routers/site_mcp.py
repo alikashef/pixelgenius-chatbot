@@ -34,6 +34,8 @@ SITES_DIR.mkdir(parents=True, exist_ok=True)
 PREVIEW_BASE_DOMAIN = (os.getenv("PREVIEW_BASE_DOMAIN") or "localhost").lower()
 PREVIEW_URL_TEMPLATE = os.getenv("PREVIEW_URL_TEMPLATE") or ("http://{slug}.localhost:8000" if PREVIEW_BASE_DOMAIN == "localhost" else "https://{slug}." + PREVIEW_BASE_DOMAIN)
 PUBLIC_MCP_URL = os.getenv("PUBLIC_MCP_URL") or "http://localhost:8000/mcp"
+_app = urlsplit(os.getenv("PUBLIC_APP_URL") or PUBLIC_MCP_URL)
+APP_ORIGIN = f"{_app.scheme}://{_app.netloc}"
 SITE_TTL_SECONDS = int(os.getenv("SITE_TTL_DAYS") or "5") * 86400
 # Expired static sites go offline but keep their files this long, so a renewal can bring them back.
 SITE_GRACE_SECONDS = int(os.getenv("SITE_GRACE_DAYS") or "7") * 86400
@@ -774,7 +776,8 @@ SITE_HEADERS = {
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "no-referrer",
     "X-Robots-Tag": "noindex, nofollow",
-    "Content-Security-Policy": "frame-ancestors 'none'",
+    # Only the app itself may frame a site, for the review preview in the project workspace.
+    "Content-Security-Policy": f"frame-ancestors 'self' {APP_ORIGIN}",
     "Cache-Control": "no-cache",
 }
 

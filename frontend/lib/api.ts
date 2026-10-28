@@ -828,6 +828,11 @@ export interface WorkspaceComment {
   stage: string;
   page: string;
   selector: string;
+  /** Short label of the pinned element (tag and text). */
+  element?: string;
+  /** Pin position on the preview, in percent. */
+  x?: number | null;
+  y?: number | null;
   text: string;
   status: "open" | "in_progress" | "review" | "approved";
   created_at: string;

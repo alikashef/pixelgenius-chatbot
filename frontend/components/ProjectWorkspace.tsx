@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -28,10 +28,10 @@ import {
   Order,
   ProjectWorkspaceData,
   uploadCustomerOrderFile,
-  WorkspaceVersion,
   workspaceRequest,
 } from "@/lib/api";
 import ThemeToggle from "@/components/ThemeToggle";
+import PreviewReview from "@/components/PreviewReview";
 
 const PATHS = [
   {
@@ -74,12 +74,6 @@ const STATES: Record<string, string> = {
   EXPIRED: "منقضی شده",
   UNKNOWN: "در حال دریافت وضعیت",
 };
-const COMMENT_STATES = {
-  open: "باز",
-  in_progress: "در حال اصلاح",
-  review: "آماده بازبینی",
-  approved: "تأییدشده",
-};
 const inputClass =
   "field";
 const panelClass =
@@ -91,13 +85,6 @@ const date = (value: string | number) =>
   });
 const safeUrl = (value?: string) =>
   value && /^https?:\/\//i.test(value) ? value : undefined;
-
-function previewDocument(version: WorkspaceVersion) {
-  // The iframe has an opaque origin. The parent accepts messages only from this iframe.
-  const bridge = `<script>document.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();var el=e.target;if(!(el instanceof Element))return;var parts=[];while(el&&el.tagName!=='HTML'){var s=el.tagName.toLowerCase();if(el.id){s+='#'+CSS.escape(el.id);parts.unshift(s);break;}var p=el.parentElement;if(p){var siblings=Array.from(p.children).filter(x=>x.tagName===el.tagName);if(siblings.length>1)s+=':nth-of-type('+(siblings.indexOf(el)+1)+')';}parts.unshift(s);el=p;}parent.postMessage({type:'workspace-element',selector:parts.join(' > '),page:location.pathname},'*');},true);</script>`;
-  const policy = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' https:; style-src 'unsafe-inline' https:; img-src https: data: http:; font-src https: data:; connect-src 'none'; form-action 'none'; base-uri 'none'">`;
-  return `<!doctype html><html><head>${policy}</head><body>${bridge}${version.html}</body></html>`;
-}
 
 export default function ProjectWorkspace({
   order: initialOrder,
@@ -113,9 +100,6 @@ export default function ProjectWorkspace({
   const [deploymentError, setDeploymentError] = useState("");
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState("");
-  const [selector, setSelector] = useState("");
-  const [page, setPage] = useState("/");
-  const [comment, setComment] = useState("");
   const [showOutput, setShowOutput] = useState(false);
   const [output, setOutput] = useState({
     stage: "development",
@@ -127,7 +111,6 @@ export default function ProjectWorkspace({
   const [credentials, setCredentials] = useState<AdminCredentials | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [notice, setNotice] = useState("");
-  const frame = useRef<HTMLIFrameElement>(null);
   const token = () => localStorage.getItem("customer_token") || "";
   const version =
     data?.versions.find((v) => v.id === selected) || data?.versions.at(-1);
@@ -199,26 +182,6 @@ export default function ProjectWorkspace({
     // Each project owns its polling cycle.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order.id]);
-  useEffect(() => {
-    const receive = (event: MessageEvent) => {
-      if (
-        event.source !== frame.current?.contentWindow ||
-        event.data?.type !== "workspace-element"
-      )
-        return;
-      if (typeof event.data.selector === "string") {
-        setSelector(event.data.selector.slice(0, 1000));
-        setPage("/");
-      }
-    };
-    window.addEventListener("message", receive);
-    return () => window.removeEventListener("message", receive);
-  }, []);
-  useEffect(() => {
-    setSelector("");
-    setPage("/");
-    setComment("");
-  }, [version?.id]);
   useEffect(() => {
     if (tab !== "deployment") {
       setCredentials(null);
@@ -819,168 +782,14 @@ export default function ProjectWorkspace({
                         {version.notes}
                       </p>
                     )}
-                    <div className="grid items-start gap-5 xl:grid-cols-[1fr_340px]">
-                      <section className="overflow-hidden rounded-2xl border border-border bg-surface shadow-card">
-                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
-                          <span className="text-xs text-muted-foreground">
-                            {version.html
-                              ? "برای ثبت بازخورد روی المان کلیک کن"
-                              : "پیش‌نمایش سایت"}
-                          </span>
-                          {safeUrl(version.url) && (
-                            <a
-                              href={safeUrl(version.url)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-1 text-xs text-brand"
-                            >
-                              باز کردن سایت
-                              <IconArrowUpRight size={14} />
-                            </a>
-                          )}
-                        </div>
-                        {version.html ? (
-                          <iframe
-                            key={version.id}
-                            ref={frame}
-                            title={`پیش‌نمایش ${version.title}`}
-                            srcDoc={previewDocument(version)}
-                            sandbox="allow-scripts"
-                            referrerPolicy="no-referrer"
-                            className="h-[620px] w-full bg-surface-2"
-                          />
-                        ) : (
-                          <div>
-                            <iframe
-                              key={version.id}
-                              ref={frame}
-                              title={`پیش‌نمایش ${version.title}`}
-                              src={safeUrl(version.url)}
-                              sandbox="allow-scripts allow-forms"
-                              referrerPolicy="no-referrer"
-                              className="h-[620px] w-full bg-surface-2"
-                            />
-                            <div className="px-5 py-6 text-center">
-                              <IconWorld
-                                className="mx-auto mb-3 text-brand"
-                                size={32}
-                              />
-                              <p className="text-sm leading-7 text-muted-foreground">
-                                Preview را در تب جدید باز کن و آدرس صفحه و
-                                selector المان را در فرم بازخورد وارد کن. برای
-                                انتخاب مستقیم، HTML این نسخه را هم ثبت کن. اگر
-                                سایت اجازه نمایش در قاب را نداد، از «باز کردن
-                                سایت» استفاده کن.
-                              </p>
-                            </div>
-                          </div>
-                        )}
-                      </section>
-                      <aside className="space-y-4">
-                        <form
-                          className={cn(panelClass, "space-y-4")}
-                          onSubmit={async (e) => {
-                            e.preventDefault();
-                            if (
-                              await mutate("/comments", {
-                                version_id: version.id,
-                                page,
-                                selector,
-                                text: comment,
-                              })
-                            )
-                              setComment("");
-                          }}
-                        >
-                          <h3 className="text-sm font-bold">
-                            بازخورد برای نسخه{" "}
-                            {version.number.toLocaleString("fa-IR")}
-                          </h3>
-                          <label className="block space-y-2 text-xs">
-                            صفحه
-                            <input
-                              required
-                              dir="ltr"
-                              className={inputClass}
-                              value={page}
-                              onChange={(e) => setPage(e.target.value)}
-                              maxLength={2000}
-                            />
-                          </label>
-                          <label className="block space-y-2 text-xs">
-                            المان انتخاب‌شده
-                            <input
-                              required
-                              dir="ltr"
-                              className={inputClass}
-                              value={selector}
-                              onChange={(e) => setSelector(e.target.value)}
-                              maxLength={1000}
-                              placeholder="main > button"
-                            />
-                          </label>
-                          <label className="block space-y-2 text-xs">
-                            توضیح تغییر
-                            <textarea
-                              required
-                              className={inputClass}
-                              rows={4}
-                              value={comment}
-                              onChange={(e) => setComment(e.target.value)}
-                              maxLength={5000}
-                            />
-                          </label>
-                          <Button disabled={busy} size="sm" className="w-full">
-                            ثبت بازخورد
-                          </Button>
-                        </form>
-                        <div className="space-y-3">
-                          {data.comments
-                            .filter((c) => c.version_id === version.id)
-                            .map((c) => (
-                              <article
-                                key={c.id}
-                                className={cn(panelClass, "space-y-3 !p-4")}
-                              >
-                                <p className="break-words text-sm leading-7">
-                                  {c.text}
-                                </p>
-                                <p
-                                  className="break-all text-xs text-muted-foreground"
-                                  dir="ltr"
-                                >
-                                  {c.page} · {c.selector}
-                                </p>
-                                <label className="block text-xs">
-                                  <span className="sr-only">
-                                    وضعیت بازخورد {c.text}
-                                  </span>
-                                  <select
-                                    value={c.status}
-                                    disabled={busy}
-                                    className={inputClass}
-                                    onChange={(e) =>
-                                      void mutate(
-                                        `/comments/${c.id}`,
-                                        { status: e.target.value },
-                                        "PATCH",
-                                      )
-                                    }
-                                  >
-                                    {Object.entries(COMMENT_STATES).map(
-                                      ([key, label]) => (
-                                        <option key={key} value={key}>
-                                          {label}
-                                        </option>
-                                      ),
-                                    )}
-                                  </select>
-                                </label>
-                              </article>
-                            ))}
-                        </div>
-                      </aside>
-                    </div>
+                    <PreviewReview
+                      version={version}
+                      url={safeUrl(version.url) || safeUrl(deployment?.url)}
+                      comments={data.comments.filter((c) => c.version_id === version.id)}
+                      busy={busy}
+                      onAdd={(note) => mutate("/comments", { version_id: version.id, ...note })}
+                      onStatus={(id, status) => void mutate(`/comments/${id}`, { status }, "PATCH")}
+                    />
                   </>
                 )}
               </div>

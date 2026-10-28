@@ -10,7 +10,10 @@ const nextConfig = {
     ];
   },
   async rewrites() {
-    return [{ source: "/account", destination: "/panel" }];
+    return [
+      { source: "/account", destination: "/panel" },
+      { source: "/account/:id", destination: "/panel/:id" },
+    ];
   },
 };
 

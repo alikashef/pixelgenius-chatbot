@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import Optional, Literal
 from datetime import datetime
 from uuid import UUID
@@ -173,10 +173,20 @@ class WorkspaceOutputIn(BaseModel):
 
 
 class WorkspaceCommentIn(BaseModel):
+    """A pinned review note: an element selector (HTML previews) and/or a point on the preview, in percent."""
     version_id: str
     page: str = Field(default="/", max_length=2000)
-    selector: str = Field(min_length=1, max_length=1000)
+    selector: str = Field(default="", max_length=1000)
+    element: str = Field(default="", max_length=200)
+    x: Optional[float] = Field(default=None, ge=0, le=100)
+    y: Optional[float] = Field(default=None, ge=0, le=100)
     text: str = Field(min_length=1, max_length=5000)
+
+    @model_validator(mode="after")
+    def _anchored(self):
+        if not self.selector and (self.x is None or self.y is None):
+            raise ValueError("selector or x/y is required")
+        return self
 
 
 class WorkspaceCommentStatusIn(BaseModel):
