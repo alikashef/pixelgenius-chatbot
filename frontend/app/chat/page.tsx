@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, FormEvent, KeyboardEvent, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { IconArrowUp, IconPlayerStopFilled, IconBrandGithub, IconChevronLeft, IconCode, IconCloudUpload, IconLayout, IconCheck, IconCoin, IconCopy, IconDownload, IconFileText, IconHelp, IconFileZip, IconMenu2, IconMessageCircle, IconPaperclip, IconPlus, IconRefresh, IconUser, IconWand, IconX } from "@tabler/icons-react";
+import { IconArrowUp, IconPlayerStopFilled, IconBrandGithub, IconChevronLeft, IconCode, IconCloudUpload, IconCpu, IconLayout, IconCheck, IconCoin, IconCopy, IconDownload, IconFileText, IconHelp, IconFileZip, IconMenu2, IconMessageCircle, IconPaperclip, IconPlus, IconRefresh, IconUser, IconWand, IconX } from "@tabler/icons-react";
 import { BrandLogo, BrandMark } from "@/components/Brand";
 import { accentStyle, robotColors } from "@/lib/widget";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ import { NavGroups, useSectionLinks } from "@/components/AppShell";
 import GuidedTour, { startTour } from "@/components/GuidedTour";
 import FreelancerPromo from "@/components/FreelancerPromo";
 import GithubRepoPicker from "@/components/GithubRepoPicker";
-import { fetchBotProfile, BotProfile, fetchOrderBrief, fetchChatProgress, ChatProgressStage, sendChat, sendOtp, submitOrder, uploadChatFile, createChatSession, updateChatSession, ChatMode, ProjectPath, Message, Proposal, LeadAnalysis, OrderFile, Order, fetchMyOrders } from "@/lib/api";
+import { fetchChatModels, ChatModels, fetchBotProfile, BotProfile, fetchOrderBrief, fetchChatProgress, ChatProgressStage, sendChat, sendOtp, submitOrder, uploadChatFile, createChatSession, updateChatSession, ChatMode, ProjectPath, Message, Proposal, LeadAnalysis, OrderFile, Order, fetchMyOrders } from "@/lib/api";
 
 const WELCOME: Message = {
   role: "assistant",
@@ -440,6 +440,28 @@ function ChatPageInner() {
   const [dbSessionId, setDbSessionId] = useState<string | null>(null);
   const [botToken, setBotToken] = useState<string | undefined>();
   const [mode, setMode] = useState<ChatMode>("designer");
+  const [chatModels, setChatModels] = useState<ChatModels | null>(null);
+  const [modelLoadFailed, setModelLoadFailed] = useState(false);
+  useEffect(() => {
+    const controller = new AbortController();
+    const refresh = () => {
+      fetchChatModels(controller.signal).then((models) => {
+        setChatModels(models);
+        setModelLoadFailed(false);
+      }).catch(() => {
+        if (!controller.signal.aborted) {
+          setChatModels(null);
+          setModelLoadFailed(true);
+        }
+      });
+    };
+    refresh();
+    window.addEventListener("focus", refresh);
+    return () => {
+      controller.abort();
+      window.removeEventListener("focus", refresh);
+    };
+  }, []);
   const [projectPath, setProjectPath] = useState<ProjectPath | undefined>();
   const [sourceUrl, setSourceUrl] = useState("");
   const [sourceType, setSourceType] = useState<"github" | "zip" | undefined>();
@@ -1004,7 +1026,22 @@ function ChatPageInner() {
 
   const composer = (
     <form onSubmit={handleSubmit} className="w-full" data-tour="composer">
-      <div className="rounded-2xl border border-input bg-surface p-2 shadow-elevated transition-[border-color,box-shadow] duration-150 focus-within:border-ring focus-within:shadow-[0_0_0_3px_hsl(var(--ring)/0.16)]">
+      {showSidebar && !phoneStep && (
+        <div className="mx-2 -mb-3 flex min-h-12 items-center gap-2 rounded-t-2xl bg-surface-2 px-3 pb-3 text-xs">
+          <IconCpu size={16} className="shrink-0 text-muted-foreground" aria-hidden="true" />
+          <span id="chat-model-label" className="shrink-0 text-secondary-foreground">مدل هوش مصنوعی</span>
+          <button
+            id="chat-model"
+            type="button"
+            disabled
+            aria-labelledby="chat-model-label chat-model-name"
+            className="flex h-8 min-w-0 items-center border-0 bg-transparent px-2 text-xs text-foreground disabled:cursor-default disabled:opacity-100"
+          >
+            <span id="chat-model-name" className="truncate" dir="auto" aria-live="polite">{chatModels?.[activeMode]?.label || (modelLoadFailed ? "نام مدل در دسترس نیست" : "در حال دریافت…")}</span>
+          </button>
+        </div>
+      )}
+      <div className="relative rounded-2xl border border-input bg-surface p-2 shadow-elevated transition-[border-color,box-shadow] duration-150 focus-within:border-ring focus-within:shadow-[0_0_0_3px_hsl(var(--ring)/0.16)]">
             {attachments.length > 0 && (
               <div className="mb-2 flex flex-wrap gap-2 px-1 pt-1">
                 {attachments.map((file) => (

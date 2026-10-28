@@ -65,6 +65,7 @@ export default function DesignerSettings({ getToken: getTokenProp, settings, onS
 
   const [tiers, setTiers] = useState<Tier[]>([]);
   const [image, setImage] = useState<ImageConfig>({ enabled: true, model: "", size: "1024x1024", max_images: 4 });
+  const [chatModel, setChatModel] = useState("");
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
@@ -77,6 +78,7 @@ export default function DesignerSettings({ getToken: getTokenProp, settings, onS
     if (loaded.current || !Array.isArray(settings.designer_stack_tiers)) return;
     loaded.current = true;
     setTiers(settings.designer_stack_tiers as Tier[]);
+    setChatModel(String(settings.designer_ai_model || ""));
     if (settings.image_generation) setImage(settings.image_generation as ImageConfig);
   }, [settings]);
 
@@ -99,7 +101,7 @@ export default function DesignerSettings({ getToken: getTokenProp, settings, onS
     setSaving(true);
     setMessage(null);
     try {
-      const data = await updateAISettings(tokenRef.current(), { designer_stack_tiers: tiers, image_generation: image });
+      const data = await updateAISettings(tokenRef.current(), { designer_stack_tiers: tiers, image_generation: image, designer_ai_model: chatModel });
       onSettingsChange(data.settings);
       setDirty(false);
       setMessage({ type: "ok", text: "تنظیمات طراحی محصول ذخیره شد و از گفتگوی بعدی اعمال می‌شود." });
@@ -150,6 +152,17 @@ export default function DesignerSettings({ getToken: getTokenProp, settings, onS
             {message.text}
           </p>
         )}
+
+        <div className="space-y-2">
+          <label htmlFor="designer-chat-model" className="block text-sm font-semibold text-foreground">مدل گفتگوی طراح محصول</label>
+          <select id="designer-chat-model" value={chatModel} onChange={(event) => { setChatModel(event.target.value); setDirty(true); }} className="admin-input" dir="auto">
+            <option value="">همان مدل پیش‌فرض فروش</option>
+            <option value="gapgpt-qwen-3.6">GapGPT Qwen 3.6</option>
+            <option value="gpt-5-mini">GPT-5 mini</option>
+            <option value="claude-sonnet-5-5">Claude Sonnet 5.5</option>
+            <option value="claude-opus-4-6">Claude Opus 4.6</option>
+          </select>
+        </div>
 
         <div className="grid gap-4 lg:grid-cols-3">
           {tiers.map((tier, index) => (

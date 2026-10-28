@@ -1,5 +1,7 @@
 DEFAULT_AI_SETTINGS = {
     "ai_model": "gapgpt-qwen-3.6",
+    "structured_analysis_model": "",
+    "designer_ai_model": "",
     "project_price_ranges": [
         {"key": "landing_page", "label": "لندینگ پیج", "price_range": "۸ تا ۱۸ میلیون تومان", "timeline": "۵ تا ۱۰ روز"},
         {"key": "corporate_cms", "label": "سایت شرکتی/CMS", "price_range": "۱۸ تا ۴۵ میلیون تومان", "timeline": "۲ تا ۴ هفته"},

@@ -1010,3 +1010,11 @@ export const verifySiteDomain = (token: string, orderId: string, domain: string)
   hostingRequest<{ domain: string; verified: boolean; detail?: string }>(token, `/${orderId}/domains/${encodeURIComponent(domain)}/verify`, { method: "POST" }, "بررسی دامنه انجام نشد");
 export const removeSiteDomain = (token: string, orderId: string, domain: string) =>
   hostingRequest<{ removed: string }>(token, `/${orderId}/domains/${encodeURIComponent(domain)}`, { method: "DELETE" }, "حذف دامنه انجام نشد");
+
+export type ChatModels = Record<ChatMode, { id: string; label: string }>;
+
+export async function fetchChatModels(signal?: AbortSignal): Promise<ChatModels> {
+  const res = await fetch(`${API_URL}/api/settings/chat-models`, { cache: "no-store", signal });
+  if (!res.ok) throw new Error("دریافت مدل گفتگو ناموفق بود");
+  return res.json();
+}

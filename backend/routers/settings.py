@@ -1,6 +1,6 @@
 import os
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,6 +11,18 @@ from services.ai_settings import get_ai_settings, update_ai_settings
 from services.images import generate_image, image_config
 
 router = APIRouter()
+
+
+@router.get("/settings/chat-models")
+async def public_chat_models(response: Response, db: AsyncSession = Depends(get_db)):
+    from lib.ai.analyze_lead import MODEL_LABELS, selected_chat_model
+
+    settings = await get_ai_settings(db)
+    response.headers["Cache-Control"] = "no-store"
+    return {
+        mode: {"id": selected_chat_model(settings, mode), "label": MODEL_LABELS[selected_chat_model(settings, mode)]}
+        for mode in ("designer", "sales")
+    }
 
 
 @router.get("/settings/ai", response_model=AISettingsOut)
@@ -27,6 +39,14 @@ async def save_ai_settings(
     db: AsyncSession = Depends(get_db),
     _: dict = Depends(get_current_admin),
 ):
+    from lib.ai.analyze_lead import AVAILABLE_MODELS, STRUCTURED_MODEL
+
+    if "ai_model" in body.settings and body.settings["ai_model"] not in AVAILABLE_MODELS:
+        raise HTTPException(status_code=422, detail="مدل انتخاب‌شده برای مکالمه پشتیبانی نمی‌شود")
+    if "designer_ai_model" in body.settings and body.settings["designer_ai_model"] not in ("", *AVAILABLE_MODELS):
+        raise HTTPException(status_code=422, detail="مدل طراح محصول پشتیبانی نمی‌شود")
+    if "structured_analysis_model" in body.settings and body.settings["structured_analysis_model"] not in ("", STRUCTURED_MODEL):
+        raise HTTPException(status_code=422, detail="مدل تحلیل ساختاریافته پشتیبانی نمی‌شود")
     return AISettingsOut(settings=await update_ai_settings(db, body.settings))
 
 

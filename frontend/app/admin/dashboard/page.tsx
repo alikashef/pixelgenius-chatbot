@@ -376,6 +376,8 @@ export default function AdminDashboard() {
               <div className="grid gap-3 md:grid-cols-3">
                 {[
                   { key: "gapgpt-qwen-3.6", label: "GapGPT Qwen 3.6", desc: "سریع و اقتصادی" },
+                  { key: "gpt-5-mini", label: "GPT-5 mini", desc: "گفتگوی متنی و تحلیل نیازمندی‌ها" },
+                  { key: "claude-sonnet-5-5", label: "Claude Sonnet 5.5", desc: "طراحی، کدنویسی و پاسخ به متن و تصویر" },
                   { key: "claude-opus-4-6", label: "Claude Opus 4.6", desc: "قدرتمند و دقیق برای متن و تصویر" },
                 ].map((model) => {
                   const isSelected = (settings.ai_model || "gapgpt-qwen-3.6") === model.key;
@@ -397,6 +399,20 @@ export default function AdminDashboard() {
                   );
                 })}
               </div>
+            </section>
+
+            <section className="bg-surface border border-border rounded-2xl p-5 space-y-4">
+              <div>
+                <h3 className="text-foreground font-semibold">تحلیل ساختاریافتهٔ درخواست</h3>
+                <p className="text-muted-foreground text-xs mt-1 leading-6">TypeSafe Jev 1.14 امتیاز و ریسک درخواست نهایی فروش را ارزیابی می‌کند. پاسخ مکالمه همچنان با مدل انتخاب‌شدهٔ بالا تولید می‌شود.</p>
+              </div>
+              <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-border bg-background p-4">
+                <input type="checkbox" checked={settings.structured_analysis_model === "typesafe/jev-1.14"} onChange={(event) => setSettingValue("structured_analysis_model", event.target.checked ? "typesafe/jev-1.14" : "")} className="h-4 w-4 accent-primary" />
+                <span className="space-y-1">
+                  <span className="block text-sm font-semibold text-foreground" dir="ltr">TypeSafe Jev 1.14</span>
+                  <span className="block text-xs text-muted-foreground">فعال‌سازی ارزیابی تکمیلی · در صورت خطا، تحلیل اصلی حفظ می‌شود</span>
+                </span>
+              </label>
             </section>
 
             <section className="bg-surface border border-border rounded-2xl p-5 space-y-4">

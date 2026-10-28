@@ -1,6 +1,9 @@
 from typing import Callable
 import asyncio
 import json
+import math
+
+import httpx
 import logging
 import os
 import re
@@ -21,12 +24,37 @@ PRIMARY_URL = "https://api.gapgpt.app/v1"
 FALLBACK_URL = "https://api.gapapi.com/v1"
 DEFAULT_MODEL = "gapgpt-qwen-3.6"
 VISION_MODEL = "claude-opus-4-6"
+SONNET_MODEL = "claude-sonnet-5-5"
+GPT_MINI_MODEL = "gpt-5-mini"
+STRUCTURED_MODEL = "typesafe/jev-1.14"
 AI_TIMEOUT_SECONDS = 3.0
 
 AVAILABLE_MODELS = [
     DEFAULT_MODEL,
     VISION_MODEL,
+    SONNET_MODEL,
+    GPT_MINI_MODEL,
 ]
+
+
+MODEL_LABELS = {
+    DEFAULT_MODEL: "GapGPT Qwen 3.6",
+    VISION_MODEL: "Claude Opus 4.6",
+    SONNET_MODEL: "Claude Sonnet 5.5",
+    GPT_MINI_MODEL: "GPT-5 mini",
+}
+
+
+def selected_chat_model(settings: dict, mode: str = "sales") -> str:
+    selected = (settings.get("designer_ai_model") if mode == "designer" else None) or settings.get("ai_model", DEFAULT_MODEL)
+    return selected if selected in AVAILABLE_MODELS else DEFAULT_MODEL
+
+
+def _completion_parameters(model: str, tokens: int, temperature: float) -> dict:
+    if model == GPT_MINI_MODEL:
+        # extra_body supports reasoning parameters with the pinned OpenAI SDK.
+        return {"extra_body": {"max_completion_tokens": tokens, "reasoning_effort": "minimal"}}
+    return {"max_tokens": tokens, "temperature": temperature}
 
 
 def _has_image_content(messages: list[dict]) -> bool:
@@ -38,11 +66,60 @@ def _has_image_content(messages: list[dict]) -> bool:
 
 
 def _model_order(selected_model: str, messages: list[dict]) -> list[str]:
-    if _has_image_content(messages):
+    if _has_image_content(messages) and selected_model not in (VISION_MODEL, SONNET_MODEL):
         return [VISION_MODEL]
-    if selected_model == VISION_MODEL:
-        return [DEFAULT_MODEL]
     return [selected_model or DEFAULT_MODEL]
+
+
+async def evaluate_sales_lead(content: str, messages: list[dict], settings: dict) -> str:
+    """Optionally refine a completed sales analysis without changing the response schema."""
+    if settings.get("structured_analysis_model") != STRUCTURED_MODEL:
+        return content
+    try:
+        lead = json.loads(content)
+    except (ValueError, TypeError):
+        return content
+    if not isinstance(lead, dict) or not {"lead_score", "client_risk_level", "client_message"}.issubset(lead):
+        return content
+    api_key = os.getenv("GAPGPT_API_KEY", "")
+    if not api_key:
+        return content
+    questions = {
+        "client_risk_level": {
+            "type": "choice",
+            "instructions": "Assess delivery risk from the client's requirements, budget and deadline. Use low when no concrete risk is present.",
+            "criteria": {"low": "Clear achievable requirements and realistic expectations", "medium": "Some uncertainty or scope/budget tension", "high": "Unrealistic deadline, budget or contradictory scope"},
+        },
+        "lead_score": {
+            "type": "score",
+            "instructions": "Rate this sales lead's readiness and fit. Use the supplied scoring rules; missing information is uncertainty, not proof of poor quality.",
+            "criteria": ["Very poor fit", "Weak fit", "Uncertain or average fit", "Good fit", "Excellent fit and ready to proceed"],
+        },
+    }
+    state = {"conversation": messages, "analysis": lead, "scoring_rules": settings.get("lead_scoring_rules", [])}
+    for base_url in _base_urls():
+        try:
+            async with httpx.AsyncClient(timeout=max(_request_timeout(), 15.0)) as client:
+                response = await client.post(
+                    f"{base_url}/systemone",
+                    headers={"Authorization": f"Bearer {api_key}"},
+                    json={"model": STRUCTURED_MODEL, "state": state, "questions": questions},
+                )
+                response.raise_for_status()
+                answers = response.json()["answers"]
+                risk = answers["client_risk_level"]["choice"]
+                score = answers["lead_score"]["score"]
+                if risk not in ("low", "medium", "high") or isinstance(score, bool) or not isinstance(score, (int, float)) or not math.isfinite(score) or not 0 <= score <= 4:
+                    raise ValueError("Invalid structured lead assessment")
+                lead.update(client_risk_level=risk, lead_score=round(score * 25))
+                return json.dumps(lead, ensure_ascii=False, separators=(",", ":"))
+        except httpx.HTTPStatusError as exc:
+            logger.warning("Structured assessment failed with status %s", exc.response.status_code)
+            if exc.response.status_code in (401, 403):
+                break
+        except (httpx.HTTPError, ValueError, KeyError, TypeError):
+            logger.warning("Structured assessment unavailable or invalid; retaining original analysis")
+    return content
 
 
 def _base_urls() -> list[str]:
@@ -145,9 +222,7 @@ async def analyze_lead(settings: dict, messages: list[dict], mode: str = "design
         logger.error("GAPGPT_API_KEY not configured; using offline chat fallback")
         return _offline_reply(messages, mode)
 
-    selected_model = settings.get("ai_model", DEFAULT_MODEL)
-    if selected_model not in AVAILABLE_MODELS:
-        selected_model = DEFAULT_MODEL
+    selected_model = selected_chat_model(settings, mode)
 
     knowledge = ""
     if mode != "sales":
@@ -165,16 +240,16 @@ async def analyze_lead(settings: dict, messages: list[dict], mode: str = "design
 
     for model in _model_order(selected_model, ai_messages):
         for base_url in _base_urls():
-            client = AsyncOpenAI(base_url=base_url, api_key=api_key, timeout=_request_timeout())
+            client = AsyncOpenAI(base_url=base_url, api_key=api_key, timeout=max(_request_timeout(), 30.0) if model in (SONNET_MODEL, GPT_MINI_MODEL) else _request_timeout())
             try:
                 response = await client.chat.completions.create(
                     model=model,
                     messages=ai_messages,
-                    max_tokens=2000,
-                    temperature=0.25,
+                    **_completion_parameters(model, 2000, 0.25),
                 )
                 content = response.choices[0].message.content or ""
-                return parse_ai_response(content)
+                parsed = parse_ai_response(content)
+                return await evaluate_sales_lead(parsed, messages, settings) if mode == "sales" else parsed
             except (APIConnectionError, APITimeoutError) as e:
                 logger.warning("Connection failed for %s using %s: %s", base_url, model, e)
                 continue
@@ -306,9 +381,7 @@ async def generate_project_brief(settings: dict, order: dict) -> dict:
         retrieve_skills(settings, history_messages, _base_urls(), api_key, wait=True),
     )))
     spec: dict = {}
-    selected_model = settings.get("ai_model", DEFAULT_MODEL)
-    if selected_model not in AVAILABLE_MODELS:
-        selected_model = DEFAULT_MODEL
+    selected_model = selected_chat_model(settings, "designer")
 
     if api_key:
         for base_url in _base_urls():
@@ -320,8 +393,7 @@ async def generate_project_brief(settings: dict, order: dict) -> dict:
                         {"role": "system", "content": "\n\n".join(filter(None, [BRIEF_SYSTEM_PROMPT.strip(), render_stack_tiers(settings), knowledge]))},
                         {"role": "user", "content": order_context[:30000]},
                     ],
-                    max_tokens=6000,
-                    temperature=0.2,
+                    **_completion_parameters(selected_model, 6000, 0.2),
                 )
                 spec = _extract_json_object(response.choices[0].message.content or "") or {}
                 if spec:
