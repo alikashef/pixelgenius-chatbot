@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, FormEvent, KeyboardEvent, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { IconArrowUp, IconBrandGithub, IconChevronLeft, IconCode, IconCloudUpload, IconLayout, IconCheck, IconCoin, IconCopy, IconDownload, IconFileText, IconHelp, IconFileZip, IconMenu2, IconMessage, IconMessageCircle, IconPaperclip, IconPlus, IconRefresh, IconUser, IconWand, IconX } from "@tabler/icons-react";
+import { IconArrowUp, IconBrandGithub, IconChevronLeft, IconCode, IconCloudUpload, IconLayout, IconCheck, IconCoin, IconCopy, IconDownload, IconFileText, IconHelp, IconFileZip, IconMenu2, IconMessageCircle, IconPaperclip, IconPlus, IconRefresh, IconUser, IconWand, IconX } from "@tabler/icons-react";
 import { BrandLogo, BrandMark } from "@/components/Brand";
 import { accentStyle, robotColors } from "@/lib/widget";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { BUILD_PROMPT, CopyBlock } from "@/components/McpTour";
 import ChatBubble from "@/components/ChatBubble";
 import ChatRobot from "@/components/ChatRobot";
 import ThemeToggle from "@/components/ThemeToggle";
+import { NavGroups, useAccountNav } from "@/components/AppShell";
 import GuidedTour, { startTour } from "@/components/GuidedTour";
 import FreelancerPromo from "@/components/FreelancerPromo";
 import GithubRepoPicker from "@/components/GithubRepoPicker";
@@ -941,6 +942,7 @@ function ChatPageInner() {
   }, [customerToken]);
 
   const visibleSessions = sessions.filter((s) => s.draft.messages.some((m) => m.role === "user"));
+  const accountNav = useAccountNav({ active: "", counts: { orders: salesOrders.length || undefined } });
   const showSidebar = !botToken && !embedded;
   const brandName = botProfile?.widget.brand_name || botProfile?.name || "دستیار پروژه";
   const robotProps = {
@@ -1073,59 +1075,49 @@ function ChatPageInner() {
           گفتگوی جدید
         </button>
       </div>
-      {customerToken && salesOrders.length > 0 && (
-        <nav aria-label="فروش" className="mt-6 px-3">
-          <p className="eyebrow mb-2 px-2.5">فروش</p>
-          <ul className="space-y-0.5">
-            {salesOrders.slice(0, 5).map((o) => (
-              <li key={o.id}>
-                <Link
-                  href={`/panel/${o.id}`}
-                  onClick={() => setSidebarOpen(false)}
-                  className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-secondary-foreground outline-none transition-colors hover:bg-foreground/5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <IconCoin size={16} className="shrink-0 text-muted-foreground" aria-hidden="true" />
-                  <span className="truncate">{o.project_name}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-          {salesOrders.length > 5 && (
-            <Link href="/account?tab=orders" onClick={() => setSidebarOpen(false)} className="mt-1 block rounded-lg px-2.5 py-2 text-xs font-bold text-brand outline-none hover:bg-foreground/5 focus-visible:ring-2 focus-visible:ring-ring">
-              مشاهده بیشتر
-            </Link>
+      <div className="mt-5 min-h-0 flex-1 overflow-y-auto px-3 pb-4">
+        {accountNav.length > 0 && (
+          <nav aria-label="منوی اصلی">
+            <NavGroups nav={accountNav} onNavigate={() => setSidebarOpen(false)} dense />
+          </nav>
+        )}
+        <nav aria-label="گفتگوهای اخیر" data-tour="history" className={accountNav.length > 0 ? "mt-4" : undefined}>
+          <p className="eyebrow mb-1.5 px-3">گفتگوهای اخیر</p>
+          {customerToken ? (
+            visibleSessions.length ? (
+              <ul className="space-y-0.5">
+                {visibleSessions.map((s) => {
+                  const sales = s.draft.mode === "sales";
+                  return (
+                    <li key={s.id}>
+                      <Link
+                        href={`/chat?session=${s.id}`}
+                        onClick={() => setSidebarOpen(false)}
+                        aria-current={s.id === sessionId ? "page" : undefined}
+                        className="flex min-h-9 items-center gap-2 rounded-lg px-3 text-sm text-secondary-foreground outline-none transition-colors hover:bg-foreground/5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:bg-foreground/[0.07] aria-[current=page]:font-bold aria-[current=page]:text-foreground"
+                      >
+                        <span className="min-w-0 flex-1 truncate">{s.title}</span>
+                        <span
+                          className={`shrink-0 rounded px-1.5 text-[10px] font-normal leading-[18px] ${sales ? "bg-accent-soft text-accent" : "bg-brand-soft text-brand"}`}
+                        >
+                          {sales ? "فروش" : "محصول"}
+                        </span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="px-3 text-xs leading-6 text-muted-foreground">هنوز گفتگویی ذخیره نشده.</p>
+            )
+          ) : (
+            <div className="rounded-xl border border-dashed border-border p-4 text-xs leading-6 text-muted-foreground">
+              برای ذخیره‌ی تاریخچه‌ی گفتگوها و پیگیری پروژه‌ها{" "}
+              <Link href="/login?redirect=/chat" className="font-bold text-brand underline-offset-4 hover:underline">وارد شو</Link>.
+            </div>
           )}
         </nav>
-      )}
-      <nav aria-label="گفتگوهای اخیر" data-tour="history" className="mt-6 min-h-0 flex-1 overflow-y-auto px-3 pb-4">
-        <p className="eyebrow mb-2 px-2.5">گفتگوهای اخیر</p>
-        {customerToken ? (
-          visibleSessions.length ? (
-            <ul className="space-y-0.5">
-              {visibleSessions.map((s) => (
-                <li key={s.id}>
-                  <Link
-                    href={`/chat?session=${s.id}`}
-                    onClick={() => setSidebarOpen(false)}
-                    aria-current={s.id === sessionId ? "page" : undefined}
-                    className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-secondary-foreground outline-none transition-colors hover:bg-foreground/5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:bg-foreground/[0.07] aria-[current=page]:font-bold aria-[current=page]:text-foreground"
-                  >
-                    <IconMessage size={16} className="shrink-0 text-muted-foreground" aria-hidden="true" />
-                    <span className="truncate">{s.title}</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="px-2.5 text-xs leading-6 text-muted-foreground">هنوز گفتگویی ذخیره نشده.</p>
-          )
-        ) : (
-          <div className="rounded-xl border border-dashed border-border p-4 text-xs leading-6 text-muted-foreground">
-            برای ذخیره‌ی تاریخچه‌ی گفتگوها و پیگیری پروژه‌ها{" "}
-            <Link href="/login?redirect=/chat" className="font-bold text-brand underline-offset-4 hover:underline">وارد شو</Link>.
-          </div>
-        )}
-      </nav>
+      </div>
       <FreelancerPromo onNavigate={() => setSidebarOpen(false)} />
       <div className="flex items-center gap-2 border-t border-border p-3">
         <Link href={customerToken ? "/account" : "/login?redirect=/account"} data-tour="account" className="flex h-10 min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2 text-sm font-bold text-foreground outline-none transition-colors hover:bg-foreground/5 focus-visible:ring-2 focus-visible:ring-ring">

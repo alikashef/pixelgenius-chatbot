@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { IconArrowLeft, IconCheck, IconLayoutDashboard, IconX } from "@tabler/icons-react";
+import { IconArrowLeft, IconCheck, IconX } from "@tabler/icons-react";
 
 const RobotHead = dynamic(() => import("robot-heads").then((module) => module.RobotHead), {
   ssr: false,
@@ -40,21 +40,7 @@ export default function FreelancerPromo({ onNavigate }: { onNavigate?: () => voi
     }
   }
 
-  if (state === "freelancer") {
-    return (
-      <div className="px-3 pb-3">
-        <Link
-          href="/freelancer/dashboard"
-          onClick={onNavigate}
-          className="flex h-10 items-center gap-2.5 rounded-lg border border-border bg-surface px-3 text-sm font-bold text-foreground outline-none transition-colors hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <IconLayoutDashboard size={17} className="text-brand" aria-hidden="true" />
-          پنل فریلنسر
-        </Link>
-      </div>
-    );
-  }
-
+  // Freelancers already have their section in the sidebar menu.
   if (state !== "promo") return null;
 
   return (

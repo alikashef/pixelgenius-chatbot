@@ -110,10 +110,10 @@ interface AppShellProps {
   width?: "default" | "wide";
 }
 
-function NavLink({ item, onNavigate }: { item: ShellNavItem; onNavigate: () => void }) {
+function NavLink({ item, onNavigate, dense }: { item: ShellNavItem; onNavigate: () => void; dense?: boolean }) {
   if (item.comingSoon) {
     return (
-      <span aria-disabled="true" className="flex min-h-10 w-full cursor-not-allowed select-none items-center gap-3 rounded-lg px-3 text-sm text-muted-foreground/70">
+      <span aria-disabled="true" className={`flex w-full ${dense ? "min-h-9" : "min-h-10"} cursor-not-allowed select-none items-center gap-3 rounded-lg px-3 text-sm text-muted-foreground/70`}>
         <item.icon size={19} stroke={1.8} aria-hidden="true" />
         <span className="flex-1 truncate text-right">{item.label}</span>
         <span className="rounded-full bg-accent-soft px-2 text-[11px] font-bold leading-5 text-accent">به‌زودی</span>
@@ -121,7 +121,8 @@ function NavLink({ item, onNavigate }: { item: ShellNavItem; onNavigate: () => v
     );
   }
   const className = cn(
-    "flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+    "flex w-full items-center gap-3 rounded-lg px-3 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+    dense ? "min-h-9" : "min-h-10",
     item.active
       ? "bg-foreground/[0.07] font-bold text-foreground"
       : "text-secondary-foreground hover:bg-foreground/5 hover:text-foreground"
@@ -157,6 +158,22 @@ function NavLink({ item, onNavigate }: { item: ShellNavItem; onNavigate: () => v
     >
       {content}
     </button>
+  );
+}
+
+/** Sidebar links under their group headings; shared by the panels and the chat sidebar. */
+export function NavGroups({ nav, onNavigate, dense }: { nav: ShellNavItem[]; onNavigate: () => void; dense?: boolean }) {
+  return (
+    <div className="space-y-0.5">
+      {nav.map((item, i) => (
+        <div key={item.key}>
+          {item.group && item.group !== nav[i - 1]?.group && (
+            <p className={cn("eyebrow px-3 pb-1.5", i > 0 && (dense ? "mt-4" : "mt-5"))}>{item.group}</p>
+          )}
+          <NavLink item={item} onNavigate={onNavigate} dense={dense} />
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -197,15 +214,8 @@ export default function AppShell({
         </button>
       </div>
       {primaryAction && <div className="px-3 pb-2" data-tour="new-project">{primaryAction}</div>}
-      <nav aria-label="منوی اصلی" className="mt-3 min-h-0 flex-1 space-y-0.5 overflow-y-auto px-3">
-        {nav.map((item, i) => (
-          <div key={item.key}>
-            {item.group && item.group !== nav[i - 1]?.group && (
-              <p className={cn("eyebrow px-3 pb-1.5", i > 0 && "mt-5")}>{item.group}</p>
-            )}
-            <NavLink item={item} onNavigate={() => setOpen(false)} />
-          </div>
-        ))}
+      <nav aria-label="منوی اصلی" className="mt-3 min-h-0 flex-1 overflow-y-auto px-3">
+        <NavGroups nav={nav} onNavigate={() => setOpen(false)} />
       </nav>
       <div className="border-t border-border p-3" data-tour="shell-footer">
         <div className="flex items-center gap-2">
