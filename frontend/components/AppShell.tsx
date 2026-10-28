@@ -17,6 +17,8 @@ export interface ShellNavItem {
   count?: number;
   /** Items sharing a group are listed under that heading. */
   group?: string;
+  /** Shown but not clickable, with a "coming soon" tag. */
+  comingSoon?: boolean;
 }
 
 interface AppShellProps {
@@ -36,6 +38,15 @@ interface AppShellProps {
 }
 
 function NavLink({ item, onNavigate }: { item: ShellNavItem; onNavigate: () => void }) {
+  if (item.comingSoon) {
+    return (
+      <span aria-disabled="true" className="flex min-h-10 w-full cursor-not-allowed select-none items-center gap-3 rounded-lg px-3 text-sm text-muted-foreground/70">
+        <item.icon size={19} stroke={1.8} aria-hidden="true" />
+        <span className="flex-1 truncate text-right">{item.label}</span>
+        <span className="rounded-full bg-brand-soft px-2 text-[11px] font-bold leading-5 text-brand">به‌زودی</span>
+      </span>
+    );
+  }
   const className = cn(
     "flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
     item.active

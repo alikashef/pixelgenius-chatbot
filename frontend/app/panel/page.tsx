@@ -6,6 +6,7 @@ import Link from "next/link";
 import {
   IconPlus,
   IconClipboardList,
+  IconLayoutGrid,
   IconMessage,
   IconSettings,
   IconWand,
@@ -311,7 +312,7 @@ export default function PanelPage() {
 
   return (
     <AppShell
-      nav={TABS.map(({ key, group, label, icon }) => ({
+      nav={TABS.flatMap(({ key, group, label, icon }) => [{
         key,
         group,
         label,
@@ -319,7 +320,7 @@ export default function PanelPage() {
         active: activeTab === key,
         onSelect: () => selectTab(key),
         count: key === "design" ? designOrders.length : key === "orders" ? salesOrders.length : key === "chats" ? chatSessions.length : undefined,
-      }))}
+      }, ...(key === "design" ? [{ key: "templates", group, label: "سایت‌های آماده", icon: IconLayoutGrid, comingSoon: true }] : [])])}
       primaryAction={newProjectLink}
       user={{ name: [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || "کاربر", detail: profile?.phone }}
       onLogout={logout}
