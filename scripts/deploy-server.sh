@@ -98,8 +98,14 @@ done
 IMAGES_SAVED=1
 
 PHASE=build
-say 'Building frontend (pnpm build, TypeScript and lint) and backend.'
-candidate build backend frontend
+build_services=(frontend)
+if [[ "$old" =~ ^0+$ ]] || ! git diff --quiet "$old" "$revision" -- backend/ docker-compose.yml; then
+  build_services+=(backend)
+else
+  say 'Backend source is unchanged; retaining its running image and still running its tests.'
+fi
+say "Building: ${build_services[*]} (frontend includes pnpm build, TypeScript and lint)."
+candidate build "${build_services[@]}"
 
 PHASE=tests
 say 'Running backend regression tests with no production credentials, network or volumes.'
