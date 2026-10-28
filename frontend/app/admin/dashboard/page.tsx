@@ -226,7 +226,6 @@ export default function AdminDashboard() {
         </div>
       )}
       <AppShell
-        area="ادمین"
         width="wide"
         nav={ADMIN_TABS.map(({ key, group, label, icon }) => ({
           key,

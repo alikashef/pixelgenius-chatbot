@@ -3,8 +3,8 @@
 import dynamic from "next/dynamic";
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { IconArrowUp, IconBrush, IconCheck, IconExternalLink, IconLayoutDashboard, IconMessageCircle, IconSchool, IconVolume, IconVolumeOff, IconX } from "@tabler/icons-react";
-import AppShell, { ShellLoading } from "@/components/AppShell";
+import { IconArrowUp, IconCheck, IconExternalLink, IconMessageCircle, IconVolume, IconVolumeOff, IconX } from "@tabler/icons-react";
+import AppShell, { NewProjectLink, ShellLoading, useAccountNav } from "@/components/AppShell";
 import { CopyBlock } from "@/components/McpTour";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -133,19 +133,17 @@ export default function FreelancerWidgetPage() {
     }
   }
 
+  const nav = useAccountNav({ active: "freelancer-widget" });
+
   if (loading) return <ShellLoading />;
 
   const snippet = `<script src="${origin}/embed.js" data-bot="${botToken}" async></script>`;
 
   return (
     <AppShell
-      area="فریلنسر"
       width="wide"
-      nav={[
-        { key: "dashboard", label: "داشبورد", icon: IconLayoutDashboard, href: "/freelancer/dashboard" },
-        { key: "widget", label: "ظاهر و نصب ویجت", icon: IconBrush, href: "/freelancer/widget", active: true },
-        { key: "settings", label: "آموزش دستیار", icon: IconSchool, href: "/freelancer/settings" },
-      ]}
+      nav={nav}
+      primaryAction={<NewProjectLink />}
       user={name ? { name } : undefined}
       onLogout={logout}
       title="ظاهر و نصب ویجت"

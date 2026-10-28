@@ -2,44 +2,14 @@
 
 import { ReactNode, useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { IconArrowUpLeft, IconBriefcase, IconHelp, IconLogout, IconMenu2, IconUser, IconX, type Icon } from "@tabler/icons-react";
+import {
+  IconBrush, IconClipboardList, IconHelp, IconLayoutDashboard, IconLayoutGrid, IconLogout, IconMenu2, IconMessage, IconPlugConnected, IconPlus,
+  IconSchool, IconSettings, IconWand, IconX, type Icon,
+} from "@tabler/icons-react";
 import { BrandLogo } from "@/components/Brand";
 import ThemeToggle from "@/components/ThemeToggle";
-import { PANELS, Role, signedInRoles } from "@/lib/api";
+import { Role, signedInRoles } from "@/lib/api";
 import { cn } from "@/lib/utils";
-
-const ROLE_PREFIX: Record<Role, string> = { customer: "/panel", freelancer: "/freelancer", admin: "/admin" };
-
-const ROLE_ICONS: Record<Role, Icon> = { customer: IconUser, freelancer: IconBriefcase, admin: IconUser };
-
-/** A plain link to each other panel this account may open; nothing when it has none. Admin is never listed. */
-function OtherPanels({ onNavigate }: { onNavigate: () => void }) {
-  const pathname = usePathname();
-  const [roles, setRoles] = useState<Role[]>([]);
-  useEffect(() => setRoles(signedInRoles().filter((role) => role !== "admin")), []);
-  const others = roles.filter((role) => !pathname.startsWith(ROLE_PREFIX[role]));
-  if (!others.length) return null;
-  return (
-    <div className="space-y-0.5 px-3 pb-3">
-      {others.map((role) => {
-        const RoleIcon = ROLE_ICONS[role];
-        return (
-          <Link
-            key={role}
-            href={PANELS[role].href}
-            onClick={onNavigate}
-            className="flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm text-secondary-foreground outline-none transition-colors hover:bg-foreground/5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <RoleIcon size={19} stroke={1.8} aria-hidden="true" className="text-muted-foreground" />
-            <span className="flex-1 truncate text-right">{PANELS[role].label}</span>
-            <IconArrowUpLeft size={15} aria-hidden="true" className="text-muted-foreground" />
-          </Link>
-        );
-      })}
-    </div>
-  );
-}
 
 export interface ShellNavItem {
   key: string;
@@ -55,10 +25,74 @@ export interface ShellNavItem {
   comingSoon?: boolean;
 }
 
+type CustomerTab = "design" | "connect" | "orders" | "chats" | "account";
+
+// One sidebar for every signed-in account: its sections follow the account's permissions.
+const CUSTOMER_NAV: (Omit<ShellNavItem, "key"> & { key: CustomerTab | "templates" })[] = [
+  { key: "design", group: "طراحی محصول", label: "پروژه‌های طراحی", icon: IconWand },
+  { key: "connect", group: "طراحی محصول", label: "اتصال به هوش مصنوعی", icon: IconPlugConnected },
+  { key: "templates", group: "طراحی محصول", label: "سایت‌های آماده", icon: IconLayoutGrid, comingSoon: true },
+  { key: "orders", group: "فروش", label: "سفارش‌ها", icon: IconClipboardList },
+];
+const FREELANCER_NAV: ShellNavItem[] = [
+  { key: "freelancer-dashboard", group: "فریلنسر", label: "درخواست‌های مشتری‌ها", icon: IconLayoutDashboard, href: "/freelancer/dashboard" },
+  { key: "freelancer-widget", group: "فریلنسر", label: "ظاهر و نصب ویجت", icon: IconBrush, href: "/freelancer/widget" },
+  { key: "freelancer-settings", group: "فریلنسر", label: "آموزش دستیار", icon: IconSchool, href: "/freelancer/settings" },
+];
+const ACCOUNT_NAV: (Omit<ShellNavItem, "key"> & { key: CustomerTab })[] = [
+  { key: "chats", group: "حساب کاربری", label: "گفتگوهای ناتمام", icon: IconMessage },
+  { key: "account", group: "حساب کاربری", label: "تنظیمات حساب", icon: IconSettings },
+];
+
+/**
+ * The shared sidebar items. Customer sections link to /panel tabs (or switch tabs in place when
+ * onCustomerTab is given); the freelancer section only appears for accounts with that permission.
+ */
+export function useAccountNav({
+  active,
+  counts = {},
+  onCustomerTab,
+}: {
+  active: string;
+  counts?: Partial<Record<string, number>>;
+  onCustomerTab?: (tab: CustomerTab) => void;
+}): ShellNavItem[] {
+  const [roles, setRoles] = useState<Role[]>([]);
+  useEffect(() => setRoles(signedInRoles()), []);
+  const customerItem = ({ key, ...item }: Omit<ShellNavItem, "key"> & { key: CustomerTab | "templates" }): ShellNavItem => ({
+    ...item,
+    key,
+    active: active === key,
+    count: counts[key],
+    ...(item.comingSoon || key === "templates"
+      ? {}
+      : onCustomerTab
+        ? { onSelect: () => onCustomerTab(key) }
+        : { href: `/panel?tab=${key}` }),
+  });
+  const customer = roles.includes("customer");
+  return [
+    ...(customer ? CUSTOMER_NAV.map(customerItem) : []),
+    ...(roles.includes("freelancer") ? FREELANCER_NAV.map((item) => ({ ...item, active: active === item.key, count: counts[item.key] })) : []),
+    ...(customer ? ACCOUNT_NAV.map(customerItem) : []),
+  ];
+}
+
+/** The "new project" button every customer sees at the top of the sidebar. */
+export function NewProjectLink() {
+  return (
+    <Link
+      href="/chat?new=1"
+      className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground outline-none transition-colors hover:bg-primary-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+    >
+      <IconPlus size={17} stroke={2.2} aria-hidden="true" />
+      پروژه جدید
+    </Link>
+  );
+}
+
 interface AppShellProps {
   nav: ShellNavItem[];
-  /** Small caption under the logo, e.g. "پنل ادمین". */
-  area?: string;
   /** Prominent action at the top of the sidebar (e.g. new project). */
   primaryAction?: ReactNode;
   user?: { name: string; detail?: string };
@@ -125,7 +159,6 @@ function NavLink({ item, onNavigate }: { item: ShellNavItem; onNavigate: () => v
 
 export default function AppShell({
   nav,
-  area,
   primaryAction,
   user,
   onLogout,
@@ -150,7 +183,6 @@ export default function AppShell({
       <div className="flex h-16 shrink-0 items-center justify-between gap-2 px-4">
         <div className="flex min-w-0 items-center gap-2">
           <BrandLogo size="sm" />
-          {area && <span className="shrink-0 rounded-full bg-foreground/[0.06] px-2 py-0.5 text-[11px] font-bold text-muted-foreground">{area}</span>}
         </div>
         <button
           type="button"
@@ -172,7 +204,6 @@ export default function AppShell({
           </div>
         ))}
       </nav>
-      <OtherPanels onNavigate={() => setOpen(false)} />
       <div className="border-t border-border p-3" data-tour="shell-footer">
         <div className="flex items-center gap-2">
           {user && (

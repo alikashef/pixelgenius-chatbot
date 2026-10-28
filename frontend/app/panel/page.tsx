@@ -3,22 +3,9 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import {
-  IconPlus,
-  IconClipboardList,
-  IconLayoutGrid,
-  IconPlugConnected,
-  IconMessage,
-  IconSettings,
-  IconWand,
-  IconCoin,
-  IconCheck,
-  IconDownload,
-  IconChevronLeft,
-  IconCalendar,
-} from "@tabler/icons-react";
+import { IconPlus, IconClipboardList, IconPlugConnected, IconMessage, IconSettings, IconWand, IconCoin, IconCheck, IconDownload, IconChevronLeft, IconCalendar } from "@tabler/icons-react";
 import { fetchCustomerProfile, fetchMyOrders, updateCustomerProfile, CustomerProfile, Order, clearSession } from "@/lib/api";
-import AppShell, { ShellLoading } from "@/components/AppShell";
+import AppShell, { NewProjectLink, ShellLoading, useAccountNav } from "@/components/AppShell";
 import McpTour, { isMcpTourDone } from "@/components/McpTour";
 import GuidedTour, { startTour } from "@/components/GuidedTour";
 import { Button } from "@/components/ui/button";
@@ -274,6 +261,16 @@ export default function PanelPage() {
     }
   }
 
+  const nav = useAccountNav({
+    active: activeTab,
+    counts: {
+      design: orders.filter((o) => o.mode === "designer").length,
+      orders: orders.filter((o) => o.mode !== "designer").length,
+      chats: chatSessions.length,
+    },
+    onCustomerTab: selectTab,
+  });
+
   if (loading) return <ShellLoading />;
 
   const designOrders = orders.filter((o) => o.mode === "designer");
@@ -307,28 +304,11 @@ export default function PanelPage() {
     chats: { title: "گفتگوهای ناتمام", description: "گفتگوهایی که هنوز به پروژه تبدیل نشده‌اند را ادامه بده." },
     account: { title: "تنظیمات حساب", description: "این اطلاعات برای شخصی‌سازی گفتگو استفاده می‌شه." },
   };
-  const newProjectLink = (
-    <Link
-      href="/chat?new=1"
-      className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground outline-none transition-colors hover:bg-primary-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-    >
-      <IconPlus size={17} stroke={2.2} aria-hidden="true" />
-      پروژه جدید
-    </Link>
-  );
 
   return (
     <AppShell
-      nav={TABS.flatMap(({ key, group, label, icon }) => [{
-        key,
-        group,
-        label,
-        icon,
-        active: activeTab === key,
-        onSelect: () => selectTab(key),
-        count: key === "design" ? designOrders.length : key === "orders" ? salesOrders.length : key === "chats" ? chatSessions.length : undefined,
-      }, ...(key === "connect" ? [{ key: "templates", group, label: "سایت‌های آماده", icon: IconLayoutGrid, comingSoon: true }] : [])])}
-      primaryAction={newProjectLink}
+      nav={nav}
+      primaryAction={<NewProjectLink />}
       user={{ name: [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || "کاربر", detail: profile?.phone }}
       onLogout={logout}
       onHelp={() => startTour("panel")}

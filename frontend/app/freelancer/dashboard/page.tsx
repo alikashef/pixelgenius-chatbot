@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { IconBrush, IconChevronLeft, IconCode, IconInbox, IconLayoutDashboard, IconSchool } from "@tabler/icons-react";
+import { IconBrush, IconChevronLeft, IconCode, IconInbox } from "@tabler/icons-react";
 import { fetchFreelancerOrders, Order, clearSession } from "@/lib/api";
-import AppShell from "@/components/AppShell";
+import AppShell, { NewProjectLink, useAccountNav } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { CopyBlock } from "@/components/McpTour";
 
@@ -65,14 +65,12 @@ export default function FreelancerDashboardPage() {
   const paid = orders.filter((o) => o.status === "paid").length;
 
 
+  const nav = useAccountNav({ active: "freelancer-dashboard", counts: { "freelancer-dashboard": orders.length || undefined } });
+
   return (
     <AppShell
-      area="فریلنسر"
-      nav={[
-        { key: "dashboard", label: "داشبورد", icon: IconLayoutDashboard, href: "/freelancer/dashboard", active: true, count: orders.length || undefined },
-        { key: "widget", label: "ظاهر و نصب ویجت", icon: IconBrush, href: "/freelancer/widget" },
-        { key: "settings", label: "آموزش دستیار", icon: IconSchool, href: "/freelancer/settings" },
-      ]}
+      nav={nav}
+      primaryAction={<NewProjectLink />}
       user={name ? { name } : undefined}
       onLogout={handleLogout}
       title={`سلام${name ? `، ${name}` : ""}`}

@@ -2,18 +2,7 @@
 
 import { FormEvent, ReactNode, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  IconBrush,
-  IconCheck,
-  IconCircleCheck,
-  IconCircleDashed,
-  IconExternalLink,
-  IconLayoutDashboard,
-  IconPlus,
-  IconSchool,
-  IconSparkles,
-  IconTrash,
-} from "@tabler/icons-react";
+import { IconCheck, IconCircleCheck, IconCircleDashed, IconExternalLink, IconPlus, IconSparkles, IconTrash } from "@tabler/icons-react";
 import {
   EMPTY_KNOWLEDGE,
   fetchFreelancerSettings,
@@ -22,7 +11,7 @@ import {
   FreelancerKnowledge,
   FreelancerService,
   updateFreelancerKnowledge, clearSession } from "@/lib/api";
-import AppShell, { ShellLoading } from "@/components/AppShell";
+import AppShell, { NewProjectLink, ShellLoading, useAccountNav } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -181,17 +170,15 @@ export default function FreelancerTrainingPage() {
     }
   }
 
+  const nav = useAccountNav({ active: "freelancer-settings" });
+
   if (loading) return <ShellLoading />;
 
   return (
     <AppShell
-      area="فریلنسر"
       width="wide"
-      nav={[
-        { key: "dashboard", label: "داشبورد", icon: IconLayoutDashboard, href: "/freelancer/dashboard" },
-        { key: "widget", label: "ظاهر و نصب ویجت", icon: IconBrush, href: "/freelancer/widget" },
-        { key: "settings", label: "آموزش دستیار", icon: IconSchool, href: "/freelancer/settings", active: true },
-      ]}
+      nav={nav}
+      primaryAction={<NewProjectLink />}
       user={name ? { name } : undefined}
       onLogout={logout}
       title="آموزش دستیار"
