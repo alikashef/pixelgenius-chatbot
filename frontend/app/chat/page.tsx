@@ -352,7 +352,7 @@ function BriefGuide({ mcpUrl }: { mcpUrl: string }) {
                     </li>
                   </ol>
                   <p className="mt-2 text-xs text-muted-foreground">اسم:</p>
-                  <CopyBlock text="FreelioAI" label="کپی اسم کانکتور" />
+                  <CopyBlock text="PixelGenius" label="کپی اسم کانکتور" />
                   <p className="mt-2 text-xs text-muted-foreground">آدرس سرور:</p>
                   <CopyBlock text={mcpUrl} label="کپی آدرس سرور" />
                 </>
@@ -370,11 +370,11 @@ function BriefGuide({ mcpUrl }: { mcpUrl: string }) {
                       اسم و آدرس زیر رو بده و احراز هویت رو روی <b>No authentication</b> بذار.
                     </li>
                     <li>
-                      توی چت جدید، از منوی ابزارها <b>FreelioAI</b> رو فعال کن.
+                      توی چت جدید، از منوی ابزارها <b>PixelGenius</b> رو فعال کن.
                     </li>
                   </ol>
                   <p className="mt-2 text-xs text-muted-foreground">اسم:</p>
-                  <CopyBlock text="FreelioAI" label="کپی اسم کانکتور" />
+                  <CopyBlock text="PixelGenius" label="کپی اسم کانکتور" />
                   <p className="mt-2 text-xs text-muted-foreground">آدرس سرور:</p>
                   <CopyBlock text={mcpUrl} label="کپی آدرس سرور" />
                   <p className="mt-2 text-xs text-muted-foreground">
@@ -1043,7 +1043,7 @@ function ChatPageInner() {
       {!showSidebar && (
         <p className="mt-2 text-center text-[11px] text-muted-foreground">
           قدرت گرفته از{" "}
-          <a href="/" target="_blank" rel="noopener noreferrer" className="font-bold text-secondary-foreground hover:text-foreground">FreelioAI</a>
+          <a href="/" target="_blank" rel="noopener noreferrer" className="font-bold text-secondary-foreground hover:text-foreground">PixelGenius</a>
         </p>
       )}
       {!isFresh && showSidebar && (
@@ -1163,7 +1163,7 @@ function ChatPageInner() {
             {embedded && (
               <button
                 type="button"
-                onClick={() => window.parent.postMessage({ type: "freelio:close" }, "*")}
+                onClick={() => window.parent.postMessage({ type: "pixelgenius:close" }, "*")}
                 aria-label="بستن چت"
                 className="grid h-9 w-9 place-items-center rounded-xl text-muted-foreground outline-none hover:bg-foreground/5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
               >

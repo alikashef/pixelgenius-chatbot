@@ -70,7 +70,7 @@ export default function AuthLayout({
         className="relative hidden w-[44%] max-w-2xl shrink-0 flex-col justify-between overflow-hidden bg-foreground p-12 text-background lg:flex"
       >
         <div className="pointer-events-none absolute inset-0 bg-dots opacity-[0.35] [--foreground:var(--background)]" />
-        <BrandMark size="lg" className="relative" />
+        <BrandMark size="lg" className="relative text-background" />
         <div className="relative">
           <p className="max-w-md text-[2rem] font-black leading-[1.45] tracking-tight">{panel.headline}</p>
           <ul className="mt-8 space-y-3">
@@ -88,12 +88,12 @@ export default function AuthLayout({
           <div className="relative max-w-md space-y-3 rounded-2xl border border-background/10 bg-background/[0.06] p-5">
             <div className="mr-auto w-fit max-w-[85%] rounded-2xl rounded-tr-md bg-background/10 px-4 py-2.5 text-sm">{panel.quote.text}</div>
             <div className="flex items-start gap-2.5">
-              <BrandMark size="sm" />
+              <BrandMark size="sm" className="text-background" />
               <p className="pt-1 text-sm leading-7 opacity-85">{panel.reply}</p>
             </div>
           </div>
         ) : (
-          <p className="relative text-sm opacity-60">FreelioAI · پنل مدیریت</p>
+          <p className="relative text-sm opacity-60">PixelGenius · پنل مدیریت</p>
         )}
       </aside>
     </div>

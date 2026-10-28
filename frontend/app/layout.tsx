@@ -16,7 +16,7 @@ const yekanBakh = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "FreelioAI — دستیار هوشمند فریلنسرهای حرفه‌ای",
+  title: "PixelGenius — دستیار هوشمند فریلنسرهای حرفه‌ای",
   description: "ویجت AI فارسی برای فریلنسرها — از intake مشتری تا تحویل پروژه",
 };
 

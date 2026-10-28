@@ -300,7 +300,7 @@ export default function PanelPage() {
     },
     connect: {
       title: "اتصال به هوش مصنوعی",
-      description: "یک‌بار Claude، ChatGPT یا Cursor رو به FreelioAI وصل کن تا پروژه‌هات رو خودش بسازه و منتشر کنه.",
+      description: "یک‌بار Claude، ChatGPT یا Cursor رو به PixelGenius وصل کن تا پروژه‌هات رو خودش بسازه و منتشر کنه.",
     },
     orders: {
       title: "سفارش‌های فروش",
@@ -370,7 +370,7 @@ export default function PanelPage() {
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-bold text-foreground">پروژه‌ات رو خودکار بساز و منتشر کن</p>
-            <p className="mt-0.5 text-xs leading-6 text-secondary-foreground">ابزار هوش مصنوعی‌ات رو با یک راهنمای ۳ دقیقه‌ای به FreelioAI وصل کن.</p>
+            <p className="mt-0.5 text-xs leading-6 text-secondary-foreground">ابزار هوش مصنوعی‌ات رو با یک راهنمای ۳ دقیقه‌ای به PixelGenius وصل کن.</p>
           </div>
           <Button size="sm" onClick={() => selectTab("connect")}>شروع راهنما</Button>
         </div>

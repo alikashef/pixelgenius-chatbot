@@ -853,7 +853,7 @@ export async function checkMcpServer(url: string): Promise<{ serverName: string;
   const init = await mcpRpc(url, 1, "initialize", {
     protocolVersion: "2025-06-18",
     capabilities: {},
-    clientInfo: { name: "freelioai-panel", version: "1.0" },
+    clientInfo: { name: "pixelgenius-panel", version: "1.0" },
   });
   const list = await mcpRpc(url, 2, "tools/list");
   return {

@@ -29,7 +29,7 @@ import { checkMcpServer, fetchMcpInfo, Order } from "@/lib/api";
 export const BUILD_PROMPT =
   "فایل project-brief.json توی همین پوشه‌ست. کامل بخونش و پروژه رو دقیقاً طبق اون بساز. اگر ابزار deploy_project در دسترسه، در پایان پروژه رو روی سرور منتشر کن، تا آماده شدن وضعیتش رو چک کن، خطاها رو خودت درست کن و آدرس نهایی رو بهم بده. اگر ابزار وصل نیست، دستور اجرای محلی رو بنویس.";
 
-const TEST_PROMPT = "ابزارهای FreelioAI رو لیست کن و بگو هر کدوم چه کاری انجام می‌ده.";
+const TEST_PROMPT = "ابزارهای PixelGenius رو لیست کن و بگو هر کدوم چه کاری انجام می‌ده.";
 
 export function CopyBlock({ text, label, rtl = false }: { text: string; label: string; rtl?: boolean }) {
   const [copied, setCopied] = useState(false);
@@ -90,7 +90,7 @@ const TOOLS: ToolGuide[] = [
       <>توی Claude برو به <b>Customize</b> و بخش <b>Connectors</b> رو باز کن.</>,
       <>دکمه‌ی <b>+</b> و بعد <b>Add custom connector</b> رو بزن.</>,
       <>اسم و آدرس سرور رو از پایین کپی کن؛ بقیه‌ی فیلدها رو خالی بذار و <b>Add</b> رو بزن.</>,
-      <>توی یک چت جدید، از منوی ابزارها مطمئن شو <b>FreelioAI</b> فعاله.</>,
+      <>توی یک چت جدید، از منوی ابزارها مطمئن شو <b>PixelGenius</b> فعاله.</>,
     ],
   },
   {
@@ -101,9 +101,9 @@ const TOOLS: ToolGuide[] = [
     steps: [
       <>ترمینال رو توی پوشه‌ی پروژه باز کن.</>,
       <>دستور زیر رو اجرا کن تا سرور اضافه بشه.</>,
-      <>Claude Code رو باز کن و با <b>/mcp</b> ببین FreelioAI وصل شده.</>,
+      <>Claude Code رو باز کن و با <b>/mcp</b> ببین PixelGenius وصل شده.</>,
     ],
-    extra: (url) => <CopyBlock text={`claude mcp add --transport http FreelioAI ${url}`} label="کپی دستور افزودن سرور" />,
+    extra: (url) => <CopyBlock text={`claude mcp add --transport http PixelGenius ${url}`} label="کپی دستور افزودن سرور" />,
   },
   {
     id: "chatgpt",
@@ -115,7 +115,7 @@ const TOOLS: ToolGuide[] = [
       <>توی ChatGPT برو به <b>Settings ← Apps &amp; Connectors ← Advanced</b> و <b>Developer Mode</b> رو روشن کن.</>,
       <><b>Create</b> رو بزن تا یک connector جدید بسازی.</>,
       <>اسم و آدرس رو بده و احراز هویت رو روی <b>No authentication</b> بذار.</>,
-      <>توی چت جدید، از منوی ابزارها <b>FreelioAI</b> رو فعال کن.</>,
+      <>توی چت جدید، از منوی ابزارها <b>PixelGenius</b> رو فعال کن.</>,
     ],
     note: "Developer Mode بسته به پلن ممکنه در دسترس نباشه؛ اگه گزینه رو ندیدی، از Claude یا Cursor استفاده کن.",
   },
@@ -131,7 +131,7 @@ const TOOLS: ToolGuide[] = [
       <>یا فایل <b>.cursor/mcp.json</b> رو با محتوای زیر بساز.</>,
     ],
     extra: (url) => (
-      <CopyBlock text={JSON.stringify({ mcpServers: { FreelioAI: { url } } }, null, 2)} label="کپی تنظیمات mcp.json" />
+      <CopyBlock text={JSON.stringify({ mcpServers: { PixelGenius: { url } } }, null, 2)} label="کپی تنظیمات mcp.json" />
     ),
     note: "Codex و ابزارهای مشابه هم توی بخش تنظیمات MCP خودشون همین آدرس رو می‌پذیرن.",
   },
@@ -201,7 +201,7 @@ function FlowDiagram() {
       <IconArrowLeft size={18} className="text-muted-foreground" />
       <div className={cn(node, "border-brand-line")}>
         <BrandMark size="md" />
-        <span className="text-xs font-bold">سرور FreelioAI</span>
+        <span className="text-xs font-bold">سرور PixelGenius</span>
       </div>
       <IconArrowLeft size={18} className="text-muted-foreground" />
       <div className={node}>
@@ -312,7 +312,7 @@ export default function McpTour({ designOrders }: { designOrders: Order[] }) {
           <p className="eyebrow">مرحله {(step + 1).toLocaleString("fa-IR")} از {STEPS.length.toLocaleString("fa-IR")}</p>
           <h2 className="mt-1 text-lg font-black text-foreground">
             {[
-              "هوش مصنوعی‌ات رو به FreelioAI وصل کن",
+              "هوش مصنوعی‌ات رو به PixelGenius وصل کن",
               "با کدوم ابزار کار می‌کنی؟",
               tool ? `افزودن سرور به ${tool.name}` : "افزودن سرور",
               "اتصال رو امتحان کن",
@@ -325,7 +325,7 @@ export default function McpTour({ designOrders }: { designOrders: Order[] }) {
           {step === 0 && (
             <div className="space-y-6">
               <p className="text-sm leading-8 text-secondary-foreground">
-                با این اتصال (MCP)، ابزار هوش مصنوعی‌ای که باهاش کد می‌نویسی مستقیم به FreelioAI دسترسی پیدا می‌کنه:
+                با این اتصال (MCP)، ابزار هوش مصنوعی‌ای که باهاش کد می‌نویسی مستقیم به PixelGenius دسترسی پیدا می‌کنه:
                 پروژه رو از روی کانفیگت می‌سازه، خودش روی سرور <b>بیلد و منتشر</b> می‌کنه و یک لینک زنده بهت می‌ده.
               </p>
               <FlowDiagram />
@@ -397,7 +397,7 @@ export default function McpTour({ designOrders }: { designOrders: Order[] }) {
                 <div className="grid gap-4 sm:grid-cols-[10rem_1fr]">
                   <div>
                     <p className="text-xs font-bold text-muted-foreground">اسم</p>
-                    <CopyBlock text="FreelioAI" label="کپی اسم کانکتور" />
+                    <CopyBlock text="PixelGenius" label="کپی اسم کانکتور" />
                   </div>
                   <div>
                     <p className="text-xs font-bold text-muted-foreground">آدرس سرور</p>
@@ -433,7 +433,7 @@ export default function McpTour({ designOrders }: { designOrders: Order[] }) {
                         {check.tools.map((name) => (
                           <li key={name} className="rounded-lg bg-surface-2 px-3 py-2 text-xs">
                             <span dir="ltr" className="font-mono font-bold text-foreground">{name}</span>
-                            <span className="mt-0.5 block text-muted-foreground">{TOOL_LABELS[name] || "ابزار سرور FreelioAI"}</span>
+                            <span className="mt-0.5 block text-muted-foreground">{TOOL_LABELS[name] || "ابزار سرور PixelGenius"}</span>
                           </li>
                         ))}
                       </ul>
@@ -450,10 +450,10 @@ export default function McpTour({ designOrders }: { designOrders: Order[] }) {
 
               <div className="rounded-xl border border-border p-4">
                 <p className="text-sm font-bold text-foreground">۲. ابزارت سرور رو می‌بینه؟</p>
-                <p className="mt-0.5 text-xs leading-6 text-muted-foreground">این پیام رو توی {tool?.name || "ابزار هوش مصنوعی‌ات"} بفرست؛ باید لیست ابزارهای FreelioAI رو جواب بده.</p>
+                <p className="mt-0.5 text-xs leading-6 text-muted-foreground">این پیام رو توی {tool?.name || "ابزار هوش مصنوعی‌ات"} بفرست؛ باید لیست ابزارهای PixelGenius رو جواب بده.</p>
                 <CopyBlock text={TEST_PROMPT} label="کپی پیام تست" rtl />
                 <p className="mt-3 text-xs leading-6 text-muted-foreground">
-                  جواب نداد؟ ابزار رو یک‌بار ببند و باز کن و مطمئن شو FreelioAI توی منوی ابزارها روشنه.
+                  جواب نداد؟ ابزار رو یک‌بار ببند و باز کن و مطمئن شو PixelGenius توی منوی ابزارها روشنه.
                 </p>
               </div>
             </div>

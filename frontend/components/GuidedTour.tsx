@@ -27,7 +27,7 @@ const GUIDE_COLORS = { color: "#f28c28", trimColor: "#36312b", screenColor: "#ff
 
 const DONE_KEY = (tour: TourId) => `tour_done_${tour}`;
 const MUTE_KEY = "tour_voice_muted";
-const START_EVENT = "freelio:start-tour";
+const START_EVENT = "pixelgenius:start-tour";
 const PAD = 8;
 
 /** Opens a tour from anywhere, e.g. a help button. */

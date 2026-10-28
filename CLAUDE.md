@@ -1,4 +1,4 @@
-# FreelioAI — Project Instructions
+# PixelGenius — Project Instructions
 
 > این فایل تنها منبع راهنمای پروژه است — هم برای Claude Code هم برای Codex.
 > تحقیق بازار و سوالات مصاحبه در `.codex/market-research/` نگه داشته شده‌اند.
@@ -27,7 +27,7 @@ Milestone ارسال می‌کند، مشتری تایید و پرداخت مر�
 
 ```
 مشتری وارد سایت فریلنسر می‌شود
-  → ویجت چت‌بات load می‌شود (embed از FreelioAI)
+  → ویجت چت‌بات load می‌شود (embed از PixelGenius)
   → Agent با داده‌های فریلنسر مکالمه را آغاز می‌کند
      (نوع خدمات، محدوده قیمت، فرآیند کاری، سوالات موردنیاز)
   → نیازمندی‌ها مرحله‌به‌مرحله جمع‌آوری می‌شود
@@ -268,7 +268,7 @@ Utilityها: `glass` (هدر)، `bg-dots` (بافت پنل برند). فیلد �
 
 | کامپوننت | کاربرد |
 |----------|--------|
-| `components/Brand.tsx` | `BrandMark` (حباب گفتگو + F روی زعفرانی)، `BrandWordmark`، `BrandLogo` — جای آیکون sparkle |
+| `components/Brand.tsx` | لوگوی pixelgenius: `BrandMark` (مکعب PG)، `BrandWordmark` (لوگوتایپ)، `BrandLogo` — SVG با `currentColor` (روی پنل معکوس `text-background` بده)؛ فاوآیکن: `app/icon.svg` |
 | `components/AppShell.tsx` | سایدبار (دسکتاپ) / دراور (موبایل) + عنوان صفحه؛ پنل مشتری، ادمین و فریلنسر |
 | `components/AuthLayout.tsx` | صفحه‌ی دوبخشی ورود: فرم + پنل برند معکوس (variant: customer / freelancer / admin) |
 | `components/ThemeToggle.tsx` | روشن / تیره / سیستم |

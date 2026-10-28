@@ -125,7 +125,7 @@ export default function ChatRobot({
   waitingForPhone: boolean;
   introduction?: string;
   shape?: RobotHeadShape;
-  /** Hex colors for a freelancer-branded robot; defaults to the FreelioAI ink/saffron robot. */
+  /** Hex colors for a freelancer-branded robot; defaults to the PixelGenius ink/saffron robot. */
   robotColors?: { color: string; trimColor: string; screenColor: string };
   /** False when the bot owner turned voice off: nothing plays and the voice button is hidden. */
   voiceAvailable?: boolean;

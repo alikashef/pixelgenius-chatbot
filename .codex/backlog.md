@@ -1,4 +1,4 @@
-# FreelioAI — Product Backlog
+# PixelGenius — Product Backlog
 
 > ایده‌ها، فیچرها، و بینش‌های استراتژیک پروژه.
 > هر آیتم با اولویت و دلیل استراتژیک ثبت شده.
@@ -107,12 +107,12 @@ f"تو مشاور هوشمند {name} هستی، {position} با تخصص در {
 ### 💡 Custom Domain — سایت فریلنسر با دامنه خودش
 
 **خلاصه:**
-فریلنسر دامنه خودش (`ali-rezaei.com`) رو به سرور FreelioAI point می‌کنه. مشتریان فریلنسر فقط دامنه او رو می‌بینن و هیچ ردی از FreelioAI نیست. پرداخت هم مستقیم با Merchant ID خود فریلنسر انجام می‌شه.
+فریلنسر دامنه خودش (`ali-rezaei.com`) رو به سرور PixelGenius point می‌کنه. مشتریان فریلنسر فقط دامنه او رو می‌بینن و هیچ ردی از PixelGenius نیست. پرداخت هم مستقیم با Merchant ID خود فریلنسر انجام می‌شه.
 
 **چطور کار می‌کنه:**
 ```
 فریلنسر یه A record ست می‌کنه:
-  ali-rezaei.com → A → IP سرور FreelioAI
+  ali-rezaei.com → A → IP سرور PixelGenius
 
 مشتری وارد ali-rezaei.com می‌شه
   → Caddy از Host header workspace رو تشخیص می‌ده
@@ -121,7 +121,7 @@ f"تو مشاور هوشمند {name} هستی، {position} با تخصص در {
 ```
 
 **مزیت استراتژیک:**
-- FreelioAI زیرساخت نامرئیه — مثل Shopify
+- PixelGenius زیرساخت نامرئیه — مثل Shopify
 - تو هیچ دخالتی در پول نداری → بدون مسئولیت مالی
 - درآمد فقط از اشتراک ماهانه فریلنسر
 

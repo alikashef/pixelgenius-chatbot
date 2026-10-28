@@ -690,8 +690,8 @@ async def _handle_message(message) -> dict | None:
             {
                 "protocolVersion": version,
                 "capabilities": {"tools": {"listChanged": False}},
-                "serverInfo": {"name": "freelioai-deploy", "version": "0.1.0"},
-                "instructions": "Publishes static websites built from a FreelioAI project brief to a temporary preview URL.",
+                "serverInfo": {"name": "pixelgenius-deploy", "version": "0.1.0"},
+                "instructions": "Publishes static websites built from a PixelGenius project brief to a temporary preview URL.",
             },
         )
     if method == "ping":
@@ -730,7 +730,7 @@ async def _handle_message(message) -> dict | None:
 @router.get("/api/mcp/info")
 async def mcp_info():
     """Public connection details shown in the customer panel's MCP setup tour."""
-    return {"mcp_server_url": PUBLIC_MCP_URL, "server_name": "FreelioAI"}
+    return {"mcp_server_url": PUBLIC_MCP_URL, "server_name": "PixelGenius"}
 
 
 @router.post("/mcp")

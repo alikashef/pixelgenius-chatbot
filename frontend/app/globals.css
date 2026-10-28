@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /*
- * FreelioAI "Studio" design tokens.
+ * PixelGenius "Studio" design tokens.
  * Warm paper/ink neutrals, monochrome primary actions, saffron as the single brand color.
  * Colors are HSL channels so Tailwind opacity modifiers work (bg-brand-solid/10).
  * :root is the light theme; .dark on <html> switches to the dark theme.

@@ -1,5 +1,5 @@
 /*
- * FreelioAI chat widget loader.
+ * PixelGenius chat widget loader.
  *
  *   <script src="https://YOUR-APP/embed.js" data-bot="BOT_TOKEN" async></script>
  *
@@ -14,7 +14,7 @@
 (function () {
   "use strict";
 
-  if (window.FreelioWidget) return;
+  if (window.PixelGeniusWidget) return;
 
   var script = document.currentScript;
   if (!script) return;
@@ -134,7 +134,7 @@
   }
 
   window.addEventListener("message", function (event) {
-    if (event.origin !== appOrigin || !event.data || event.data.type !== "freelio:close") return;
+    if (event.origin !== appOrigin || !event.data || event.data.type !== "pixelgenius:close") return;
     setOpen(false);
   });
 
@@ -147,9 +147,10 @@
     close: function () { setOpen(false); },
     toggle: function () { setOpen(!open); },
   };
-  window.FreelioWidget = api;
-  // Name used by earlier versions of the widget.
+  window.PixelGeniusWidget = api;
+  // Names used by earlier versions of the widget.
   window.PixelGeniusChatbot = api;
+  window.FreelioWidget = api;
 
   function boot() {
     if (!bot) return start(null);

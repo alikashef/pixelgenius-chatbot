@@ -220,7 +220,7 @@ BRIEF_INSTRUCTIONS = (
     "9. Images: `assets.images` lists AI-generated images, each with a `url`. Use those exact URLs for the matching spots "
     "(use `id`/`purpose` to place them) instead of stock photos or placeholder services. If an entry has no `url`, use a neutral CSS gradient.\n"
     "10. Workspace (product design projects only): if `deploy.workspace_url` is present, call `get_workspace` with deploy.token first. Follow the owner-selected path. Register each design/development preview with `report_output` (include HTML for element selection), and concise progress with `report_activity`. Wait for explicit owner approval of design before development on the design path, and development before deployment. Read and address versioned comments with `update_feedback`; only the owner approves them. Save actual admin access with `save_admin_credentials`, never in logs or notes. If deploy.workspace_url is absent, skip the workspace workflow. "
-    "Deployment: if a tool named `deploy_project` from the FreelioAI server is available, finish by calling it with "
+    "Deployment: if a tool named `deploy_project` from the PixelGenius server is available, finish by calling it with "
     "`deploy.token` from this file, the right `platform`, the `port` your app listens on, ALL source files (no node_modules, "
     "no .env; the server installs dependencies) and secrets in `env`. Then call `get_deploy_status` every 15 seconds until "
     "READY. If it FAILED, read `build_errors`, `hint` and `build_log_tail`, fix the code and call `deploy_project` again with "

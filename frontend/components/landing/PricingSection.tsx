@@ -13,7 +13,7 @@ const PLANS = [
     highlight: false,
     features: [
       "تا ۳ پروژه فعال",
-      "ویجت با برند FreelioAI",
+      "ویجت با برند PixelGenius",
       "چت AI پایه",
       "پرداخت آنلاین",
     ],

@@ -225,7 +225,7 @@ async def create_release(name: str, source_id: str, platform: str, port: int) ->
         "sourceID": source_id,
         "type": platform,
         "port": port,
-        "message": "FreelioAI deploy",
+        "message": "PixelGenius deploy",
         "build": {"cache": True},
         "platformConfig": {},
     }

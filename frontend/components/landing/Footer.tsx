@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { IconSparkles } from "@tabler/icons-react";
+import { BrandLogo } from "@/components/Brand";
 
 const LINKS = {
   محصول: [
@@ -26,14 +26,7 @@ export default function Footer() {
         <div className="grid gap-10 md:grid-cols-[1.5fr_repeat(3,1fr)]">
           {/* brand */}
           <div>
-            <Link href="/" className="flex items-center gap-2.5 font-black text-foreground">
-              <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary text-primary-foreground">
-                <IconSparkles size={18} stroke={2.2} />
-              </span>
-              <span>
-                Freelio<span className="text-brand">AI</span>
-              </span>
-            </Link>
+            <BrandLogo className="w-fit" />
             <p className="mt-4 max-w-xs text-sm leading-7 text-muted-foreground">
               دستیار هوشمند فریلنسرهای حرفه‌ای ایران.
               از intake تا تحویل، همه روی برند خودت.
@@ -61,7 +54,7 @@ export default function Footer() {
         </div>
 
         <div className="mt-12 flex flex-col items-center justify-between gap-3 border-t border-border pt-8 text-xs text-muted-foreground md:flex-row">
-          <p>© ۱۴۰۴ FreelioAI — تمام حقوق محفوظ است.</p>
+          <p>© ۱۴۰۴ PixelGenius — تمام حقوق محفوظ است.</p>
           <p>ساخته شده با ❤️ در ایران</p>
         </div>
       </div>
