@@ -76,7 +76,7 @@ export default function AuthLayout({
           <ul className="mt-8 space-y-3">
             {panel.points.map((point) => (
               <li key={point} className="flex items-center gap-3 text-[15px] opacity-80">
-                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-brand-solid text-brand-foreground">
+                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-accent-solid text-accent-foreground">
                   <IconCheck size={14} stroke={2.6} />
                 </span>
                 {point}

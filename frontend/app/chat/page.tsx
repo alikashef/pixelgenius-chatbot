@@ -1219,7 +1219,7 @@ function ChatPageInner() {
                             <span className="flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-bold text-muted-foreground transition-colors hover:text-foreground peer-checked:bg-surface peer-checked:text-foreground peer-checked:shadow-card dark:peer-checked:bg-foreground/10 peer-focus-visible:ring-2 peer-focus-visible:ring-ring">
                               <Icon size={18} aria-hidden="true" />
                               {MODE_CARDS[id].label}
-                              {MODE_CARDS[id].badge && <span className="hidden rounded-full bg-brand-soft px-1.5 sm:inline text-[10px] font-bold leading-5 text-brand">{MODE_CARDS[id].badge}</span>}
+                              {MODE_CARDS[id].badge && <span className="hidden rounded-full bg-accent-soft px-1.5 sm:inline text-[10px] font-bold leading-5 text-accent">{MODE_CARDS[id].badge}</span>}
                             </span>
                           </label>
                         );

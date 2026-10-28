@@ -83,13 +83,13 @@ export default function FreelancerPromo({ onNavigate }: { onNavigate?: () => voi
               floorShadow={false}
               interactive={false}
               paused={reducedMotion}
-              color="#f28c28"
-              trimColor="#36312b"
-              screenColor="#fff1df"
+              color="#7c3aed"
+              trimColor="#1e1b2e"
+              screenColor="#f3efff"
             />
           </div>
           <div className="min-w-0 pl-6">
-            <p className="text-[11px] font-bold text-brand-solid">ویژه‌ی فریلنسرها</p>
+            <p className="text-[11px] font-bold text-accent-solid">ویژه‌ی فریلنسرها</p>
             <h2 id="freelancer-promo-title" className="mt-0.5 text-[15px] font-black leading-6">
               دستیار هوشمند خودت رو بساز
             </h2>
@@ -99,7 +99,7 @@ export default function FreelancerPromo({ onNavigate }: { onNavigate?: () => voi
         <ul className="relative mt-3 space-y-1.5">
           {PERKS.map((perk) => (
             <li key={perk} className="flex items-center gap-2 text-xs text-background/80">
-              <IconCheck size={14} stroke={2.6} className="shrink-0 text-brand-solid" aria-hidden="true" />
+              <IconCheck size={14} stroke={2.6} className="shrink-0 text-accent-solid" aria-hidden="true" />
               {perk}
             </li>
           ))}

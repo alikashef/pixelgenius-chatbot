@@ -3,8 +3,9 @@
 @tailwind utilities;
 
 /*
- * PixelGenius "Studio" design tokens.
- * Warm paper/ink neutrals, monochrome primary actions, saffron as the single brand color.
+ * PixelGenius design tokens.
+ * Cool, quiet neutrals; violet (#7c3aed) is the app color for primary actions and brand marks;
+ * amber is the secondary accent for small highlights (badges, "soon" tags, checkmarks).
  * Colors are HSL channels so Tailwind opacity modifiers work (bg-brand-solid/10).
  * :root is the light theme; .dark on <html> switches to the dark theme.
  */
@@ -12,29 +13,35 @@
   :root {
     color-scheme: light;
 
-    --background: 40 20% 97%;
-    --foreground: 30 8% 10%;
+    --background: 250 20% 98%;
+    --foreground: 250 15% 10%;
     --surface: 0 0% 100%;
-    --surface-2: 40 14% 94.5%;
+    --surface-2: 250 16% 95.5%;
     --card: 0 0% 100%;
-    --card-foreground: 30 8% 10%;
-    --muted: 40 12% 93%;
-    --muted-foreground: 30 5% 38%;
-    --secondary: 40 12% 93%;
-    --secondary-foreground: 30 6% 24%;
-    --border: 36 12% 88%;
-    --input: 36 10% 80%;
+    --card-foreground: 250 15% 10%;
+    --muted: 250 14% 94%;
+    --muted-foreground: 250 6% 40%;
+    --secondary: 250 14% 94%;
+    --secondary-foreground: 250 8% 25%;
+    --border: 250 14% 90%;
+    --input: 250 10% 81%;
 
-    --primary: 30 8% 11%;
-    --primary-hover: 30 6% 24%;
-    --primary-foreground: 40 20% 98%;
+    --primary: 262 83% 58%;
+    --primary-hover: 263 70% 50%;
+    --primary-foreground: 0 0% 100%;
 
-    --brand: 22 88% 40%;
-    --brand-solid: 27 96% 53%;
-    --brand-foreground: 30 8% 10%;
-    --brand-soft: 32 100% 95.5%;
-    --brand-line: 30 85% 82%;
-    --ring: 25 95% 50%;
+    --brand: 263 70% 50%;
+    --brand-solid: 262 83% 58%;
+    --brand-foreground: 0 0% 100%;
+    --brand-soft: 251 91% 96%;
+    --brand-line: 251 80% 88%;
+    --ring: 262 83% 58%;
+
+    --accent: 32 95% 34%;
+    --accent-solid: 38 92% 50%;
+    --accent-foreground: 30 15% 10%;
+    --accent-soft: 48 100% 95%;
+    --accent-line: 45 90% 80%;
 
     --success: 155 70% 28%;
     --warning: 38 92% 34%;
@@ -42,37 +49,43 @@
     --danger: 0 72% 46%;
     --info: 214 75% 44%;
 
-    --overlay: 30 10% 6%;
-    --shadow-color: 30 15% 20%;
+    --overlay: 250 15% 6%;
+    --shadow-color: 250 20% 20%;
     --radius: 0.625rem;
   }
 
   .dark {
     color-scheme: dark;
 
-    --background: 30 6% 6.5%;
-    --foreground: 40 15% 92%;
-    --surface: 30 5% 9.5%;
-    --surface-2: 30 5% 13%;
-    --card: 30 5% 9.5%;
-    --card-foreground: 40 15% 92%;
-    --muted: 30 5% 13%;
-    --muted-foreground: 35 6% 64%;
-    --secondary: 30 5% 13%;
-    --secondary-foreground: 38 9% 80%;
-    --border: 30 5% 17%;
-    --input: 30 5% 25%;
+    --background: 250 12% 6.5%;
+    --foreground: 250 15% 93%;
+    --surface: 250 10% 9.5%;
+    --surface-2: 250 9% 13%;
+    --card: 250 10% 9.5%;
+    --card-foreground: 250 15% 93%;
+    --muted: 250 9% 13%;
+    --muted-foreground: 250 6% 64%;
+    --secondary: 250 9% 13%;
+    --secondary-foreground: 250 8% 80%;
+    --border: 250 8% 17%;
+    --input: 250 7% 26%;
 
-    --primary: 40 15% 92%;
-    --primary-hover: 40 10% 80%;
-    --primary-foreground: 30 8% 9%;
+    --primary: 262 83% 58%;
+    --primary-hover: 258 90% 66%;
+    --primary-foreground: 0 0% 100%;
 
-    --brand: 30 95% 66%;
-    --brand-solid: 28 95% 56%;
-    --brand-foreground: 30 8% 9%;
-    --brand-soft: 28 35% 12%;
-    --brand-line: 28 40% 27%;
-    --ring: 30 95% 60%;
+    --brand: 255 92% 76%;
+    --brand-solid: 262 83% 58%;
+    --brand-foreground: 0 0% 100%;
+    --brand-soft: 262 30% 15%;
+    --brand-line: 262 35% 30%;
+    --ring: 258 90% 66%;
+
+    --accent: 43 96% 60%;
+    --accent-solid: 38 92% 55%;
+    --accent-foreground: 30 15% 8%;
+    --accent-soft: 38 40% 12%;
+    --accent-line: 38 40% 27%;
 
     --success: 152 55% 55%;
     --warning: 43 90% 60%;
@@ -80,8 +93,8 @@
     --danger: 0 80% 70%;
     --info: 213 85% 72%;
 
-    --overlay: 30 10% 2%;
-    --shadow-color: 30 20% 1%;
+    --overlay: 250 15% 2%;
+    --shadow-color: 250 20% 1%;
   }
 
   * {

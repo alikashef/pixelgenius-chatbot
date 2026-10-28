@@ -43,6 +43,13 @@ module.exports = {
           soft: token("brand-soft"),
           line: token("brand-line"),
         },
+        accent: {
+          DEFAULT: token("accent"),
+          solid: token("accent-solid"),
+          foreground: token("accent-foreground"),
+          soft: token("accent-soft"),
+          line: token("accent-line"),
+        },
         success: token("success"),
         warning: token("warning"),
         pending: token("pending"),

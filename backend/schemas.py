@@ -356,14 +356,14 @@ class FreelancerOnboardingIn(BaseModel):
     note: Optional[str] = None
 
 
-WidgetColor = Literal["saffron", "ink", "emerald", "ocean", "rose", "plum"]
+WidgetColor = Literal["violet", "saffron", "ink", "emerald", "ocean", "rose", "plum"]
 
 
 class WidgetSettings(BaseModel):
     """How a freelancer's chatbot looks and sounds on their own site."""
     brand_name: str = Field(default="", max_length=60)
     greeting: str = Field(default="", max_length=300)
-    accent: WidgetColor = "saffron"
+    accent: WidgetColor = "violet"
     robot_shape: Literal["circle", "rectangle", "square", "hexagon"] = "circle"
     robot_color: WidgetColor = "ink"
     voice: bool = True

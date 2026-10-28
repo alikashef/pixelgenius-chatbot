@@ -113,7 +113,7 @@ function NavLink({ item, onNavigate }: { item: ShellNavItem; onNavigate: () => v
       <span aria-disabled="true" className="flex min-h-10 w-full cursor-not-allowed select-none items-center gap-3 rounded-lg px-3 text-sm text-muted-foreground/70">
         <item.icon size={19} stroke={1.8} aria-hidden="true" />
         <span className="flex-1 truncate text-right">{item.label}</span>
-        <span className="rounded-full bg-brand-soft px-2 text-[11px] font-bold leading-5 text-brand">به‌زودی</span>
+        <span className="rounded-full bg-accent-soft px-2 text-[11px] font-bold leading-5 text-accent">به‌زودی</span>
       </span>
     );
   }

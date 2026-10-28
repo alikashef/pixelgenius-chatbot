@@ -125,7 +125,7 @@ export default function ChatRobot({
   waitingForPhone: boolean;
   introduction?: string;
   shape?: RobotHeadShape;
-  /** Hex colors for a freelancer-branded robot; defaults to the PixelGenius ink/saffron robot. */
+  /** Hex colors for a freelancer-branded robot; defaults to the PixelGenius ink/violet robot. */
   robotColors?: { color: string; trimColor: string; screenColor: string };
   /** False when the bot owner turned voice off: nothing plays and the voice button is hidden. */
   voiceAvailable?: boolean;
@@ -150,8 +150,8 @@ export default function ChatRobot({
   const previousBrief = useRef(briefState);
 
   useEffect(() => {
-    // robot-heads only accepts hex colors, so the ink body and saffron trim are passed directly.
-    setColors({ color: "#36312b", trimColor: "#f28c28", screenColor: "#ffc48a" });
+    // robot-heads only accepts hex colors, so the ink body and violet trim are passed directly.
+    setColors({ color: "#1e1b2e", trimColor: "#7c3aed", screenColor: "#c4b5fd" });
     const wake = () => {
       activityAt.current = Date.now();
       setClock(Date.now());

@@ -21,6 +21,7 @@
 
   // Keep in sync with WIDGET_COLORS in frontend/lib/widget.ts.
   var ACCENTS = {
+    violet: { bg: "#7c3aed", fg: "#ffffff" },
     saffron: { bg: "#f28c28", fg: "#1c1a17" },
     ink: { bg: "#36312b", fg: "#fbfaf7" },
     emerald: { bg: "#0f9d6e", fg: "#ffffff" },
@@ -41,7 +42,7 @@
     position: attr("position"),
     height: attr("height") || "640px",
     autoOpen: attr("auto-open") === "true",
-    accent: ACCENTS.saffron,
+    accent: ACCENTS.violet,
     title: "چت با دستیار پروژه",
   };
 

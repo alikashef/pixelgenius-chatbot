@@ -22,8 +22,8 @@ const RobotHead = dynamic(() => import("robot-heads").then((module) => module.Ro
   loading: () => <span className="block h-16 w-16" />,
 });
 
-// The guide is the chat robot's sibling: a round saffron head, so it reads as "the tour" rather than the chat.
-const GUIDE_COLORS = { color: "#f28c28", trimColor: "#36312b", screenColor: "#fff1df" };
+// The guide is the chat robot's sibling: a round violet head, so it reads as "the tour" rather than the chat.
+const GUIDE_COLORS = { color: "#7c3aed", trimColor: "#1e1b2e", screenColor: "#f3efff" };
 
 const DONE_KEY = (tour: TourId) => `tour_done_${tour}`;
 const MUTE_KEY = "tour_voice_muted";

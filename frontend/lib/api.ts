@@ -538,7 +538,7 @@ export interface FreelancerOnboardingData {
   note?: string;
 }
 
-export type WidgetColor = "saffron" | "ink" | "emerald" | "ocean" | "rose" | "plum";
+export type WidgetColor = "violet" | "saffron" | "ink" | "emerald" | "ocean" | "rose" | "plum";
 export type RobotShape = "circle" | "rectangle" | "square" | "hexagon";
 
 export interface WidgetSettings {
@@ -554,7 +554,7 @@ export interface WidgetSettings {
 export const DEFAULT_WIDGET: WidgetSettings = {
   brand_name: "",
   greeting: "",
-  accent: "saffron",
+  accent: "violet",
   robot_shape: "circle",
   robot_color: "ink",
   voice: true,

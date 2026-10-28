@@ -250,8 +250,8 @@ NEXT_PUBLIC_API_URL   ← پیش‌فرض http://localhost:8000
 
 ## Design System — "Studio"
 
-جهت طراحی (بعد از R&D): فاصله گرفتن از کلیشه‌ی «بنفش + گرادیان + glow» محصولات AI.
-پایه‌ی **کاغذ/جوهر** گرم و خنثی، دکمه‌های اصلی **تک‌رنگ** (جوهری)، و **زعفرانی** تنها رنگ برند.
+رنگ اپ **بنفش `#7c3aed`** (دکمه‌های اصلی، حالت فعال، لینک‌ها و نشان برند)؛ رنگ ثانویه **کهربایی** (`accent`)
+فقط برای تأکیدهای کوچک (badge «پیشنهادی»، برچسب «به‌زودی»، تیک‌های پنل برند). پایه‌ی خنثی‌ها سرد و آرام.
 بدون گرادیان و glow؛ عمق فقط با بوردر و سایه‌ی خیلی نرم. ساختار: سایدبار + محتوای متمرکز.
 
 ### توکن‌ها
@@ -265,10 +265,11 @@ NEXT_PUBLIC_API_URL   ← پیش‌فرض http://localhost:8000
 | `bg-surface` / `bg-surface-2` | کارت / سطح فرعی (سایدبار، سگمنت، هدر جدول) |
 | `text-muted-foreground` / `text-secondary-foreground` | متن کم‌رنگ / متن ثانویه |
 | `border-border` / `border-input` | بوردر عمومی / بوردر فیلد |
-| `bg-primary` + `text-primary-foreground` | دکمه اصلی (در لایت مشکی، در دارک روشن) |
-| `bg-brand-solid` + `text-brand-foreground` | زعفرانی؛ فقط برای لوگو، CTA پرداخت و نقاط تأکید |
-| `bg-brand-soft` / `border-brand-line` / `text-brand` | تینت برند و متن برند (کنتراست AA) |
-| `ring-ring` | فوکوس (زعفرانی) |
+| `bg-primary` + `text-primary-foreground` | دکمه اصلی (بنفش `#7c3aed`، متن سفید) |
+| `bg-brand-solid` + `text-brand-foreground` | بنفش برند |
+| `bg-brand-soft` / `border-brand-line` / `text-brand` | تینت بنفش و متن بنفش (کنتراست AA) |
+| `bg-accent-solid` / `bg-accent-soft` / `text-accent` | کهربایی ثانویه؛ فقط تأکیدهای کوچک |
+| `ring-ring` | فوکوس (بنفش) |
 | `success` / `warning` / `pending` / `danger` / `info` | وضعیت‌ها؛ pill = `bg-x/10 text-x` + نقطه |
 
 سایه‌ها: `shadow-card` (خیلی نرم)، `shadow-elevated` (پاپ‌اور/کامپوزر)، `shadow-glow` (حلقه انتخاب).
@@ -283,7 +284,7 @@ Utilityها: `glass` (هدر)، `bg-dots` (بافت پنل برند). فیلد �
 | `components/AppShell.tsx` | سایدبار (دسکتاپ) / دراور (موبایل) + عنوان صفحه؛ پنل مشتری، ادمین و فریلنسر |
 | `components/AuthLayout.tsx` | صفحه‌ی دوبخشی ورود: فرم + پنل برند معکوس (variant: customer / freelancer / admin) |
 | `components/ThemeToggle.tsx` | روشن / تیره / سیستم |
-| `components/GuidedTour.tsx` | تور اولین ورود: اسپات‌لایت روی المان‌های `data-tour`، روبات دایره‌ای زعفرانی که حین پخش صدا «حرف می‌زند»؛ با `startTour(id)` دوباره باز می‌شود |
+| `components/GuidedTour.tsx` | تور اولین ورود: اسپات‌لایت روی المان‌های `data-tour`، روبات دایره‌ای بنفش که حین پخش صدا «حرف می‌زند»؛ با `startTour(id)` دوباره باز می‌شود |
 | `components/McpTour.tsx` | تور ۵ مرحله‌ای اتصال ابزار AI به سرور MCP (`/panel?tab=connect`)، پیشرفت در `localStorage.mcp_tour` |
 
 ### قوانین طراحی
@@ -293,7 +294,8 @@ Utilityها: `glass` (هدر)، `bg-dots` (بافت پنل برند). فیلد �
 - فونت: **YekanBakh FaNum** (لوکال در `frontend/app/fonts/`، `--font-yekan`) — Light(300) · Bold(700) · ExtraBold · Black · ExtraBlack
 - direction: **RTL**
 - رنگ hardcode نکن (hex، `text-white`، palette مثل `violet-300`) — فقط توکن‌ها
-- گرادیان، glow و رنگ بنفش استفاده نکن؛ زعفرانی را کم و هدفمند خرج کن
+- گرادیان و glow استفاده نکن؛ کهربایی را کم و هدفمند خرج کن
+- رنگ‌های hex روبات‌ها (`robot-heads` فقط hex می‌گیرد): بنفش `#7c3aed`، جوهری `#1e1b2e`؛ ویجت فریلنسر پیش‌فرض `violet` و `accentStyle` توکن‌های primary/brand را با رنگ فریلنسر عوض می‌کند
 - انتخاب‌شده‌ها: بوردر `foreground` (کارت) یا سطح `surface` روی `surface-2` (سگمنت)
 - چت: پیام دستیار بدون حباب کنار `BrandMark`؛ پیام کاربر در حباب `surface-2`
 - ایموجی به‌عنوان آیکون UI ممنوع — `@tabler/icons-react` با `aria-hidden`
