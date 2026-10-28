@@ -1,5 +1,14 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
+async function readDetail(res: Response, fallback: string) {
+  try {
+    const data = await res.json();
+    return typeof data?.detail === "string" ? data.detail : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export interface Message {
   role: "user" | "assistant";
   content: string;
@@ -9,6 +18,8 @@ export interface Message {
 export type ProjectPath = "design" | "direct" | "source";
 
 export interface Proposal {
+  /** Set when the chat ran through a freelancer's bot, so the order is credited to them. */
+  bot_token?: string;
   project_path?: ProjectPath;
   source_url?: string;
   source_type?: "github" | "zip";
@@ -254,6 +265,7 @@ export async function submitOrder(token: string, proposal: Proposal, chatHistory
       price_label: proposal.priceLabel,
       order_files: orderFiles,
       session_id: sessionId || null,
+      bot_token: proposal.bot_token || null,
       mode: proposal.mode ?? "sales",
       project_path: proposal.project_path || null,
       source_url: proposal.source_url || "",
@@ -346,8 +358,12 @@ export async function fetchOrders(token: string): Promise<Order[]> {
   return res.json();
 }
 
-export async function fetchOrder(token: string, id: string): Promise<Order> {
-  const res = await fetch(`${API_URL}/api/orders/${id}`, {
+/** Admins manage every order; a freelancer only the orders from their own chatbot. */
+export type OrderScope = "admin" | "freelancer";
+const ORDER_BASE: Record<OrderScope, string> = { admin: "/api/orders", freelancer: "/api/freelancer/orders" };
+
+export async function fetchOrder(token: string, id: string, scope: OrderScope = "admin"): Promise<Order> {
+  const res = await fetch(`${API_URL}${ORDER_BASE[scope]}/${id}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (res.status === 401 || res.status === 403) throw new Error("UNAUTHORIZED");
@@ -370,14 +386,15 @@ export async function approveOrder(
   finalPrice: number,
   paymentPercentage: number,
   adminNote?: string,
-  milestones: { title: string; amount: number }[] = []
+  milestones: { title: string; amount: number }[] = [],
+  scope: OrderScope = "admin"
 ) {
-  const res = await fetch(`${API_URL}/api/orders/${orderId}/approve`, {
+  const res = await fetch(`${API_URL}${ORDER_BASE[scope]}/${orderId}/approve`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({ final_price: finalPrice, payment_percentage: paymentPercentage, admin_note: adminNote, milestones }),
   });
-  if (!res.ok) throw new Error("خطا در تایید سفارش");
+  if (!res.ok) throw new Error(await readDetail(res, "خطا در تایید سفارش"));
   return res.json();
 }
 
@@ -390,6 +407,52 @@ export interface FreelancerOnboardingData {
   note?: string;
 }
 
+export type WidgetColor = "saffron" | "ink" | "emerald" | "ocean" | "rose" | "plum";
+export type RobotShape = "circle" | "rectangle" | "square" | "hexagon";
+
+export interface WidgetSettings {
+  brand_name: string;
+  greeting: string;
+  accent: WidgetColor;
+  robot_shape: RobotShape;
+  robot_color: WidgetColor;
+  voice: boolean;
+  position: "bottom-left" | "bottom-right";
+}
+
+export const DEFAULT_WIDGET: WidgetSettings = {
+  brand_name: "",
+  greeting: "",
+  accent: "saffron",
+  robot_shape: "circle",
+  robot_color: "ink",
+  voice: true,
+  position: "bottom-left",
+};
+
+export interface BotProfile {
+  name: string;
+  position: string;
+  widget: WidgetSettings;
+}
+
+export async function fetchBotProfile(botToken: string): Promise<BotProfile> {
+  const res = await fetch(`${API_URL}/api/bot/${encodeURIComponent(botToken)}`);
+  if (!res.ok) throw new Error("چت‌بات پیدا نشد");
+  return res.json();
+}
+
+export async function updateWidgetSettings(token: string, widget: WidgetSettings): Promise<WidgetSettings> {
+  const res = await fetch(`${API_URL}/api/freelancer/widget`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify(widget),
+  });
+  if (res.status === 401 || res.status === 403) throw new Error("UNAUTHORIZED");
+  if (!res.ok) throw new Error(await readDetail(res, "ذخیره تنظیمات ویجت ناموفق بود"));
+  return res.json();
+}
+
 export async function fetchFreelancerOrders(token: string): Promise<Order[]> {
   const res = await fetch(`${API_URL}/api/freelancer/orders`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -399,7 +462,61 @@ export async function fetchFreelancerOrders(token: string): Promise<Order[]> {
   return res.json();
 }
 
-export async function fetchFreelancerSettings(token: string): Promise<FreelancerOnboardingData> {
+export type FreelancerField = "web" | "mobile" | "uiux" | "graphic" | "motion" | "content" | "marketing" | "seo" | "other" | "";
+
+export interface FreelancerService {
+  name: string;
+  price_min: number | null;
+  price_max: number | null;
+  unit: "project" | "hour" | "month" | "item";
+  days_min: number | null;
+  days_max: number | null;
+  description: string;
+}
+
+/** What a freelancer teaches their own chatbot; the bot quotes only these services and prices. */
+export interface FreelancerKnowledge {
+  field: FreelancerField;
+  field_label: string;
+  experience_years: number | null;
+  bio: string;
+  portfolio_url: string;
+  services: FreelancerService[];
+  process: string;
+  intake_questions: string[];
+  out_of_scope: string;
+  payment_terms: string;
+  faqs: { q: string; a: string }[];
+  tone: "friendly" | "formal";
+}
+
+export const EMPTY_KNOWLEDGE: FreelancerKnowledge = {
+  field: "",
+  field_label: "",
+  experience_years: null,
+  bio: "",
+  portfolio_url: "",
+  services: [],
+  process: "",
+  intake_questions: [],
+  out_of_scope: "",
+  payment_terms: "",
+  faqs: [],
+  tone: "friendly",
+};
+
+export async function updateFreelancerKnowledge(token: string, knowledge: FreelancerKnowledge): Promise<FreelancerKnowledge> {
+  const res = await fetch(`${API_URL}/api/freelancer/knowledge`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify(knowledge),
+  });
+  if (res.status === 401 || res.status === 403) throw new Error("UNAUTHORIZED");
+  if (!res.ok) throw new Error(await readDetail(res, "ذخیره آموزش دستیار ناموفق بود"));
+  return res.json();
+}
+
+export async function fetchFreelancerSettings(token: string): Promise<FreelancerOnboardingData & { bot_token: string; widget: WidgetSettings; knowledge: FreelancerKnowledge }> {
   const res = await fetch(`${API_URL}/api/freelancer/settings`, {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -417,10 +534,10 @@ export async function freelancerOnboarding(token: string, data: FreelancerOnboar
   return res.json();
 }
 
-export async function uploadProposal(token: string, orderId: string, file: File) {
+export async function uploadProposal(token: string, orderId: string, file: File, scope: OrderScope = "admin") {
   const form = new FormData();
   form.append("file", file);
-  const res = await fetch(`${API_URL}/api/orders/${orderId}/proposal`, {
+  const res = await fetch(`${API_URL}${ORDER_BASE[scope]}/${orderId}/proposal`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
     body: form,
@@ -429,8 +546,8 @@ export async function uploadProposal(token: string, orderId: string, file: File)
   return res.json();
 }
 
-export async function summarizeOrder(token: string, orderId: string): Promise<Order> {
-  const res = await fetch(`${API_URL}/api/orders/${orderId}/summarize`, {
+export async function summarizeOrder(token: string, orderId: string, scope: OrderScope = "admin"): Promise<Order> {
+  const res = await fetch(`${API_URL}${ORDER_BASE[scope]}/${orderId}/summarize`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -439,10 +556,10 @@ export async function summarizeOrder(token: string, orderId: string): Promise<Or
   return res.json();
 }
 
-export async function uploadAdminOrderFile(token: string, orderId: string, file: File) {
+export async function uploadAdminOrderFile(token: string, orderId: string, file: File, scope: OrderScope = "admin") {
   const form = new FormData();
   form.append("file", file);
-  const res = await fetch(`${API_URL}/api/orders/${orderId}/files`, {
+  const res = await fetch(`${API_URL}${ORDER_BASE[scope]}/${orderId}/files`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
     body: form,

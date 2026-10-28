@@ -89,8 +89,9 @@ Milestone ارسال می‌کند، مشتری تایید و پرداخت مر�
 | Project Space (چت، فایل، milestone) | 🔲 ساخته نشده |
 | پرداخت مرحله‌ای per Milestone | 🔲 ساخته نشده |
 | AI Agent پروژه | 🔲 ساخته نشده |
-| Multi-tenant SaaS (هر فریلنسر workspace جدا) | 🔲 ساخته نشده |
-| White-label Widget (embed با برند فریلنسر) | 🔲 ساخته نشده |
+| Multi-tenant SaaS (هر فریلنسر workspace جدا) | 🟡 نسبی — دستیار، ویجت و سفارش‌ها per-freelancer؛ پرداخت هنوز مشترک |
+| White-label Widget (embed با برند فریلنسر) | ✅ پیاده شده — روبات، رنگ، صدا، جایگاه |
+| آموزش دستیار فریلنسر (حوزه، خدمات، قیمت، FAQ) | ✅ پیاده شده |
 
 ---
 
@@ -138,8 +139,14 @@ frontend/
     AuthLayout.tsx                ← لِی‌اوت دوبخشی صفحات ورود
     ThemeToggle.tsx               ← سوییچ تم (client)
     McpTour.tsx                   ← تور آموزشی اتصال MCP در پنل مشتری + CopyBlock و BUILD_PROMPT مشترک
+    OrderManager.tsx              ← بررسی/قیمت‌گذاری سفارش؛ مشترک ادمین و فریلنسر (scope)
     GuidedTour.tsx                ← تور خوش‌آمد (اسپات‌لایت + روبات راهنما + صدا)
   lib/tours.json                  ← متن مراحل تورها (منبع مشترک UI و تولید صدا)
+  lib/widget.ts                   ← پالت رنگ ویجت و رنگ روبات فریلنسر
+  app/freelancer/settings/        ← آموزش دستیار (حوزه، خدمات و قیمت، روش کار، FAQ)
+  app/freelancer/widget/          ← ظاهر و نصب ویجت با پیش‌نمایش زنده
+  app/freelancer/orders/[id]/     ← مدیریت سفارش توسط خود فریلنسر
+  public/embed.js                 ← لودر ویجت: دکمه + iframe از /chat?embed=1&bot=TOKEN
   public/audio/tour/              ← صداهای تور + manifest.json (خروجی اسکریپت)
   lib/
     utils.ts                      ← cn() با clsx + tailwind-merge
@@ -157,6 +164,7 @@ backend/
     system_prompt.py
     pricing_knowledge.py          ← جدول قیمت‌ها اینجاست
     question_flow.py
+    freelancer_prompt.py          ← پرامپت دستیار فریلنسر؛ فقط از خدمات و قیمت‌های خودش
     sales_rules.py
     technical_advice.py
     output_schema.py
@@ -322,6 +330,13 @@ ELEVENLABS_API_KEY=... python3 scripts/generate_tour_audio.py
 
 کلید فقط از env خوانده می‌شود و **هرگز** commit نمی‌شود. اختیاری: `ELEVENLABS_VOICE_ID`، `ELEVENLABS_MODEL_ID` (پیش‌فرض `eleven_v3`).
 اگر فایل صدا نباشد، تور بدون صدا (فقط متن) کار می‌کند.
+
+### دستیار و ویجت فریلنسر
+
+- چت با `bot_token` از `prompts/freelancer_prompt.py` استفاده می‌کند، نه پرامپت و جدول قیمت آژانس؛ دانش فریلنسر در `freelancers.knowledge` (JSON)
+- ظاهر ویجت در `freelancers.widget_settings`؛ پروفایل عمومی: `GET /api/bot/{token}`
+- سفارش‌ها با `bot_token` به فریلنسر نسبت داده می‌شوند (در proposal/handoff)؛ فریلنسر فقط سفارش‌های خودش را از `/api/freelancer/orders/*` می‌بیند
+- نصب: `<script src="https://APP/embed.js" data-bot="TOKEN" async></script>`
 
 ### قبل از هر commit
 

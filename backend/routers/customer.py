@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from database import get_db, SessionLocal
-from models import Customer, Order, ChatSession
+from models import Customer, Order, ChatSession, Freelancer
 from schemas import CustomerProfileOut, CustomerProfileUpdateIn, OrderCreateIn, OrderOut
 from auth import get_current_customer
 from sms import send_notification
@@ -102,7 +102,11 @@ async def create_order(
     if body.mode == "designer" and body.project_path == "source":
         source_kind = validate_project_source(body.source_type, body.source_url, ChatAttachmentIn.model_validate(body.source_file.model_dump()) if body.source_file else None)
     freelancer_id = None
-    if body.session_id:
+    if body.bot_token:
+        freelancer = (await db.execute(select(Freelancer).where(Freelancer.bot_token == body.bot_token))).scalar_one_or_none()
+        if freelancer:
+            freelancer_id = freelancer.id
+    if not freelancer_id and body.session_id:
         session = await db.get(ChatSession, body.session_id)
         if session and session.freelancer_id:
             freelancer_id = session.freelancer_id

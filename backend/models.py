@@ -42,6 +42,8 @@ class Freelancer(Base):
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     bot_token: Mapped[str] = mapped_column(String(36), unique=True, index=True, default=lambda: str(uuid.uuid4()))
     onboarding_completed: Mapped[bool] = mapped_column(Boolean, default=False)
+    widget_settings: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    knowledge: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

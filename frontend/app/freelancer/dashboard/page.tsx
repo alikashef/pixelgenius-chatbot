@@ -3,10 +3,11 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { IconCheck, IconChevronLeft, IconCode, IconCopy, IconExternalLink, IconInbox, IconLayoutDashboard, IconSettings } from "@tabler/icons-react";
+import { IconBrush, IconChevronLeft, IconCode, IconInbox, IconLayoutDashboard, IconSchool } from "@tabler/icons-react";
 import { fetchFreelancerOrders, Order } from "@/lib/api";
 import AppShell from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
+import { CopyBlock } from "@/components/McpTour";
 
 const STATUS_LABEL: Record<Order["status"], string> = {
   pending_review: "در انتظار بررسی",
@@ -34,11 +35,12 @@ export default function FreelancerDashboardPage() {
   const [botToken, setBotToken] = useState("");
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [copied, setCopied] = useState(false);
+  const [origin, setOrigin] = useState("");
 
   useEffect(() => {
     const token = localStorage.getItem("freelancer_token");
     if (!token) { router.replace("/freelancer/login"); return; }
+    setOrigin(window.location.origin);
     setName(localStorage.getItem("freelancer_name") || "");
     setBotToken(localStorage.getItem("freelancer_bot_token") || "");
 
@@ -58,24 +60,18 @@ export default function FreelancerDashboardPage() {
     router.push("/freelancer/login");
   }
 
-  function copyEmbedUrl() {
-    const url = `${window.location.origin}/chat?bot=${botToken}`;
-    navigator.clipboard.writeText(url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
-  }
 
   const pending = orders.filter((o) => o.status === "pending_review").length;
   const paid = orders.filter((o) => o.status === "paid").length;
 
-  const embedUrl = typeof window !== "undefined" ? `${window.location.origin}/chat?bot=${botToken}` : `/chat?bot=${botToken}`;
 
   return (
     <AppShell
       area="فریلنسر"
       nav={[
         { key: "dashboard", label: "داشبورد", icon: IconLayoutDashboard, href: "/freelancer/dashboard", active: true, count: orders.length || undefined },
-        { key: "settings", label: "تنظیمات دستیار", icon: IconSettings, href: "/freelancer/settings" },
+        { key: "widget", label: "ظاهر و نصب ویجت", icon: IconBrush, href: "/freelancer/widget" },
+        { key: "settings", label: "آموزش دستیار", icon: IconSchool, href: "/freelancer/settings" },
       ]}
       user={name ? { name } : undefined}
       onLogout={handleLogout}
@@ -101,30 +97,29 @@ export default function FreelancerDashboardPage() {
 
         {botToken && (
           <section aria-labelledby="embed-title" className="rounded-xl border border-border bg-surface p-5">
-            <div className="flex items-start gap-3">
+            <div className="flex flex-wrap items-start gap-3">
               <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-brand-soft text-brand" aria-hidden="true">
                 <IconCode size={20} />
               </span>
-              <div className="min-w-0">
-                <h2 id="embed-title" className="font-bold text-foreground">لینک چت‌بات اختصاصی تو</h2>
-                <p className="mt-0.5 text-[13px] leading-6 text-muted-foreground">این لینک رو روی سایتت بذار یا مستقیم به مشتری‌هات بده.</p>
+              <div className="min-w-0 flex-1">
+                <h2 id="embed-title" className="font-bold text-foreground">چت‌بات رو روی سایتت نصب کن</h2>
+                <p className="mt-0.5 text-[13px] leading-6 text-muted-foreground">این کد رو روی سایتت بذار، یا لینک مستقیم رو به مشتری‌هات بده.</p>
               </div>
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/freelancer/widget">
+                  <IconBrush size={15} aria-hidden="true" />
+                  شخصی‌سازی ظاهر
+                </Link>
+              </Button>
             </div>
-            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
-              <code dir="ltr" className="min-w-0 flex-1 truncate rounded-lg border border-border bg-surface-2 px-3 py-2.5 text-left font-mono text-xs text-secondary-foreground">
-                {embedUrl}
-              </code>
-              <div className="flex gap-2">
-                <Button variant="default" size="sm" onClick={copyEmbedUrl} className="flex-1 sm:flex-none">
-                  {copied ? <IconCheck size={15} aria-hidden="true" /> : <IconCopy size={15} aria-hidden="true" />}
-                  {copied ? "کپی شد" : "کپی لینک"}
-                </Button>
-                <Button variant="outline" size="sm" asChild className="flex-1 sm:flex-none">
-                  <a href={`/chat?bot=${botToken}`} target="_blank" rel="noopener noreferrer">
-                    <IconExternalLink size={15} aria-hidden="true" />
-                    پیش‌نمایش
-                  </a>
-                </Button>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <div>
+                <p className="text-xs font-bold text-muted-foreground">کد نصب</p>
+                <CopyBlock text={`<script src="${origin}/embed.js" data-bot="${botToken}" async></script>`} label="کپی کد نصب ویجت" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-muted-foreground">لینک مستقیم</p>
+                <CopyBlock text={`${origin}/chat?bot=${botToken}`} label="کپی لینک چت‌بات" />
               </div>
             </div>
           </section>
@@ -133,10 +128,7 @@ export default function FreelancerDashboardPage() {
         <section aria-labelledby="orders-title" className="overflow-hidden rounded-xl border border-border bg-surface">
           <div className="flex items-center justify-between border-b border-border px-5 py-4">
             <h2 id="orders-title" className="font-bold text-foreground">درخواست‌ها</h2>
-            <Link href="/admin/dashboard" className="inline-flex items-center gap-0.5 rounded text-[13px] font-bold text-secondary-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
-              مدیریت کامل
-              <IconChevronLeft size={15} aria-hidden="true" />
-            </Link>
+            <span className="text-xs text-muted-foreground">برای قیمت‌گذاری و ارسال پروپوزال روی هر درخواست بزن</span>
           </div>
 
           {loading ? (
@@ -154,7 +146,7 @@ export default function FreelancerDashboardPage() {
               {orders.map((order) => (
                 <li key={order.id}>
                   <Link
-                    href={`/admin/orders/${order.id}`}
+                    href={`/freelancer/orders/${order.id}`}
                     className="flex items-center gap-4 px-5 py-4 outline-none transition-colors hover:bg-foreground/[0.02] focus-visible:bg-foreground/5"
                   >
                     <div className="min-w-0 flex-1">
@@ -166,6 +158,7 @@ export default function FreelancerDashboardPage() {
                       <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
                       {STATUS_LABEL[order.status]}
                     </span>
+                    <IconChevronLeft size={16} className="shrink-0 text-muted-foreground" aria-hidden="true" />
                   </Link>
                 </li>
               ))}

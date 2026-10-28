@@ -254,6 +254,7 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
                     "freelancer_price_range": freelancer.price_range or "",
                     "freelancer_timeline": freelancer.timeline or "",
                     "freelancer_note": freelancer.note or "",
+                    "freelancer_knowledge": freelancer.knowledge or {},
                 })
         if source_attachments:
             _set_progress(progress_id, "working")

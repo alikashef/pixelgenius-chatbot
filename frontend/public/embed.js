@@ -1,888 +1,164 @@
+/*
+ * FreelioAI chat widget loader.
+ *
+ *   <script src="https://YOUR-APP/embed.js" data-bot="BOT_TOKEN" async></script>
+ *
+ * The chat itself (robot, voice, OTP and order submission) runs in an iframe of
+ * /chat?embed=1, so the widget always matches the app. The freelancer's widget
+ * settings (accent color, button position) are read from /api/bot/{token}.
+ *
+ * Optional attributes: data-position (bottom-left | bottom-right), data-mode
+ * (floating | inline), data-container (CSS selector for inline mode),
+ * data-height (inline height), data-auto-open (true), data-app-url.
+ */
 (function () {
   "use strict";
 
-  if (window.PixelGeniusChatbot) return;
+  if (window.FreelioWidget) return;
 
-  var currentScript = document.currentScript;
-  var scriptOrigin = currentScript ? new URL(currentScript.src).origin : window.location.origin;
-  var config = {
-    apiUrl: attr("api-url") || scriptOrigin,
-    loginUrl: attr("login-url") || scriptOrigin + "/login",
-    title: attr("title") || "مشاور پروژه",
-    subtitle: attr("subtitle") || "آنلاین",
-    brand: attr("brand") || "نابغه پیکسل",
-    mode: normalizeMode(attr("mode")),
-    container: attr("container"),
-    primaryColor: attr("primary-color") || attr("primary") || attr("accent") || "#059669",
-    fontFamily: attr("font-family") || "Vazirmatn",
-    fontUrl: attr("font-url") || "https://cdn.jsdelivr.net/npm/vazirmatn@33.0.3/Vazirmatn-font-face.css",
-    position: attr("position") || "bottom-left",
-    height: attr("height") || "560px",
-    autoOpen: attr("auto-open") === "true",
-  };
+  var script = document.currentScript;
+  if (!script) return;
 
-  var WELCOME = "سلام! خوش اومدید.\nمن مشاور هوشمند تیم " + config.brand + " هستم. بهم بگید چه نوع پروژه‌ای در ذهن دارید؟";
-  var PHONE_ASK = "پروپوزال پروژه‌تون آماده‌ست.\nبرای ثبت درخواست، شماره موبایلتون رو بنویسید تا کد تایید ارسال کنیم:";
-  var STORAGE_KEY = "pixelgenius_embed_chat_v1";
-  var SESSIONS_KEY = "pixelgenius_embed_chat_sessions_v1";
-  var MAX_SESSIONS = 12;
-
-  if (!document.body && currentScript) {
-    document.addEventListener(
-      "DOMContentLoaded",
-      function () {
-        if (window.PixelGeniusChatbot) return;
-        var retryScript = document.createElement("script");
-        retryScript.src = currentScript.src;
-        Array.prototype.forEach.call(currentScript.attributes, function (attribute) {
-          if (attribute.name !== "src") retryScript.setAttribute(attribute.name, attribute.value);
-        });
-        document.head.appendChild(retryScript);
-      },
-      { once: true }
-    );
-    return;
-  }
-
-  var state = readState();
-  loadFont();
-  var root = document.createElement("div");
-  var shadow = root.attachShadow({ mode: "open" });
-  var mountTarget = getMountTarget();
-  mountTarget.appendChild(root);
-
-  shadow.innerHTML = [
-    "<style>",
-    ":host{all:initial;--pg-primary:" + escapeCss(config.primaryColor) + ";--pg-height:" + escapeCss(config.height) + ";--pg-font:" + cssFontFamily(config.fontFamily) + ",Tahoma,Arial,sans-serif;font-family:var(--pg-font);direction:rtl;color:#0f172a}",
-    "*,*::before,*::after{box-sizing:border-box;font-family:var(--pg-font)}",
-    ".pg-wrap{position:fixed;z-index:2147483647;inset:auto auto 24px 24px;font-family:inherit;direction:rtl}",
-    ".pg-wrap[data-position='bottom-right']{inset:auto 24px 24px auto}",
-    ".pg-button{width:62px;height:62px;border:0;border-radius:50%;background:var(--pg-primary);color:#fff;box-shadow:0 18px 45px rgba(15,23,42,.24);cursor:pointer;display:grid;place-items:center;transition:transform .18s ease,box-shadow .18s ease}",
-    ".pg-button:hover{transform:translateY(-2px);box-shadow:0 22px 55px rgba(15,23,42,.3)}",
-    ".pg-button svg{width:30px;height:30px}",
-    ".pg-panel{position:absolute;bottom:78px;left:0;width:min(380px,calc(100vw - 32px));height:min(620px,calc(100vh - 112px));background:#f8fcfa;border:1px solid #dbe5e1;border-radius:18px;box-shadow:0 24px 70px rgba(15,23,42,.28);overflow:hidden;display:none;grid-template-rows:auto 1fr auto}",
-    ".pg-wrap[data-position='bottom-right'] .pg-panel{left:auto;right:0}",
-    ".pg-wrap[data-open='true'] .pg-panel{display:grid}",
-    ".pg-wrap[data-mode='inline']{position:relative;z-index:auto;inset:auto;width:100%;height:var(--pg-height)}",
-    ".pg-wrap[data-mode='inline'] .pg-panel{position:relative;inset:auto;width:100%;height:100%;display:grid;border-radius:12px;box-shadow:none}",
-    ".pg-wrap[data-mode='inline'] .pg-button,.pg-wrap[data-mode='inline'] .pg-close{display:none}",
-    ".pg-head{background:rgba(255,255,255,.94);border-bottom:1px solid #dbe5e1;padding:14px 16px;display:flex;align-items:center;gap:10px}",
-    ".pg-dot{width:10px;height:10px;border-radius:50%;background:var(--pg-primary);box-shadow:0 0 0 5px color-mix(in srgb,var(--pg-primary) 14%,transparent)}",
-    ".pg-title{font-size:15px;font-weight:700;color:#0f172a;line-height:1.4;margin:0}",
-    ".pg-sub{font-size:12px;color:#64748b;margin:0}",
-    ".pg-close,.pg-reset,.pg-history{border:0;background:transparent;color:#64748b;cursor:pointer;font:inherit;font-family:var(--pg-font);padding:6px;border-radius:8px}",
-    ".pg-history{font-size:12px;font-weight:700;padding:7px 8px}",
-    ".pg-close:hover,.pg-reset:hover,.pg-history:hover{background:#eef5f1;color:#0f172a}",
-    ".pg-spacer{flex:1}",
-    ".pg-body{overflow:auto;padding:16px 14px;background:linear-gradient(180deg,#f8fcfa 0%,#f1f7f4 100%)}",
-    ".pg-sessions{display:grid;gap:10px}",
-    ".pg-sessions-head{display:flex;align-items:center;gap:8px;margin-bottom:4px}",
-    ".pg-sessions-title{font-size:13px;font-weight:800;color:#0f172a;margin:0}",
-    ".pg-sessions-new{margin-right:auto;border:0;border-radius:10px;background:var(--pg-primary);color:#fff;cursor:pointer;font:700 12px/1 var(--pg-font);padding:9px 10px}",
-    ".pg-session{width:100%;border:1px solid #dbe5e1;border-radius:12px;background:#fff;color:#0f172a;cursor:pointer;text-align:right;padding:11px 12px;display:grid;gap:5px}",
-    ".pg-session:hover{border-color:color-mix(in srgb,var(--pg-primary) 40%,#dbe5e1);background:#fbfffd}",
-    ".pg-session-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:800}",
-    ".pg-session-meta{font-size:11px;color:#64748b}",
-    ".pg-empty{margin:28px 0;text-align:center;color:#64748b;font-size:13px;line-height:1.8}",
-    ".pg-msg-row{display:flex;margin:0 0 12px}",
-    ".pg-msg-row.user{justify-content:flex-start}",
-    ".pg-msg-row.assistant{justify-content:flex-end}",
-    ".pg-msg{max-width:82%;white-space:pre-wrap;border-radius:16px;padding:11px 13px;font-size:13px;line-height:1.8;word-break:break-word}",
-    ".pg-msg.user{background:#fff;border:1px solid #dbe5e1;color:#0f172a;box-shadow:0 1px 2px rgba(15,23,42,.04)}",
-    ".pg-msg.assistant{background:var(--pg-primary);color:#fff;font-weight:500}",
-    ".pg-attachments{display:grid;gap:8px;margin-bottom:8px;white-space:normal}",
-    ".pg-attachment{display:flex;align-items:center;gap:8px;min-width:0;border:1px solid rgba(15,23,42,.1);border-radius:10px;background:rgba(255,255,255,.78);padding:7px 8px;color:#0f172a;text-decoration:none}",
-    ".pg-msg.assistant .pg-attachment{border-color:rgba(255,255,255,.24);background:rgba(255,255,255,.12);color:#fff}",
-    ".pg-attachment img{width:86px;height:64px;object-fit:cover;border-radius:8px;background:#e2e8f0}",
-    ".pg-file-icon{display:grid;place-items:center;flex:0 0 auto;width:34px;height:34px;border-radius:9px;background:color-mix(in srgb,var(--pg-primary) 15%,#fff);color:var(--pg-primary);font-weight:800}",
-    ".pg-file-meta{min-width:0;display:grid;gap:2px}",
-    ".pg-file-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:700}",
-    ".pg-file-size{font-size:11px;color:#64748b}",
-    ".pg-msg.assistant .pg-file-size{color:rgba(255,255,255,.72)}",
-    ".pg-typing{display:inline-flex;gap:4px;align-items:center}",
-    ".pg-typing span{width:6px;height:6px;border-radius:50%;background:#fff;opacity:.8;animation:pg-bounce .9s infinite ease-in-out}",
-    ".pg-typing span:nth-child(2){animation-delay:.12s}.pg-typing span:nth-child(3){animation-delay:.24s}",
-    "@keyframes pg-bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-5px)}}",
-    ".pg-error{margin:0 0 12px;text-align:center;color:#dc2626;font-size:12px;line-height:1.7}",
-    ".pg-form{border-top:1px solid #dbe5e1;background:rgba(255,255,255,.94);padding:12px;display:grid;gap:8px}",
-    ".pg-pending{display:flex;gap:8px;overflow:auto;padding-bottom:2px}",
-    ".pg-pending:empty{display:none}",
-    ".pg-pending-item{position:relative;flex:0 0 auto;width:86px;min-height:64px;border:1px solid #dbe5e1;border-radius:12px;background:#fff;padding:6px;display:grid;place-items:center;color:#0f172a}",
-    ".pg-pending-item img{width:100%;height:52px;object-fit:cover;border-radius:8px}",
-    ".pg-pending-file{max-width:74px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;font-weight:700;text-align:center}",
-    ".pg-remove{position:absolute;top:-7px;left:-7px;width:22px;height:22px;border:0;border-radius:50%;background:#0f172a;color:#fff;cursor:pointer;font:700 14px/1 var(--pg-font)}",
-    ".pg-composer{display:flex;gap:8px;align-items:flex-end}",
-    ".pg-file-button{width:42px;height:42px;border:1px solid #dbe5e1;background:#fff;color:#0f172a;border-radius:12px;cursor:pointer;font:700 24px/1 var(--pg-font);display:grid;place-items:center}",
-    ".pg-file-button:disabled{opacity:.55;cursor:not-allowed}",
-    ".pg-file-input{display:none}",
-    ".pg-input{min-width:0;flex:1;min-height:42px;max-height:130px;resize:none;border:1px solid #dbe5e1;background:#fff;border-radius:12px;padding:11px 12px;font:400 16px/1.65 var(--pg-font);color:#0f172a;outline:none}",
-    ".pg-input:focus{border-color:var(--pg-primary);box-shadow:0 0 0 2px color-mix(in srgb,var(--pg-primary) 16%,transparent)}",
-    ".pg-send{border:0;border-radius:12px;background:var(--pg-primary);color:#fff;font:700 13px/1 var(--pg-font);padding:0 15px;cursor:pointer;min-width:62px;height:42px}",
-    ".pg-send:disabled{opacity:.55;cursor:not-allowed}",
-    "@media (max-width:520px){.pg-wrap{inset:auto 16px 16px 16px}.pg-wrap[data-position='bottom-right']{inset:auto 16px 16px 16px}.pg-panel{position:fixed;left:16px;right:16px;bottom:88px;width:auto;height:min(620px,calc(100vh - 112px))}.pg-wrap[data-position='bottom-right'] .pg-panel{left:16px;right:16px}.pg-wrap[data-mode='inline']{inset:auto;height:var(--pg-height)}.pg-wrap[data-mode='inline'] .pg-panel{position:relative;left:auto;right:auto;bottom:auto;width:100%;height:100%}}",
-    "</style>",
-    "<div class='pg-wrap' data-mode='" + escapeHtml(config.mode) + "' data-position='" + escapeHtml(config.position) + "' data-open='" + String(config.autoOpen || config.mode === "inline") + "'>",
-    "  <section class='pg-panel' aria-label='چت مشاوره پروژه'>",
-    "    <header class='pg-head'>",
-    "      <span class='pg-dot' aria-hidden='true'></span>",
-    "      <div><p class='pg-title'></p><p class='pg-sub'></p></div>",
-    "      <span class='pg-spacer'></span>",
-    "      <button class='pg-history' type='button' title='چت‌های قبلی'>چت‌ها</button>",
-    "      <button class='pg-reset' type='button' title='چت جدید'>↻</button>",
-    "      <button class='pg-close' type='button' title='بستن'>×</button>",
-    "    </header>",
-    "    <main class='pg-body'></main>",
-    "    <form class='pg-form'>",
-    "      <div class='pg-pending'></div>",
-    "      <div class='pg-composer'>",
-    "        <button class='pg-file-button' type='button' title='افزودن فایل' aria-label='افزودن فایل'>+</button>",
-    "        <input class='pg-file-input' type='file' multiple accept='image/*,.pdf,.doc,.docx,.txt,.md,.csv,.json' />",
-    "        <textarea class='pg-input' autocomplete='off' rows='1'></textarea>",
-    "        <button class='pg-send' type='submit'>ارسال</button>",
-    "      </div>",
-    "    </form>",
-    "  </section>",
-    "  <button class='pg-button' type='button' aria-label='باز کردن چت'>",
-    "    <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' aria-hidden='true'><path d='M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z'/></svg>",
-    "  </button>",
-    "</div>",
-  ].join("");
-
-  var wrap = shadow.querySelector(".pg-wrap");
-  var panel = shadow.querySelector(".pg-panel");
-  var button = shadow.querySelector(".pg-button");
-  var closeButton = shadow.querySelector(".pg-close");
-  var resetButton = shadow.querySelector(".pg-reset");
-  var historyButton = shadow.querySelector(".pg-history");
-  var title = shadow.querySelector(".pg-title");
-  var subtitle = shadow.querySelector(".pg-sub");
-  var body = shadow.querySelector(".pg-body");
-  var form = shadow.querySelector(".pg-form");
-  var input = shadow.querySelector(".pg-input");
-  var sendButton = shadow.querySelector(".pg-send");
-  var fileButton = shadow.querySelector(".pg-file-button");
-  var fileInput = shadow.querySelector(".pg-file-input");
-  var pendingList = shadow.querySelector(".pg-pending");
-
-  title.textContent = config.title;
-  subtitle.textContent = config.subtitle;
-
-  button.addEventListener("click", function () {
-    setOpen(wrap.getAttribute("data-open") !== "true");
-  });
-  closeButton.addEventListener("click", function () {
-    setOpen(false);
-  });
-  historyButton.addEventListener("click", function () {
-    state.view = state.view === "history" ? "chat" : "history";
-    render();
-  });
-  resetButton.addEventListener("click", function () {
-    state = defaultState(createSessionId());
-    saveState();
-    render();
-    input.focus();
-  });
-  form.addEventListener("submit", onSubmit);
-  input.addEventListener("keydown", onInputKeydown);
-  input.addEventListener("input", function () {
-    autoSizeInput();
-    renderButtonState();
-  });
-  fileButton.addEventListener("click", function () {
-    if (!state.loading && !state.phoneStep) fileInput.click();
-  });
-  fileInput.addEventListener("change", onFilesSelected);
-
-  render();
-  if (config.autoOpen || config.mode === "inline") input.focus();
-
-  window.PixelGeniusChatbot = {
-    open: function () {
-      setOpen(true);
-    },
-    close: function () {
-      setOpen(false);
-    },
-    reset: function () {
-      state = defaultState(createSessionId());
-      saveState();
-      render();
-    },
+  // Keep in sync with WIDGET_COLORS in frontend/lib/widget.ts.
+  var ACCENTS = {
+    saffron: { bg: "#f28c28", fg: "#1c1a17" },
+    ink: { bg: "#36312b", fg: "#fbfaf7" },
+    emerald: { bg: "#0f9d6e", fg: "#ffffff" },
+    ocean: { bg: "#2f6fde", fg: "#ffffff" },
+    rose: { bg: "#e2456b", fg: "#ffffff" },
+    plum: { bg: "#7c4dbd", fg: "#ffffff" },
   };
 
   function attr(name) {
-    return currentScript ? currentScript.getAttribute("data-" + name) : "";
+    return script.getAttribute("data-" + name) || "";
   }
 
-  function normalizeMode(mode) {
-    return mode === "box" || mode === "inline" ? "inline" : "floating";
+  var appUrl = (attr("app-url") || attr("api-url") || new URL(script.src).origin).replace(/\/+$/, "");
+  var appOrigin = new URL(appUrl).origin;
+  var bot = attr("bot");
+  var inline = attr("mode") === "inline" || attr("mode") === "box";
+  var config = {
+    position: attr("position"),
+    height: attr("height") || "640px",
+    autoOpen: attr("auto-open") === "true",
+    accent: ACCENTS.saffron,
+    title: "چت با دستیار پروژه",
+  };
+
+  var chatUrl = appUrl + "/chat?embed=1" + (bot ? "&bot=" + encodeURIComponent(bot) : "");
+  var host, shadow, panel, launcher, frame;
+  var open = false;
+
+  function start(profile) {
+    var widget = (profile && profile.widget) || {};
+    if (ACCENTS[widget.accent]) config.accent = ACCENTS[widget.accent];
+    if (!config.position) config.position = widget.position === "bottom-right" ? "bottom-right" : "bottom-left";
+    if (profile) config.title = "چت با " + (widget.brand_name || profile.name || "دستیار پروژه");
+    if (inline) mountInline();
+    else mountFloating();
   }
 
-  function loadFont() {
-    if (!config.fontUrl || document.querySelector("link[data-pixelgenius-font='true']")) return;
-    var link = document.createElement("link");
-    link.rel = "stylesheet";
-    link.href = config.fontUrl;
-    link.setAttribute("data-pixelgenius-font", "true");
-    document.head.appendChild(link);
+  function createFrame() {
+    frame = document.createElement("iframe");
+    frame.src = chatUrl;
+    frame.title = config.title;
+    frame.setAttribute("allow", "autoplay; clipboard-write");
+    frame.setAttribute("loading", "lazy");
+    frame.style.cssText = "border:0;width:100%;height:100%;display:block;background:transparent;color-scheme:normal";
+    return frame;
   }
 
-  function getMountTarget() {
-    if (config.mode !== "inline") return document.body;
-    if (config.container) {
-      var container = document.querySelector(config.container);
-      if (container) return container;
-    }
-    if (currentScript && currentScript.parentElement && currentScript.parentElement !== document.head) {
-      return currentScript.parentElement;
-    }
-    return document.body;
+  function mountInline() {
+    var target = (attr("container") && document.querySelector(attr("container"))) || script.parentElement || document.body;
+    var box = document.createElement("div");
+    box.style.cssText = "width:100%;height:" + config.height + ";border-radius:16px;overflow:hidden;border:1px solid rgba(0,0,0,.08)";
+    box.appendChild(createFrame());
+    target.appendChild(box);
   }
 
-  function defaultState(sessionId) {
-    return {
-      sessionId: sessionId || createSessionId(),
-      view: "chat",
-      messages: [{ role: "assistant", content: WELCOME }],
-      attachments: [],
-      phoneStep: false,
-      handoff: null,
-      loading: false,
-      error: "",
-    };
-  }
-
-  function readState() {
-    try {
-      var parsed = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || "");
-      if (parsed && Array.isArray(parsed.messages) && typeof parsed.phoneStep === "boolean") {
-        return {
-          sessionId: typeof parsed.sessionId === "string" ? parsed.sessionId : createSessionId(),
-          view: "chat",
-          messages: parsed.messages.filter(isMessage),
-          attachments: Array.isArray(parsed.attachments) ? parsed.attachments.filter(isAttachment) : [],
-          phoneStep: parsed.phoneStep,
-          handoff: parsed.handoff && isHandoff(parsed.handoff) ? parsed.handoff : null,
-          loading: false,
-          error: "",
-        };
-      }
-    } catch (error) {
-      return defaultState(createSessionId());
-    }
-    return defaultState(createSessionId());
-  }
-
-  function isMessage(message) {
-    return (
-      message &&
-      (message.role === "user" || message.role === "assistant") &&
-      typeof message.content === "string" &&
-      (!message.attachments || Array.isArray(message.attachments))
-    );
-  }
-
-  function isAttachment(attachment) {
-    return (
-      attachment &&
-      typeof attachment.name === "string" &&
-      typeof attachment.url === "string" &&
-      (typeof attachment.size === "number" || typeof attachment.size === "undefined" || attachment.size === null)
-    );
-  }
-
-  function isHandoff(handoff) {
-    return (
-      handoff &&
-      handoff.version === 1 &&
-      handoff.proposal &&
-      handoff.proposal.type === "proposal" &&
-      Array.isArray(handoff.chatHistory)
-    );
-  }
-
-  function saveState() {
-    try {
-      var snapshot = {
-        sessionId: state.sessionId,
-        messages: state.messages,
-        attachments: state.attachments || [],
-        phoneStep: state.phoneStep,
-        handoff: state.handoff || null,
-        updatedAt: new Date().toISOString(),
-      };
-      window.localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify(snapshot)
-      );
-      upsertSession(snapshot);
-    } catch (error) {
-      // Storage can be unavailable in restricted embeds; the chat still works for the current page.
-    }
-  }
-
-  function readSessions() {
-    try {
-      var parsed = JSON.parse(window.localStorage.getItem(SESSIONS_KEY) || "[]");
-      if (!Array.isArray(parsed)) return [];
-      return parsed.filter(function (session) {
-        return session && typeof session.id === "string" && session.draft && Array.isArray(session.draft.messages);
-      });
-    } catch (error) {
-      return [];
-    }
-  }
-
-  function writeSessions(sessions) {
-    try {
-      window.localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions.slice(0, MAX_SESSIONS)));
-    } catch (error) {
-      // Ignore unavailable storage.
-    }
-  }
-
-  function upsertSession(snapshot) {
-    var sessions = readSessions().filter(function (session) {
-      return session.id !== snapshot.sessionId;
+  function mountFloating() {
+    host = document.createElement("div");
+    shadow = host.attachShadow({ mode: "open" });
+    var side = config.position === "bottom-right" ? "right" : "left";
+    shadow.innerHTML =
+      "<style>" +
+      ":host{all:initial}" +
+      ".launcher{position:fixed;bottom:24px;" + side + ":24px;z-index:2147483646;width:60px;height:60px;border:0;border-radius:50%;cursor:pointer;" +
+      "display:grid;place-items:center;background:" + config.accent.bg + ";color:" + config.accent.fg + ";" +
+      "box-shadow:0 10px 30px -8px rgba(0,0,0,.35),0 2px 6px rgba(0,0,0,.12);transition:transform .18s ease}" +
+      ".launcher:hover{transform:translateY(-2px)}" +
+      ".launcher:focus-visible{outline:3px solid " + config.accent.bg + ";outline-offset:3px}" +
+      ".launcher svg{width:28px;height:28px}" +
+      ".panel{position:fixed;bottom:96px;" + side + ":24px;z-index:2147483647;width:400px;height:min(680px,calc(100vh - 120px));" +
+      "border-radius:20px;overflow:hidden;background:#fff;box-shadow:0 24px 60px -12px rgba(0,0,0,.35),0 0 0 1px rgba(0,0,0,.06);" +
+      "opacity:0;transform:translateY(12px) scale(.98);pointer-events:none;visibility:hidden;transition:opacity .2s ease,transform .2s ease,visibility .2s}" +
+      ".panel.open{opacity:1;transform:none;pointer-events:auto;visibility:visible}" +
+      "@media (max-width:520px){.panel{inset:0;width:auto;height:auto;border-radius:0}.panel.open~.launcher{display:none}}" +
+      "@media (prefers-reduced-motion:reduce){.panel,.launcher{transition:none}}" +
+      "</style>" +
+      "<div class='panel' role='dialog' aria-label='" + escapeAttr(config.title) + "'></div>" +
+      "<button class='launcher' type='button' aria-expanded='false' aria-label='" + escapeAttr(config.title) + "'></button>";
+    panel = shadow.querySelector(".panel");
+    launcher = shadow.querySelector(".launcher");
+    launcher.addEventListener("click", function () {
+      setOpen(!open);
     });
-    sessions.unshift({
-      id: snapshot.sessionId,
-      title: getSessionTitle(snapshot.messages),
-      updatedAt: snapshot.updatedAt,
-      draft: snapshot,
-    });
-    writeSessions(sessions);
+    renderIcon();
+    document.body.appendChild(host);
+    if (config.autoOpen) setOpen(true);
   }
 
-  function createSessionId() {
-    return String(Date.now()) + "-" + Math.random().toString(36).slice(2, 9);
+  function renderIcon() {
+    launcher.innerHTML = open
+      ? "<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.2' stroke-linecap='round' aria-hidden='true'><path d='M6 6l12 12M18 6L6 18'/></svg>"
+      : "<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linejoin='round' aria-hidden='true'><path d='M5 4.5h14a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5h-7.2L7.4 20v-3.5H5A1.5 1.5 0 0 1 3.5 15V6A1.5 1.5 0 0 1 5 4.5Z'/><path d='M8.5 9.5h7M8.5 12.5h4.5' stroke-linecap='round'/></svg>";
   }
 
-  function getSessionTitle(messages) {
-    var userMessage = (messages || []).find(function (message) {
-      return message.role === "user" && message.content.trim();
-    });
-    return userMessage ? userMessage.content.trim().slice(0, 54) : "چت جدید";
+  function setOpen(next) {
+    if (inline || !panel) return;
+    open = next;
+    // The chat loads on first open and stays alive afterwards so the conversation is kept.
+    if (open && !frame) panel.appendChild(createFrame());
+    panel.classList.toggle("open", open);
+    launcher.setAttribute("aria-expanded", String(open));
+    launcher.setAttribute("aria-label", open ? "بستن چت" : config.title);
+    renderIcon();
+    if (open && frame) frame.focus();
+    else if (!open) launcher.focus();
   }
 
-  function openSession(sessionId) {
-    var session = readSessions().find(function (item) {
-      return item.id === sessionId;
-    });
-    if (!session || !session.draft) return;
-    state = {
-      sessionId: session.id,
-      view: "chat",
-      messages: (session.draft.messages || []).filter(isMessage),
-      attachments: Array.isArray(session.draft.attachments) ? session.draft.attachments.filter(isAttachment) : [],
-      phoneStep: Boolean(session.draft.phoneStep),
-      handoff: session.draft.handoff && isHandoff(session.draft.handoff) ? session.draft.handoff : null,
-      loading: false,
-      error: "",
-    };
-    saveState();
-    render();
-  }
-
-  function setOpen(open) {
-    if (config.mode === "inline") open = true;
-    wrap.setAttribute("data-open", String(open));
-    button.setAttribute("aria-expanded", String(open));
-    if (open) {
-      setTimeout(function () {
-        input.focus();
-      }, 0);
-    }
-  }
-
-  async function onSubmit(event) {
-    event.preventDefault();
-    var text = input.value.trim();
-    var attachments = (state.attachments || []).slice();
-    if ((!text && !attachments.length) || state.loading) return;
-
-    state.messages.push({ role: "user", content: text, attachments: attachments });
-    state.attachments = [];
-    input.value = "";
-    autoSizeInput();
-    state.error = "";
-    render();
-
-    if (state.phoneStep) {
-      await sendOtp(text);
-      return;
-    }
-
-    state.loading = true;
-    render();
-
-    try {
-      var reply = await sendChat(state.messages.slice(1).slice(-10), attachments);
-      var lead = parseLead(reply);
-      if (lead) {
-        var clientReply = lead.client_message || "پیشنهاد اولیه پروژه آماده شد.";
-        state.handoff = buildHandoff(lead);
-        state.messages.push({ role: "assistant", content: clientReply + "\n\n" + PHONE_ASK });
-        state.phoneStep = true;
-      } else {
-        state.messages.push({ role: "assistant", content: reply });
-      }
-      saveState();
-    } catch (error) {
-      state.error = error.message || "خطا در ارتباط با سرور";
-      state.attachments = attachments.concat(state.attachments || []);
-    } finally {
-      state.loading = false;
-      render();
-    }
-  }
-
-  function onInputKeydown(event) {
-    if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-      form.requestSubmit();
-    }
-  }
-
-  function autoSizeInput() {
-    input.style.height = "auto";
-    input.style.height = Math.min(input.scrollHeight, 130) + "px";
-  }
-
-  async function onFilesSelected(event) {
-    var files = Array.prototype.slice.call(event.target.files || []);
-    event.target.value = "";
-    if (!files.length || state.loading || state.phoneStep) return;
-
-    state.loading = true;
-    state.error = "";
-    render();
-
-    try {
-      var uploaded = [];
-      for (var index = 0; index < files.length; index += 1) {
-        uploaded.push(await uploadFile(files[index]));
-      }
-      state.attachments = (state.attachments || []).concat(uploaded);
-      saveState();
-    } catch (error) {
-      state.error = error.message || "خطا در آپلود فایل";
-    } finally {
-      state.loading = false;
-      render();
-    }
-  }
-
-  async function uploadFile(file) {
-    var formData = new FormData();
-    formData.append("file", file);
-    var response = await fetch(joinUrl(config.apiUrl, "/api/chat/files"), {
-      method: "POST",
-      body: formData,
-    });
-    if (!response.ok) throw new Error(await readError(response, "خطا در آپلود فایل"));
-    return response.json();
-  }
-
-  async function sendChat(messages, attachments) {
-    var response = await fetch(joinUrl(config.apiUrl, "/api/chat"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        messages: messages.map(function (message) {
-          return { role: message.role, content: message.content };
-        }),
-        attachments: attachments || [],
-      }),
-    });
-    if (!response.ok) throw new Error(await readError(response, "خطا در ارتباط با سرور"));
-    var data = await response.json();
-    return data.content || "";
-  }
-
-  async function sendOtp(phone) {
-    state.loading = true;
-    render();
-
-    try {
-      var response = await fetch(joinUrl(config.apiUrl, "/api/customer/otp/send"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: phone }),
-      });
-      if (!response.ok) {
-        throw new Error(await readError(response, "خطا در ارسال کد"));
-      }
-      state.messages.push({
-        role: "assistant",
-        content: "کد تایید به " + phone + " ارسال شد. الان به صفحه ورود منتقل می‌شید تا درخواست ثبت بشه.",
-      });
-      state.error = "";
-      saveState();
-      render();
-      setTimeout(function () {
-        redirectToLogin(phone).catch(function (error) {
-          state.error = error.message || "خطا در انتقال به صفحه ورود";
-          render();
-        });
-      }, 1200);
-    } catch (error) {
-      state.error = error.message || "خطا در ارسال کد";
-      state.messages.push({ role: "assistant", content: "مشکلی در ارسال کد پیش اومد. شماره رو دوباره وارد کنید:" });
-    } finally {
-      state.loading = false;
-      render();
-    }
-  }
-
-  async function redirectToLogin(phone) {
-    var url = new URL(config.loginUrl, window.location.href);
-    url.searchParams.set("phone", phone);
-    url.searchParams.set("redirect", "/panel");
-    if (state.handoff) {
-      var handoff = await storeHandoff(state.handoff);
-      url.searchParams.set("handoff_id", handoff.handoff_id);
-    }
-    state = {
-      sessionId: createSessionId(),
-      view: "chat",
-      messages: [
-        { role: "assistant", content: "کد تایید ارسال شد. ادامه ثبت درخواست داخل پنل انجام می‌شود." },
-        { role: "assistant", content: "بعد از تایید کد، درخواست در پنل ثبت می‌شود. این گفتگو از بخش «چت‌ها» همینجا قابل مشاهده است." },
-      ],
-      attachments: [],
-      phoneStep: false,
-      handoff: null,
-      loading: false,
-      error: "",
-    };
-    saveState();
-    window.location.href = url.toString();
-  }
-
-  async function storeHandoff(handoff) {
-    var response = await fetch(joinUrl(config.apiUrl, "/api/customer/handoff"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(handoff),
-    });
-    if (!response.ok) throw new Error(await readError(response, "خطا در آماده‌سازی ثبت درخواست"));
-    return response.json();
-  }
-
-  function parseLead(reply) {
-    var trimmed = (reply || "").trim();
-    if (trimmed.charAt(0) !== "{") return null;
-    try {
-      var parsed = JSON.parse(trimmed);
-      if (
-        typeof parsed.project_type === "string" &&
-        typeof parsed.client_message === "string" &&
-        Array.isArray(parsed.missing_questions)
-      ) {
-        return parsed;
-      }
-    } catch (error) {
-      return null;
-    }
-    return null;
-  }
-
-  function buildHandoff(lead) {
-    var proposal = leadToProposal(lead);
-    return {
-      version: 1,
-      proposal: proposal,
-      chatHistory: state.messages.filter(isMessage).slice(-20),
-      attachments: collectMessageAttachments(state.messages),
-    };
-  }
-
-  function leadToProposal(lead) {
-    return {
-      type: "proposal",
-      projectName: lead.project_type || "درخواست پروژه",
-      summary: [lead.client_message, lead.admin_summary ? "خلاصه ادمین: " + lead.admin_summary : ""].filter(Boolean).join("\n\n"),
-      features: [
-        lead.project_goal ? "هدف: " + lead.project_goal : "",
-        lead.recommended_solution ? "راهکار پیشنهادی: " + lead.recommended_solution : "",
-        lead.budget_fit ? "تناسب بودجه: " + lead.budget_fit : "",
-        lead.client_risk_level ? "سطح ریسک: " + lead.client_risk_level : "",
-        typeof lead.lead_score === "number" ? "امتیاز لید: " + lead.lead_score : "",
-      ]
-        .concat((lead.missing_questions || []).map(function (question) {
-          return "ابهام: " + question;
-        }))
-        .filter(Boolean),
-      tech: lead.recommended_stack || "",
-      days: parseDays(lead.estimated_timeline || ""),
-      price: parsePriceEstimate(lead.estimated_price_range || ""),
-      priceLabel: lead.estimated_price_range || "",
-    };
-  }
-
-  function parseDays(timeline) {
-    var numbers = String(timeline).match(/\d+/g) || [];
-    if (!numbers.length) return 14;
-    var max = Math.max.apply(null, numbers.map(Number));
-    if (timeline.indexOf("ماه") >= 0) return max * 30;
-    if (timeline.indexOf("هفته") >= 0) return max * 7;
-    return max;
-  }
-
-  function parsePriceEstimate(priceRange) {
-    var normalized = String(priceRange).replace(/[۰-۹]/g, function (digit) {
-      return "۰۱۲۳۴۵۶۷۸۹".indexOf(digit).toString();
-    });
-    var numbers = normalized.match(/\d+/g) || [];
-    if (!numbers.length) return 0;
-    return Math.max.apply(null, numbers.map(Number)) * 1000000;
-  }
-
-  function encodeHandoff(payload) {
-    return btoa(unescape(encodeURIComponent(JSON.stringify(payload))))
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_")
-      .replace(/=+$/, "");
-  }
-
-  function render() {
-    body.innerHTML = "";
-    historyButton.textContent = state.view === "history" ? "چت" : "چت‌ها";
-    form.style.display = state.view === "history" ? "none" : "grid";
-    if (state.view === "history") {
-      renderSessions();
-      return;
-    }
-    state.messages.forEach(function (message) {
-      var row = document.createElement("div");
-      var bubble = document.createElement("div");
-      row.className = "pg-msg-row " + message.role;
-      bubble.className = "pg-msg " + message.role;
-      renderAttachments(bubble, message.attachments || []);
-      if (message.content) bubble.appendChild(document.createTextNode(message.content));
-      row.appendChild(bubble);
-      body.appendChild(row);
-    });
-
-    if (state.loading) {
-      var row = document.createElement("div");
-      var bubble = document.createElement("div");
-      row.className = "pg-msg-row assistant";
-      bubble.className = "pg-msg assistant";
-      bubble.innerHTML = "<span class='pg-typing'><span></span><span></span><span></span></span>";
-      row.appendChild(bubble);
-      body.appendChild(row);
-    }
-
-    if (state.error) {
-      var error = document.createElement("p");
-      error.className = "pg-error";
-      error.textContent = state.error;
-      body.appendChild(error);
-    }
-
-    renderPendingAttachments();
-    input.placeholder = state.phoneStep ? "09xxxxxxxxx" : "پیام خود را بنویسید...";
-    input.inputMode = state.phoneStep ? "tel" : "text";
-    input.dir = state.phoneStep ? "ltr" : "rtl";
-    input.disabled = state.loading;
-    fileButton.disabled = state.loading || state.phoneStep;
-    renderButtonState();
-    panel.setAttribute("aria-busy", String(state.loading));
-    autoSizeInput();
-    body.scrollTop = body.scrollHeight;
-  }
-
-  function renderSessions() {
-    var wrapper = document.createElement("div");
-    wrapper.className = "pg-sessions";
-
-    var header = document.createElement("div");
-    header.className = "pg-sessions-head";
-    var heading = document.createElement("p");
-    heading.className = "pg-sessions-title";
-    heading.textContent = "چت‌های قبلی";
-    var newButton = document.createElement("button");
-    newButton.className = "pg-sessions-new";
-    newButton.type = "button";
-    newButton.textContent = "چت جدید";
-    newButton.addEventListener("click", function () {
-      state = defaultState(createSessionId());
-      saveState();
-      render();
-      input.focus();
-    });
-    header.appendChild(heading);
-    header.appendChild(newButton);
-    wrapper.appendChild(header);
-
-    var sessions = readSessions();
-    if (!sessions.length) {
-      var empty = document.createElement("p");
-      empty.className = "pg-empty";
-      empty.textContent = "هنوز چتی ذخیره نشده است.";
-      wrapper.appendChild(empty);
-      body.appendChild(wrapper);
-      return;
-    }
-
-    sessions.forEach(function (session) {
-      var item = document.createElement("button");
-      item.className = "pg-session";
-      item.type = "button";
-      item.addEventListener("click", function () {
-        openSession(session.id);
-      });
-
-      var itemTitle = document.createElement("span");
-      itemTitle.className = "pg-session-title";
-      itemTitle.textContent = session.title || "چت جدید";
-      var meta = document.createElement("span");
-      meta.className = "pg-session-meta";
-      meta.textContent = formatSessionDate(session.updatedAt);
-      item.appendChild(itemTitle);
-      item.appendChild(meta);
-      wrapper.appendChild(item);
-    });
-
-    body.appendChild(wrapper);
-  }
-
-  function formatSessionDate(value) {
-    try {
-      return new Date(value).toLocaleDateString("fa-IR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
-    } catch (error) {
-      return "";
-    }
-  }
-
-  function renderButtonState() {
-    sendButton.disabled = state.loading || (!input.value.trim() && !(state.attachments || []).length);
-  }
-
-  function renderAttachments(container, attachments) {
-    if (!attachments.length) return;
-    var list = document.createElement("div");
-    list.className = "pg-attachments";
-    attachments.forEach(function (attachment) {
-      var link = document.createElement("a");
-      link.className = "pg-attachment";
-      link.href = attachmentHref(attachment);
-      link.target = "_blank";
-      link.rel = "noreferrer";
-      if (isImageAttachment(attachment)) {
-        var img = document.createElement("img");
-        img.src = attachmentHref(attachment);
-        img.alt = attachment.name;
-        link.appendChild(img);
-      } else {
-        var icon = document.createElement("span");
-        icon.className = "pg-file-icon";
-        icon.textContent = "F";
-        link.appendChild(icon);
-      }
-      var meta = document.createElement("span");
-      meta.className = "pg-file-meta";
-      var name = document.createElement("span");
-      name.className = "pg-file-name";
-      name.textContent = attachment.name;
-      var size = document.createElement("span");
-      size.className = "pg-file-size";
-      size.textContent = formatFileSize(attachment.size);
-      meta.appendChild(name);
-      meta.appendChild(size);
-      link.appendChild(meta);
-      list.appendChild(link);
-    });
-    container.appendChild(list);
-  }
-
-  function renderPendingAttachments() {
-    pendingList.innerHTML = "";
-    (state.attachments || []).forEach(function (attachment, index) {
-      var item = document.createElement("div");
-      item.className = "pg-pending-item";
-      if (isImageAttachment(attachment)) {
-        var img = document.createElement("img");
-        img.src = attachmentHref(attachment);
-        img.alt = attachment.name;
-        item.appendChild(img);
-      } else {
-        var file = document.createElement("span");
-        file.className = "pg-pending-file";
-        file.textContent = attachment.name;
-        item.appendChild(file);
-      }
-      var remove = document.createElement("button");
-      remove.className = "pg-remove";
-      remove.type = "button";
-      remove.textContent = "×";
-      remove.setAttribute("aria-label", "حذف فایل");
-      remove.addEventListener("click", function () {
-        state.attachments.splice(index, 1);
-        saveState();
-        render();
-      });
-      item.appendChild(remove);
-      pendingList.appendChild(item);
+  function escapeAttr(value) {
+    return String(value).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
     });
   }
 
-  function collectMessageAttachments(messages) {
-    return messages.reduce(function (files, message) {
-      return files.concat(Array.isArray(message.attachments) ? message.attachments.filter(isAttachment) : []);
-    }, []);
+  window.addEventListener("message", function (event) {
+    if (event.origin !== appOrigin || !event.data || event.data.type !== "freelio:close") return;
+    setOpen(false);
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && open) setOpen(false);
+  });
+
+  var api = {
+    open: function () { setOpen(true); },
+    close: function () { setOpen(false); },
+    toggle: function () { setOpen(!open); },
+  };
+  window.FreelioWidget = api;
+  // Name used by earlier versions of the widget.
+  window.PixelGeniusChatbot = api;
+
+  function boot() {
+    if (!bot) return start(null);
+    fetch(appUrl + "/api/bot/" + encodeURIComponent(bot))
+      .then(function (res) { return res.ok ? res.json() : null; })
+      .catch(function () { return null; })
+      .then(start);
   }
 
-  function isImageAttachment(attachment) {
-    return String(attachment.content_type || "").indexOf("image/") === 0;
-  }
-
-  function attachmentHref(attachment) {
-    var url = attachment.url || "";
-    if (/^https?:\/\//i.test(url) || /^data:/i.test(url)) return url;
-    return joinUrl(config.apiUrl, url.charAt(0) === "/" ? url : "/" + url);
-  }
-
-  function formatFileSize(size) {
-    if (!size) return "فایل";
-    if (size < 1024) return size + " B";
-    if (size < 1024 * 1024) return Math.round(size / 1024) + " KB";
-    return (size / (1024 * 1024)).toFixed(1) + " MB";
-  }
-
-  function joinUrl(base, path) {
-    return String(base).replace(/\/+$/, "") + path;
-  }
-
-  async function readError(response, fallback) {
-    try {
-      var body = await response.json();
-      return body.detail || body.message || fallback;
-    } catch (error) {
-      return fallback;
-    }
-  }
-
-  function escapeHtml(value) {
-    return String(value).replace(/[&<>"']/g, function (character) {
-      return {
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&#39;",
-      }[character];
-    });
-  }
-
-  function escapeCss(value) {
-    return String(value).replace(/[;"\\]/g, "");
-  }
-
-  function cssFontFamily(value) {
-    return "'" + String(value).replace(/['"\\]/g, "") + "'";
-  }
+  if (document.body) boot();
+  else document.addEventListener("DOMContentLoaded", boot, { once: true });
 })();

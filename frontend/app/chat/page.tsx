@@ -3,15 +3,16 @@
 import { useState, useRef, useEffect, FormEvent, KeyboardEvent, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { IconArrowUp, IconBrandGithub, IconChevronLeft, IconCode, IconCloudUpload, IconLayout, IconCheck, IconCoin, IconCopy, IconDownload, IconFileText, IconHelp, IconFileZip, IconMenu2, IconMessage, IconPaperclip, IconPlus, IconRefresh, IconUser, IconWand, IconX } from "@tabler/icons-react";
+import { IconArrowUp, IconBrandGithub, IconChevronLeft, IconCode, IconCloudUpload, IconLayout, IconCheck, IconCoin, IconCopy, IconDownload, IconFileText, IconHelp, IconFileZip, IconMenu2, IconMessage, IconMessageCircle, IconPaperclip, IconPlus, IconRefresh, IconUser, IconWand, IconX } from "@tabler/icons-react";
 import { BrandLogo, BrandMark } from "@/components/Brand";
+import { accentStyle, robotColors } from "@/lib/widget";
 import { Button } from "@/components/ui/button";
 import { BUILD_PROMPT, CopyBlock } from "@/components/McpTour";
 import ChatBubble from "@/components/ChatBubble";
 import ChatRobot, { ROBOT_INTRODUCTIONS } from "@/components/ChatRobot";
 import ThemeToggle from "@/components/ThemeToggle";
 import GuidedTour, { startTour } from "@/components/GuidedTour";
-import { fetchOrderBrief, fetchChatProgress, ChatProgressStage, sendChat, sendOtp, submitOrder, uploadChatFile, createChatSession, updateChatSession, ChatMode, ProjectPath, Message, Proposal, LeadAnalysis, OrderFile } from "@/lib/api";
+import { fetchBotProfile, BotProfile, fetchOrderBrief, fetchChatProgress, ChatProgressStage, sendChat, sendOtp, submitOrder, uploadChatFile, createChatSession, updateChatSession, ChatMode, ProjectPath, Message, Proposal, LeadAnalysis, OrderFile } from "@/lib/api";
 
 const WELCOME: Message = {
   role: "assistant",
@@ -453,6 +454,9 @@ function ChatPageInner() {
   const [attachments, setAttachments] = useState<OrderFile[]>([]);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [embedded, setEmbedded] = useState(false);
+  const [submittedNotice, setSubmittedNotice] = useState(false);
+  const [botProfile, setBotProfile] = useState<BotProfile | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -469,7 +473,10 @@ function ChatPageInner() {
     const requestedSessionId = searchParams.get("session");
     const forceNew = searchParams.get("new") === "1";
     const bot = searchParams.get("bot") || undefined;
+    const isEmbedded = searchParams.get("embed") === "1";
     setBotToken(bot);
+    setEmbedded(isEmbedded);
+    setSubmittedNotice(isEmbedded && searchParams.get("submitted") === "1");
     const nextChatKey = token && currentCustomerId ? getCustomerChatKey(currentCustomerId) : ANON_CHAT_KEY;
     const customerDraft = readDraft(nextChatKey);
     const anonymousDraft = readDraft(ANON_CHAT_KEY);
@@ -500,7 +507,7 @@ function ChatPageInner() {
       }
     }
 
-    const storedMode: ChatMode = bot ? "sales" : draft?.mode || (localStorage.getItem("chat_mode") === "sales" ? "sales" : "designer");
+    const storedMode: ChatMode = bot || isEmbedded ? "sales" : draft?.mode || (localStorage.getItem("chat_mode") === "sales" ? "sales" : "designer");
     const restoredPath = !bot && storedMode === "designer" && isProjectPath(draft?.projectPath) ? draft.projectPath : undefined;
     setProjectPath(restoredPath);
     setSourceUrl(restoredPath === "source" ? draft?.sourceUrl || "" : "");
@@ -522,6 +529,24 @@ function ChatPageInner() {
     }
     setHydrated(true);
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!botToken) {
+      setBotProfile(null);
+      return;
+    }
+    let cancelled = false;
+    fetchBotProfile(botToken)
+      .then((profile) => {
+        if (cancelled) return;
+        setBotProfile(profile);
+        const greeting = profile.widget.greeting.trim() ||
+          `سلام! من دستیار هوشمند ${profile.widget.brand_name || profile.name || "تیم"} هستم.\nبهم بگید چه پروژه‌ای در ذهن دارید؟`;
+        setMessages((prev) => (prev.length <= 1 ? [{ role: "assistant", content: greeting }] : prev));
+      })
+      .catch(() => { /* unknown bot: the generic sales assistant still works */ });
+    return () => { cancelled = true; };
+  }, [botToken]);
 
   useEffect(() => {
     const orderId = searchParams.get("brief");
@@ -726,7 +751,7 @@ function ChatPageInner() {
 
       if (lead) {
         setProgressStage("working");
-        const proposal: Proposal = { ...leadToProposal(lead, activeMode), ...(activeMode === "designer" ? { project_path: projectPath, source_url: projectPath === "source" && sourceType === "github" ? sourceUrl : "", source_type: projectPath === "source" ? sourceType : undefined, source_file: projectPath === "source" && sourceType === "zip" ? sourceArchive : undefined } : {}) };
+        const proposal: Proposal = { ...leadToProposal(lead, activeMode), ...(botToken ? { bot_token: botToken } : {}), ...(activeMode === "designer" ? { project_path: projectPath, source_url: projectPath === "source" && sourceType === "github" ? sourceUrl : "", source_type: projectPath === "source" ? sourceType : undefined, source_file: projectPath === "source" && sourceType === "zip" ? sourceArchive : undefined } : {}) };
         const clientReply = lead.client_message || "پیشنهاد اولیه پروژه آماده شد.";
         const orderFiles = collectMessageAttachments(newMessages);
         if (customerToken) {
@@ -771,7 +796,9 @@ function ChatPageInner() {
     try {
       await sendOtp(phone);
       setMessages((prev) => [...prev, { role: "assistant", content: `کد تایید به ${phone} ارسال شد. الان بهتون منتقل می‌کنم تا کد رو وارد کنید...` }]);
-      setTimeout(() => router.push(`/login?phone=${encodeURIComponent(phone)}&redirect=/panel`), 1200);
+      // Inside the embed, come back to the widget chat after login instead of the full panel.
+      const redirect = embedded ? `/chat?${botToken ? `bot=${encodeURIComponent(botToken)}&` : ""}embed=1&submitted=1` : "/panel";
+      setTimeout(() => router.push(`/login?phone=${encodeURIComponent(phone)}&redirect=${encodeURIComponent(redirect)}`), 1200);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "خطا در ارسال کد");
       setMessages((prev) => [...prev, { role: "assistant", content: "مشکلی در ارسال کد پیش اومد. شماره رو دوباره وارد کنید:" }]);
@@ -786,7 +813,7 @@ function ChatPageInner() {
   const placeholder = needsProjectPath ? "اول مسیر پروژه را انتخاب کن" : mode === "designer" && projectPath === "source" && !sourceReady ? "لینک GitHub یا ZIP سورس را اضافه کن" : phoneStep ? "09xxxxxxxxx" : mode === "designer" ? "ایده‌ات رو بنویس..." : "پیام بنویسید...";
   const isLoading = loading || sendingOtp || uploadingFile;
   const canSubmit = !chatBlocked && (phoneStep ? Boolean(input.trim()) : Boolean(input.trim() || attachments.length));
-  const activeMode: ChatMode = botToken ? "sales" : mode;
+  const activeMode: ChatMode = botToken || embedded ? "sales" : mode;
   const isFresh = messages.length <= 1 && !loading && !briefOrderId;
 
   function handleTextareaKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
@@ -902,13 +929,35 @@ function ChatPageInner() {
   }
 
   const visibleSessions = sessions.filter((s) => s.draft.messages.some((m) => m.role === "user"));
-  const showSidebar = !botToken;
+  const showSidebar = !botToken && !embedded;
+  const brandName = botProfile?.widget.brand_name || botProfile?.name || "دستیار پروژه";
+  const robotProps = botProfile
+    ? { shape: botProfile.widget.robot_shape, robotColors: robotColors(botProfile.widget.robot_color), voiceAvailable: botProfile.widget.voice }
+    : {};
   const modeChip = !isFresh && !briefOrderId ? (
     <span className="inline-flex min-w-0 items-center gap-1.5 truncate rounded-full bg-surface-2 px-3 py-1 text-xs font-bold text-secondary-foreground" title="برای تغییر حالت، یک گفتگوی جدید شروع کن">
       {activeMode === "designer" ? <IconWand size={14} aria-hidden="true" /> : <IconCoin size={14} aria-hidden="true" />}
       <span className="truncate">{MODE_CARDS[activeMode].label}{activeMode === "designer" && projectPath ? ` · ${PROJECT_PATHS.find(p => p.id === projectPath)?.title}` : ""}</span>
     </span>
   ) : null;
+
+  const introRobot = (
+    <div className="mt-10 rounded-xl border border-border bg-surface p-3 sm:p-5">
+      <ChatRobot
+        {...robotProps}
+        busy={false}
+        stage={null}
+        uploading={false}
+        sendingOtp={false}
+        briefState="idle"
+        failed={false}
+        input=""
+        replyKey=""
+        waitingForPhone={false}
+        introduction={ROBOT_INTRODUCTIONS[activeMode === "sales" ? "sales" : projectPath === "source" ? "source" : "designer"]}
+      />
+    </div>
+  );
 
   const composer = (
     <form onSubmit={handleSubmit} className="w-full" data-tour="composer">
@@ -990,7 +1039,13 @@ function ChatPageInner() {
               </button>
             </div>
       </div>
-      {!isFresh && (
+      {!showSidebar && (
+        <p className="mt-2 text-center text-[11px] text-muted-foreground">
+          قدرت گرفته از{" "}
+          <a href="/" target="_blank" rel="noopener noreferrer" className="font-bold text-secondary-foreground hover:text-foreground">FreelioAI</a>
+        </p>
+      )}
+      {!isFresh && showSidebar && (
         <p className="mt-2 text-center text-[11px] text-muted-foreground">
           <span className="hidden sm:inline">Enter برای ارسال · Shift+Enter برای خط جدید · </span>
           هوش مصنوعی ممکنه اشتباه کنه؛ نتیجه نهایی رو بررسی کن
@@ -1067,7 +1122,7 @@ function ChatPageInner() {
   );
 
   return (
-    <div className="flex h-[100dvh] min-h-[100dvh] overflow-hidden bg-background">
+    <div className="flex h-[100dvh] min-h-[100dvh] overflow-hidden bg-background" style={botProfile ? accentStyle(botProfile.widget) : undefined}>
       {showSidebar && hydrated && <GuidedTour tour="chat" autoStart={isFresh} />}
       {showSidebar && (
         <aside className="hidden w-72 shrink-0 border-l border-border bg-surface-2/60 lg:block">{sidebar}</aside>
@@ -1080,25 +1135,68 @@ function ChatPageInner() {
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className={`z-10 flex h-14 shrink-0 items-center gap-2 px-3 sm:px-5 ${isFresh ? "lg:hidden" : "border-b border-border"}`}>
+        <header className={`z-10 flex h-14 shrink-0 items-center gap-2 px-3 sm:px-5 ${isFresh && showSidebar ? "lg:hidden" : "border-b border-border"}`}>
           {showSidebar ? (
             <button type="button" onClick={() => setSidebarOpen(true)} aria-label="باز کردن منو" className="grid h-9 w-9 place-items-center rounded-lg text-muted-foreground outline-none hover:bg-foreground/5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring lg:hidden">
               <IconMenu2 size={20} aria-hidden="true" />
             </button>
           ) : null}
-          <span className={showSidebar ? "lg:hidden" : ""}><BrandLogo size="sm" hideWordmarkOnMobile={Boolean(modeChip)} /></span>
-          {modeChip}
+          {showSidebar ? (
+            <span className="lg:hidden"><BrandLogo size="sm" hideWordmarkOnMobile={Boolean(modeChip)} /></span>
+          ) : (
+            <span className="flex min-w-0 items-center gap-2.5">
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-brand-solid text-brand-foreground" aria-hidden="true">
+                <IconMessageCircle size={17} />
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-black text-foreground">{brandName}</span>
+                <span className="block text-[11px] text-muted-foreground">دستیار هوشمند · آنلاین</span>
+              </span>
+            </span>
+          )}
+          {showSidebar && modeChip}
           <div className="mr-auto flex items-center gap-1.5">
             {!showSidebar && <ThemeToggle />}
             {showSidebar && isFresh && <ThemeToggle className="lg:hidden" />}
+            {embedded && (
+              <button
+                type="button"
+                onClick={() => window.parent.postMessage({ type: "freelio:close" }, "*")}
+                aria-label="بستن چت"
+                className="grid h-9 w-9 place-items-center rounded-xl text-muted-foreground outline-none hover:bg-foreground/5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <IconX size={18} aria-hidden="true" />
+              </button>
+            )}
           </div>
         </header>
 
-        {!isFresh && <ChatRobot busy={loading} stage={progressStage} uploading={uploadingFile} sendingOtp={sendingOtp} briefState={briefState} failed={Boolean(error)} input={input} replyKey={messages.at(-1)?.role === "assistant" ? `${messages.length}:${messages.at(-1)?.content}` : ""} waitingForPhone={phoneStep} />}
+        {!isFresh && <ChatRobot {...robotProps} busy={loading} stage={progressStage} uploading={uploadingFile} sendingOtp={sendingOtp} briefState={briefState} failed={Boolean(error)} input={input} replyKey={messages.at(-1)?.role === "assistant" ? `${messages.length}:${messages.at(-1)?.content}` : ""} waitingForPhone={phoneStep} />}
 
         <main className={`min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 md:px-8 ${isFresh ? "pb-10 pt-6 lg:pt-[9vh]" : "pb-6 pt-10"}`}>
           <div className="mx-auto max-w-2xl">
-            {isFresh ? (
+            {isFresh && !showSidebar ? (
+              <section aria-labelledby="widget-greeting" className="flex min-h-full flex-col items-center justify-center pb-6 text-center">
+                <h1 className="sr-only">{brandName}</h1>
+                <ChatRobot {...robotProps} plain busy={false} stage={null} uploading={uploadingFile} sendingOtp={false} briefState="idle" failed={false} input={input} replyKey="" waitingForPhone={false} />
+                <p id="widget-greeting" className="mt-2 max-w-xs whitespace-pre-line text-[15px] leading-8 text-foreground">
+                  {messages[0]?.content}
+                </p>
+                {submittedNotice && (
+                  <div role="status" className="mt-6 flex w-full max-w-sm items-start gap-3 rounded-xl border border-success/25 bg-success/10 p-4 text-right">
+                    <IconCheck size={20} stroke={2.4} className="mt-0.5 shrink-0 text-success" aria-hidden="true" />
+                    <div className="min-w-0 flex-1 text-sm leading-7">
+                      <p className="font-bold text-foreground">درخواستت ثبت شد</p>
+                      <p className="text-secondary-foreground">{botProfile?.name || "تیم"} به‌زودی بررسیش می‌کنه و باهات در تماس خواهد بود.</p>
+                      <a href="/panel" target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex items-center gap-1 font-bold text-brand underline-offset-4 hover:underline">
+                        پیگیری در پنل کاربری
+                        <IconChevronLeft size={14} aria-hidden="true" />
+                      </a>
+                    </div>
+                  </div>
+                )}
+              </section>
+            ) : isFresh ? (
               <section aria-labelledby="chat-hero-title">
                 <div className="text-center">
                   <h1 id="chat-hero-title" className="text-[1.75rem] font-black leading-[1.4] tracking-tight text-foreground sm:text-4xl sm:leading-[1.35]">
@@ -1109,7 +1207,7 @@ function ChatPageInner() {
                   </p>
                 </div>
 
-                {!botToken && (
+                {showSidebar && (
                   <fieldset className="mt-8" data-tour="mode">
                     <legend className="sr-only">حالت گفتگو</legend>
                     <div className="mx-auto grid max-w-md grid-cols-2 gap-1 rounded-xl bg-surface-2 p-1">
@@ -1170,22 +1268,7 @@ function ChatPageInner() {
                   )}
                 </div>
 
-                {!needsProjectPath && (
-                  <div className="mt-10 rounded-xl border border-border bg-surface p-3 sm:p-5">
-                    <ChatRobot
-                      busy={false}
-                      stage={null}
-                      uploading={false}
-                      sendingOtp={false}
-                      briefState="idle"
-                      failed={false}
-                      input=""
-                      replyKey=""
-                      waitingForPhone={false}
-                      introduction={ROBOT_INTRODUCTIONS[activeMode === "sales" ? "sales" : projectPath === "source" ? "source" : "designer"]}
-                    />
-                  </div>
-                )}
+                {!needsProjectPath && introRobot}
 
                 {!customerToken && (
                   <p className="mt-6 text-center text-[11px] leading-6 text-muted-foreground">
@@ -1312,7 +1395,7 @@ function ChatPageInner() {
           </div>
         </main>
 
-        {!isFresh && (
+        {(!isFresh || !showSidebar) && (
           <footer className="shrink-0 px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-2 md:px-8">
             <div className="mx-auto max-w-2xl">{composer}</div>
           </footer>

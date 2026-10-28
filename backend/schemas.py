@@ -109,6 +109,7 @@ class OrderFileOut(BaseModel):
 
 
 class HandoffProposalIn(BaseModel):
+    bot_token: Optional[str] = Field(default=None, max_length=64)
     project_path: Literal["design", "direct", "source"] | None = None
     source_url: str = Field(default="", max_length=2000)
     source_type: Literal["github", "zip"] | None = None
@@ -140,6 +141,7 @@ class HandoffOut(HandoffCreateIn):
 
 
 class OrderCreateIn(BaseModel):
+    bot_token: Optional[str] = Field(default=None, max_length=64)
     project_path: Literal["design", "direct", "source"] | None = None
     source_url: str = Field(default="", max_length=2000)
     source_type: Literal["github", "zip"] | None = None
@@ -292,6 +294,57 @@ class FreelancerOnboardingIn(BaseModel):
     price_range: str
     timeline: str
     note: Optional[str] = None
+
+
+WidgetColor = Literal["saffron", "ink", "emerald", "ocean", "rose", "plum"]
+
+
+class WidgetSettings(BaseModel):
+    """How a freelancer's chatbot looks and sounds on their own site."""
+    brand_name: str = Field(default="", max_length=60)
+    greeting: str = Field(default="", max_length=300)
+    accent: WidgetColor = "saffron"
+    robot_shape: Literal["circle", "rectangle", "square", "hexagon"] = "circle"
+    robot_color: WidgetColor = "ink"
+    voice: bool = True
+    position: Literal["bottom-left", "bottom-right"] = "bottom-left"
+
+
+class FreelancerService(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    price_min: int | None = Field(default=None, ge=0, le=100_000_000_000)
+    price_max: int | None = Field(default=None, ge=0, le=100_000_000_000)
+    unit: Literal["project", "hour", "month", "item"] = "project"
+    days_min: int | None = Field(default=None, ge=0, le=3650)
+    days_max: int | None = Field(default=None, ge=0, le=3650)
+    description: str = Field(default="", max_length=400)
+
+
+class FreelancerFaq(BaseModel):
+    q: str = Field(max_length=300)
+    a: str = Field(max_length=1000)
+
+
+class FreelancerKnowledge(BaseModel):
+    """What a freelancer teaches their own chatbot: field, services, prices, process."""
+    field: Literal["web", "mobile", "uiux", "graphic", "motion", "content", "marketing", "seo", "other", ""] = ""
+    field_label: str = Field(default="", max_length=80)
+    experience_years: int | None = Field(default=None, ge=0, le=60)
+    bio: str = Field(default="", max_length=800)
+    portfolio_url: str = Field(default="", max_length=300)
+    services: list[FreelancerService] = Field(default_factory=list, max_length=25)
+    process: str = Field(default="", max_length=1500)
+    intake_questions: list[str] = Field(default_factory=list, max_length=12)
+    out_of_scope: str = Field(default="", max_length=800)
+    payment_terms: str = Field(default="", max_length=600)
+    faqs: list[FreelancerFaq] = Field(default_factory=list, max_length=20)
+    tone: Literal["friendly", "formal"] = "friendly"
+
+
+class BotProfileOut(BaseModel):
+    name: str
+    position: str
+    widget: WidgetSettings
 
 
 # ── Chat Session ──────────────────────────────────────────────────────────────

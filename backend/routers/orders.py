@@ -56,30 +56,18 @@ async def get_stats(
     )
 
 
-@router.get("/orders/{order_id}", response_model=OrderOut)
-async def get_order(
-    order_id: str,
-    db: AsyncSession = Depends(get_db),
-    _: dict = Depends(get_current_admin),
-):
-    result = await db.execute(select(Order).where(Order.id == order_id))
-    order = result.scalar_one_or_none()
+async def load_order(db: AsyncSession, order_id: str, freelancer_id: str | None = None) -> Order:
+    """Fetch an order; when freelancer_id is given, only that freelancer's orders are visible."""
+    query = select(Order).where(Order.id == order_id)
+    if freelancer_id is not None:
+        query = query.where(Order.freelancer_id == freelancer_id)
+    order = (await db.execute(query)).scalar_one_or_none()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     return order
 
 
-@router.post("/orders/{order_id}/summarize", response_model=OrderOut)
-async def summarize_order(
-    order_id: str,
-    db: AsyncSession = Depends(get_db),
-    _: dict = Depends(get_current_admin),
-):
-    result = await db.execute(select(Order).where(Order.id == order_id))
-    order = result.scalar_one_or_none()
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found")
-
+async def summarize(db: AsyncSession, order: Order) -> Order:
     if order.ai_summary:
         return order
 
@@ -114,18 +102,9 @@ async def summarize_order(
     return order
 
 
-@router.post("/orders/{order_id}/approve", response_model=OrderOut)
-async def approve_order(
-    order_id: str,
-    body: AdminApproveIn,
-    db: AsyncSession = Depends(get_db),
-    _: dict = Depends(get_current_admin),
-):
-    result = await db.execute(select(Order).where(Order.id == order_id))
-    order = result.scalar_one_or_none()
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found")
-
+async def approve(db: AsyncSession, order: Order, body: AdminApproveIn) -> Order:
+    if order.status in (OrderStatus.paid, OrderStatus.cancelled):
+        raise HTTPException(status_code=400, detail="سفارش پرداخت‌شده یا لغوشده قابل ویرایش نیست")
     order.final_price = body.final_price
     order.payment_percentage = body.payment_percentage
     order.payment_amount = int(body.final_price * body.payment_percentage / 100)
@@ -140,45 +119,23 @@ async def approve_order(
     return order
 
 
-@router.post("/orders/{order_id}/proposal", response_model=OrderOut)
-async def upload_proposal(
-    order_id: str,
-    file: UploadFile = File(...),
-    db: AsyncSession = Depends(get_db),
-    _: dict = Depends(get_current_admin),
-):
-    result = await db.execute(select(Order).where(Order.id == order_id))
-    order = result.scalar_one_or_none()
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found")
-
+async def save_proposal(db: AsyncSession, order: Order, file: UploadFile) -> Order:
     ext = Path(file.filename or "file.pdf").suffix
-    dest = UPLOAD_DIR / f"{order_id}{ext}"
+    dest = UPLOAD_DIR / f"{order.id}{ext}"
     with dest.open("wb") as f:
         shutil.copyfileobj(file.file, f)
 
-    order.proposal_file = f"/uploads/{order_id}{ext}"
+    order.proposal_file = f"/uploads/{order.id}{ext}"
     await db.commit()
     await db.refresh(order)
     return order
 
 
-@router.post("/orders/{order_id}/files", response_model=OrderOut)
-async def upload_admin_order_file(
-    order_id: str,
-    file: UploadFile = File(...),
-    db: AsyncSession = Depends(get_db),
-    _: dict = Depends(get_current_admin),
-):
-    result = await db.execute(select(Order).where(Order.id == order_id))
-    order = result.scalar_one_or_none()
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found")
-
+async def add_order_file(db: AsyncSession, order: Order, file: UploadFile, uploaded_by: str) -> Order:
     file_id = str(uuid.uuid4())
     original_name = Path(file.filename or "file").name
     ext = Path(original_name).suffix
-    dest = ORDER_FILES_DIR / f"{order_id}-{file_id}{ext}"
+    dest = ORDER_FILES_DIR / f"{order.id}-{file_id}{ext}"
     with dest.open("wb") as f:
         shutil.copyfileobj(file.file, f)
 
@@ -188,13 +145,61 @@ async def upload_admin_order_file(
         "url": f"/uploads/order-files/{dest.name}",
         "size": dest.stat().st_size,
         "content_type": file.content_type,
-        "uploaded_by": "admin",
+        "uploaded_by": uploaded_by,
         "uploaded_at": datetime.now(timezone.utc).isoformat(),
     }
     order.order_files = [*(order.order_files or []), item]
     await db.commit()
     await db.refresh(order)
     return order
+
+
+@router.get("/orders/{order_id}", response_model=OrderOut)
+async def get_order(
+    order_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_admin),
+):
+    return await load_order(db, order_id)
+
+
+@router.post("/orders/{order_id}/summarize", response_model=OrderOut)
+async def summarize_order(
+    order_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_admin),
+):
+    return await summarize(db, await load_order(db, order_id))
+
+
+@router.post("/orders/{order_id}/approve", response_model=OrderOut)
+async def approve_order(
+    order_id: str,
+    body: AdminApproveIn,
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_admin),
+):
+    return await approve(db, await load_order(db, order_id), body)
+
+
+@router.post("/orders/{order_id}/proposal", response_model=OrderOut)
+async def upload_proposal(
+    order_id: str,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_admin),
+):
+    return await save_proposal(db, await load_order(db, order_id), file)
+
+
+@router.post("/orders/{order_id}/files", response_model=OrderOut)
+async def upload_admin_order_file(
+    order_id: str,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_admin),
+):
+    return await add_order_file(db, await load_order(db, order_id), file, "admin")
 
 
 @router.delete("/orders/{order_id}/cancel", response_model=OrderOut)

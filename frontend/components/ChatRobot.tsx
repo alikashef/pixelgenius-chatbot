@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
-import type { RobotHeadState } from "robot-heads";
+import type { RobotHeadShape, RobotHeadState } from "robot-heads";
 import type { ChatProgressStage } from "@/lib/api";
 import { IconVolume, IconVolumeOff } from "@tabler/icons-react";
 
@@ -109,6 +109,10 @@ export default function ChatRobot({
   replyKey,
   waitingForPhone,
   introduction,
+  shape = "rectangle",
+  robotColors,
+  voiceAvailable = true,
+  plain = false,
 }: {
   busy: boolean;
   stage: ChatProgressStage | null;
@@ -120,6 +124,13 @@ export default function ChatRobot({
   replyKey: string;
   waitingForPhone: boolean;
   introduction?: string;
+  shape?: RobotHeadShape;
+  /** Hex colors for a freelancer-branded robot; defaults to the FreelioAI ink/saffron robot. */
+  robotColors?: { color: string; trimColor: string; screenColor: string };
+  /** False when the bot owner turned voice off: nothing plays and the voice button is hidden. */
+  voiceAvailable?: boolean;
+  /** Drop the sticky strip background, for a robot shown inline in the page. */
+  plain?: boolean;
 }) {
   const [clock, setClock] = useState(() => Date.now());
   const [voiceEnabled, setVoiceEnabled] = useState(true);
@@ -215,7 +226,7 @@ export default function ChatRobot({
   }, [introduction]);
 
   useEffect(() => {
-    if (!voiceEnabled) return;
+    if (!voiceEnabled || !voiceAvailable) return;
     const url = robotSpeechUrl(mood.label);
     const timer = window.setTimeout(() => {
       if (document.hidden) {
@@ -254,7 +265,7 @@ export default function ChatRobot({
       voice.current?.pause();
       voice.current = null;
     };
-  }, [mood.label, voiceEnabled, introduction]);
+  }, [mood.label, voiceEnabled, introduction, voiceAvailable]);
 
   useEffect(() => {
     const pauseWhenHidden = () => {
@@ -297,7 +308,7 @@ export default function ChatRobot({
     <section
       aria-label="همراه گفتگو"
       data-robot-state={mood.state}
-      className={`relative z-10 flex shrink-0 flex-col items-center px-4 pb-3 pt-2 sm:pt-3 ${introduction ? "" : "glass"}`}
+      className={`relative z-10 flex shrink-0 flex-col items-center px-4 pb-3 pt-2 sm:pt-3 ${introduction || plain ? "" : "glass"}`}
     >
       <div
         aria-hidden="true"
@@ -305,10 +316,10 @@ export default function ChatRobot({
       >
         <span className="pointer-events-none absolute inset-x-6 bottom-4 h-10 rounded-full bg-brand-soft blur-2xl" />
         <RobotHead
-          shape="rectangle"
+          shape={shape}
           state={speaking && introduction ? "speaking" : mood.state}
           size={176}
-          {...colors}
+          {...(robotColors || colors)}
           interactive
           antenna
           floorShadow
@@ -323,6 +334,8 @@ export default function ChatRobot({
       >
         {mood.label}
       </p>
+      {voiceAvailable && (
+        <>
       <button
         type="button"
         onClick={toggleVoice}
@@ -334,7 +347,9 @@ export default function ChatRobot({
         {introduction ? voiceEnabled ? "قطع صدای راهنما" : "پخش راهنمای شروع" : voiceEnabled ? "صدا روشن" : "صدای روبات"}
       </button>
       {voiceError && <p role="status" className="text-center text-xs text-muted-foreground">صدا پخش نشد؛ برای تلاش دوباره دکمه صدا را بزن.</p>}
-      {!introduction && <div
+        </>
+      )}
+      {!introduction && !plain && <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-x-0 top-full h-12 bg-gradient-to-b from-background/80 to-transparent"
       />}
