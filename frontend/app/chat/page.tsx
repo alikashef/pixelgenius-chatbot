@@ -3,7 +3,9 @@
 import { useState, useRef, useEffect, FormEvent, KeyboardEvent, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { IconArrowUp, IconCode, IconCloudUpload, IconLayout, IconCheck, IconCoin, IconCopy, IconDownload, IconPaperclip, IconPlus, IconRefresh, IconSparkles, IconUser, IconWand, IconX } from "@tabler/icons-react";
+import { IconArrowUp, IconBrandGithub, IconCode, IconCloudUpload, IconLayout, IconCheck, IconCoin, IconCopy, IconDownload, IconFileText, IconFileZip, IconMenu2, IconMessage, IconPaperclip, IconPlus, IconRefresh, IconUser, IconWand, IconX } from "@tabler/icons-react";
+import { BrandLogo, BrandMark } from "@/components/Brand";
+import { Button } from "@/components/ui/button";
 import ChatBubble from "@/components/ChatBubble";
 import ChatRobot, { ROBOT_INTRODUCTIONS } from "@/components/ChatRobot";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -289,7 +291,7 @@ function CopyBlock({ text, label, rtl = false }: { text: string; label: string; 
         type="button"
         onClick={copy}
         aria-label={label}
-        className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-border px-2.5 text-xs text-secondary-foreground outline-none transition-colors hover:border-primary-line hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+        className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-border px-2.5 text-xs text-secondary-foreground outline-none transition-colors hover:border-brand-line hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
       >
         {copied ? <IconCheck size={14} stroke={2.5} /> : <IconCopy size={14} stroke={2} />}
         {copied ? "کپی شد" : "کپی"}
@@ -318,7 +320,7 @@ function BriefGuide({ mcpUrl }: { mcpUrl: string }) {
       <ol className="mt-3 space-y-4">
         {steps.map((step, i) => (
           <li key={step.title} className="flex gap-3">
-            <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border border-primary-line bg-primary-soft text-xs font-bold text-brand">
+            <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border border-brand-line bg-brand-soft text-xs font-bold text-brand">
               {i + 1}
             </span>
             <div className="min-w-0 flex-1">
@@ -329,7 +331,7 @@ function BriefGuide({ mcpUrl }: { mcpUrl: string }) {
         ))}
 
         <li className="flex gap-3">
-          <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border border-primary-line bg-primary-soft text-xs font-bold text-brand">
+          <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border border-brand-line bg-brand-soft text-xs font-bold text-brand">
             3
           </span>
           <div className="min-w-0 flex-1">
@@ -425,7 +427,7 @@ function BriefGuide({ mcpUrl }: { mcpUrl: string }) {
         </li>
 
         <li className="flex gap-3">
-          <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border border-primary-line bg-primary-soft text-xs font-bold text-brand">
+          <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border border-brand-line bg-brand-soft text-xs font-bold text-brand">
             4
           </span>
           <div className="min-w-0 flex-1">
@@ -435,7 +437,7 @@ function BriefGuide({ mcpUrl }: { mcpUrl: string }) {
         </li>
 
         <li className="flex gap-3">
-          <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border border-primary-line bg-primary-soft text-xs font-bold text-brand">
+          <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border border-brand-line bg-brand-soft text-xs font-bold text-brand">
             5
           </span>
           <div className="min-w-0 flex-1">
@@ -477,6 +479,8 @@ function ChatPageInner() {
   const [sendingOtp, setSendingOtp] = useState(false);
   const [attachments, setAttachments] = useState<OrderFile[]>([]);
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -511,6 +515,7 @@ function ChatPageInner() {
 
     if (token && currentCustomerId) {
       const sessions = readCustomerSessions(currentCustomerId);
+      setSessions(sessions);
       if (!forceNew) {
         const selected = requestedSessionId
           ? sessions.find((s) => s.id === requestedSessionId)
@@ -570,6 +575,7 @@ function ChatPageInner() {
       const sessions = readCustomerSessions(customerId).filter((s) => s.id !== sessionId);
       sessions.unshift({ id: sessionId, title: getSessionTitle(messages), updated_at: new Date().toISOString(), draft });
       writeCustomerSessions(customerId, sessions.slice(0, 25));
+      setSessions(sessions.slice(0, 25));
     }
   }, [attachments, chatKey, customerId, customerToken, input, messages, phoneStep, sessionId, hydrated, mode, projectPath, sourceUrl, sourceType, sourceArchive]);
 
@@ -580,16 +586,12 @@ function ChatPageInner() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [customerToken, messages.length]);
 
-  function resetChat() {
-    if (customerToken && customerId && sessionId) {
-      const sessions = readCustomerSessions(customerId).filter((s) => s.id !== sessionId);
-      writeCustomerSessions(customerId, sessions);
-      const nextSession = createSessionId();
-      setSessionId(nextSession);
-      router.replace(`/chat?session=${nextSession}`);
-    } else {
-      localStorage.removeItem(chatKey);
-    }
+  // Starts a fresh conversation; signed-in users keep the previous one in their history.
+  function startNewChat() {
+    setSidebarOpen(false);
+    if (!customerToken) localStorage.removeItem(chatKey);
+    setSessionId(createSessionId());
+    router.push("/chat?new=1");
     setProjectPath(undefined);
     setSourceUrl("");
     setSourceType(undefined);
@@ -840,20 +842,84 @@ function ChatPageInner() {
     finally { setUploadingFile(false); if (sourceFileRef.current) sourceFileRef.current.value = ""; }
   }
 
+  const sourceOptions: { id: "github" | "zip"; title: string; description: string; icon: typeof IconLayout }[] = [
+    { id: "github", title: "مخزن GitHub", description: "لینک مخزن پروژه را وارد کن", icon: IconBrandGithub },
+    { id: "zip", title: "فایل ZIP", description: "سورس پروژه را بارگذاری کن", icon: IconFileZip },
+  ];
+
   const pathPicker = !botToken && mode === "designer" && !briefOrderId && (isFresh || needsProjectPath) ? (
-    <fieldset className="mt-7 rounded-2xl border border-border bg-surface p-4 shadow-card sm:p-5">
-      <legend className="px-2 text-sm font-bold text-brand">مسیر پروژه را قبل از گفتگو مشخص کن</legend>
-      <p className="mb-4 text-xs leading-6 text-muted-foreground">سؤال‌ها و مراحل پروژه براساس این انتخاب تنظیم می‌شوند. مسیر بعد از شروع گفتگو ثابت می‌ماند.</p>
-      <div className="grid gap-3 sm:grid-cols-3">{PROJECT_PATHS.map(path => <label key={path.id} className="relative cursor-pointer">
-        <input type="radio" name="project-path" className="peer sr-only" value={path.id} checked={projectPath === path.id} onChange={() => chooseProjectPath(path.id)} />
-        <span className="block h-full rounded-xl border border-border bg-background p-4 transition-colors hover:border-primary-line peer-checked:border-primary peer-checked:bg-primary-soft peer-checked:shadow-glow peer-focus-visible:ring-2 peer-focus-visible:ring-ring"><path.icon size={23} className="mb-3 text-brand" /><span className="block text-sm font-bold">{path.title}</span><span className="mt-2 block text-xs leading-6 text-muted-foreground">{path.description}</span></span>
-      </label>)}</div>
-      {projectPath === "source" && <fieldset className="mt-5 border-t border-border pt-4">
-        <legend className="px-2 text-sm font-semibold">سورس پروژه کجاست؟</legend>
-        <div className="mb-4 mt-2 grid grid-cols-2 gap-3">{[{ id: "github", title: "مخزن GitHub", description: "لینک مخزن پروژه را وارد کن" }, { id: "zip", title: "فایل ZIP", description: "سورس پروژه را بارگذاری کن" }].map(item => <label key={item.id} className="cursor-pointer"><input className="peer sr-only" type="radio" name="source-type" value={item.id} checked={sourceType === item.id} onChange={() => { setSourceType(item.id as "github" | "zip"); setError(""); }} /><span className="block rounded-xl border border-border bg-background px-4 py-3 peer-checked:border-primary peer-checked:bg-primary-soft peer-focus-visible:ring-2 peer-focus-visible:ring-ring"><span className="block text-sm font-bold">{item.title}</span><span className="mt-1 block text-xs leading-6 text-muted-foreground">{item.description}</span></span></label>)}</div>
-        {sourceType === "github" && <label className="block text-xs text-muted-foreground">لینک مخزن GitHub<input type="url" dir="ltr" value={sourceUrl} onChange={e => setSourceUrl(e.target.value)} maxLength={2000} className="field mt-2 py-3" placeholder="https://github.com/owner/repo" /></label>}
-        {sourceType === "zip" && <div className="rounded-xl border border-dashed border-primary-line bg-background p-4"><input ref={sourceFileRef} type="file" accept=".zip,application/zip" className="hidden" aria-label="فایل ZIP سورس پروژه" onChange={e => void handleSourceZip(e.target.files?.[0])} />{sourceArchive ? <div className="flex items-center justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-semibold" dir="auto">{sourceArchive.name}</p><p className="mt-1 text-xs text-brand">سورس بارگذاری شد · {(sourceArchive.size / 1024).toLocaleString("fa-IR", { maximumFractionDigits: 1 })} کیلوبایت</p></div><button type="button" onClick={() => setSourceArchive(undefined)} disabled={uploadingFile} className="rounded-lg px-3 py-2 text-xs text-brand">حذف فایل</button></div> : <><button type="button" onClick={() => sourceFileRef.current?.click()} disabled={uploadingFile} className="flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground disabled:opacity-50"><IconCloudUpload size={18} />{uploadingFile ? "در حال بارگذاری…" : "انتخاب فایل ZIP"}</button><p className="mt-3 text-xs leading-6 text-muted-foreground">حداکثر ۱۲ مگابایت؛ فایل‌های سورس بدون node_modules و پوشه‌های build.</p></>}</div>}
-      </fieldset>}
+    <fieldset className="mt-8 text-right">
+      <legend className="eyebrow mb-3">مسیر پروژه</legend>
+      <div className="grid gap-2.5 sm:grid-cols-3">
+        {PROJECT_PATHS.map((path) => {
+          const checked = projectPath === path.id;
+          return (
+            <label key={path.id} className="cursor-pointer">
+              <input type="radio" name="project-path" className="peer sr-only" value={path.id} checked={checked} onChange={() => chooseProjectPath(path.id)} />
+              <span className="flex h-full flex-col rounded-xl border border-border bg-surface p-4 transition-colors hover:border-foreground/30 peer-checked:border-foreground peer-checked:shadow-[inset_0_0_0_1px_hsl(var(--foreground))] peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background">
+                <span className="mb-3 flex items-center justify-between">
+                  <path.icon size={22} stroke={1.8} aria-hidden="true" className={checked ? "text-brand" : "text-muted-foreground"} />
+                  <span aria-hidden="true" className={`grid h-5 w-5 place-items-center rounded-full border ${checked ? "border-foreground bg-foreground text-background" : "border-input"}`}>
+                    {checked && <IconCheck size={12} stroke={3} />}
+                  </span>
+                </span>
+                <span className="text-sm font-bold text-foreground">{path.title}</span>
+                <span className="mt-1.5 text-xs leading-6 text-muted-foreground">{path.description}</span>
+              </span>
+            </label>
+          );
+        })}
+      </div>
+      <p className="mt-3 text-xs leading-6 text-muted-foreground">سؤال‌ها و مراحل پروژه براساس این انتخاب تنظیم می‌شوند و بعد از شروع گفتگو ثابت می‌مانند.</p>
+      {projectPath === "source" && (
+        <fieldset className="mt-5 rounded-xl border border-border bg-surface p-4">
+          <legend className="sr-only">سورس پروژه کجاست؟</legend>
+          <p className="mb-3 text-sm font-bold text-foreground">سورس پروژه کجاست؟</p>
+          <div className="mb-4 grid grid-cols-2 gap-1 rounded-lg bg-surface-2 p-1">
+            {sourceOptions.map((item) => (
+              <label key={item.id} className="cursor-pointer">
+                <input className="peer sr-only" type="radio" name="source-type" value={item.id} checked={sourceType === item.id} onChange={() => { setSourceType(item.id); setError(""); }} />
+                <span className="flex min-h-10 items-center justify-center gap-2 rounded-md text-sm font-bold text-muted-foreground transition-colors hover:text-foreground peer-checked:bg-surface peer-checked:text-foreground peer-checked:shadow-card dark:peer-checked:bg-foreground/10 peer-focus-visible:ring-2 peer-focus-visible:ring-ring">
+                  <item.icon size={17} aria-hidden="true" />
+                  {item.title}
+                </span>
+              </label>
+            ))}
+          </div>
+          {!sourceType && <p className="text-xs leading-6 text-muted-foreground">یکی از دو روش بالا را انتخاب کن.</p>}
+          {sourceType === "github" && (
+            <label className="block">
+              <span className="field-label">لینک مخزن GitHub</span>
+              <input type="url" dir="ltr" value={sourceUrl} onChange={e => setSourceUrl(e.target.value)} maxLength={2000} className="field py-3" placeholder="https://github.com/owner/repo" />
+            </label>
+          )}
+          {sourceType === "zip" && (
+            <div className="rounded-lg border border-dashed border-input bg-surface-2 p-4">
+              <input ref={sourceFileRef} type="file" accept=".zip,application/zip" className="hidden" aria-label="فایل ZIP سورس پروژه" onChange={e => void handleSourceZip(e.target.files?.[0])} />
+              {sourceArchive ? (
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <IconFileZip size={22} className="shrink-0 text-brand" aria-hidden="true" />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold" dir="auto">{sourceArchive.name}</p>
+                      <p className="mt-0.5 text-xs text-success">بارگذاری شد · {(sourceArchive.size / 1024).toLocaleString("fa-IR", { maximumFractionDigits: 1 })} کیلوبایت</p>
+                    </div>
+                  </div>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setSourceArchive(undefined)} disabled={uploadingFile}>حذف</Button>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-3 py-2 text-center">
+                  <Button type="button" variant="outline" onClick={() => sourceFileRef.current?.click()} disabled={uploadingFile}>
+                    <IconCloudUpload size={18} aria-hidden="true" />
+                    {uploadingFile ? "در حال بارگذاری…" : "انتخاب فایل ZIP"}
+                  </Button>
+                  <p className="text-xs leading-6 text-muted-foreground">حداکثر ۱۲ مگابایت؛ بدون node_modules و پوشه‌های build.</p>
+                </div>
+              )}
+            </div>
+          )}
+        </fieldset>
+      )}
     </fieldset>
   ) : null;
 
@@ -862,195 +928,298 @@ function ChatPageInner() {
     if (last) runReply(last.messages, last.attachments, last.finalize);
   }
 
-  return (
-    <div className="flex h-[100dvh] min-h-[100dvh] flex-col overflow-hidden bg-background bg-aura">
-      <header className="glass z-10 flex h-16 shrink-0 items-center gap-2 border-b border-border/70 px-3 sm:gap-3 sm:px-6">
-        <Link
-          href="/"
-          className="flex items-center gap-2 rounded-lg font-black text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          aria-label="FreelioAI، بازگشت به صفحه اصلی"
-        >
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-primary to-primary-hover text-primary-foreground shadow-md shadow-primary/30">
-            <IconSparkles size={18} stroke={2.2} aria-hidden="true" />
-          </span>
-          <span className="hidden text-base tracking-tight sm:inline">Freelio<span className="text-gradient">AI</span></span>
-        </Link>
+  const visibleSessions = sessions.filter((s) => s.draft.messages.some((m) => m.role === "user"));
+  const showSidebar = !botToken;
+  const modeChip = !isFresh && !briefOrderId ? (
+    <span className="inline-flex min-w-0 items-center gap-1.5 truncate rounded-full bg-surface-2 px-3 py-1 text-xs font-bold text-secondary-foreground" title="برای تغییر حالت، یک گفتگوی جدید شروع کن">
+      {activeMode === "designer" ? <IconWand size={14} aria-hidden="true" /> : <IconCoin size={14} aria-hidden="true" />}
+      <span className="truncate">{MODE_CARDS[activeMode].label}{activeMode === "designer" && projectPath ? ` · ${PROJECT_PATHS.find(p => p.id === projectPath)?.title}` : ""}</span>
+    </span>
+  ) : null;
 
-        {!isFresh && !briefOrderId && (
-          <span
-            className="rounded-lg border border-primary-line bg-primary-soft px-2.5 py-1 text-xs font-semibold text-brand"
-            title="برای تغییر حالت، یک چت جدید شروع کن"
-          >
-            {MODE_CARDS[activeMode].label}{activeMode === "designer" && projectPath ? ` · ${PROJECT_PATHS.find(p => p.id === projectPath)?.title}` : ""}
-          </span>
-        )}
-
-        <div className="mr-auto flex items-center gap-1.5 sm:gap-2">
-          <ThemeToggle />
-          {messages.length > 1 && (
-            <button
-              onClick={resetChat}
-              disabled={isLoading}
-              aria-label="چت جدید"
-              className="flex h-9 items-center gap-1.5 rounded-xl border border-border bg-surface px-3 text-xs font-bold text-muted-foreground outline-none transition-colors hover:border-primary-line hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-            >
-              <IconPlus size={14} stroke={2.5} />
-              <span className="hidden sm:inline">چت جدید</span>
-            </button>
-          )}
-          <Link
-            href={customerToken ? "/panel" : "/login?redirect=/panel"}
-            aria-label="حساب کاربری"
-            className="flex h-9 items-center gap-1.5 rounded-xl bg-primary px-3 text-xs font-bold text-primary-foreground shadow-sm shadow-primary/25 outline-none transition-colors hover:bg-primary-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-          >
-            <IconUser size={14} stroke={2} />
-            <span className="hidden sm:inline">حساب کاربری</span>
-          </Link>
-        </div>
-      </header>
-
-      {!isFresh && <ChatRobot busy={loading} stage={progressStage} uploading={uploadingFile} sendingOtp={sendingOtp} briefState={briefState} failed={Boolean(error)} input={input} replyKey={messages.at(-1)?.role === "assistant" ? `${messages.length}:${messages.at(-1)?.content}` : ""} waitingForPhone={phoneStep} />}
-
-      <main className={`min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-6 md:px-8 ${isFresh ? "pt-6" : "pt-12"}`}>
-        <div className="mx-auto max-w-2xl">
-          {isFresh ? (
-            <section className="pb-4 pt-2 sm:pt-8" aria-labelledby="chat-hero-title">
-              <div className="text-center">
-                <span className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-primary-line bg-primary-soft px-3 py-1 text-xs font-bold text-brand">
-                  <IconSparkles size={14} stroke={2.2} aria-hidden="true" />
-                  دستیار هوشمند پروژه
-                </span>
-                <h1 id="chat-hero-title" className="text-2xl font-black tracking-tight text-foreground sm:text-[2rem] sm:leading-[1.35]">
-                  {customerName ? `${customerName} جان، ` : ""}چطور می‌خوای شروع کنیم؟
-                </h1>
-                <p className="mx-auto mt-3 max-w-md text-sm leading-7 text-muted-foreground">
-                  یکی از دو حالت رو انتخاب کن. بعد از شروع گفتگو، برای تغییر حالت باید چت جدید بزنی.
-                </p>
-              </div>
-
-              {!botToken && (
-              <div role="radiogroup" aria-label="حالت گفتگو" className="mt-6 grid gap-3 sm:grid-cols-2">
-                {(Object.keys(MODE_CARDS) as ChatMode[]).map((id) => {
-                  const card = MODE_CARDS[id];
-                  const Icon = id === "designer" ? IconWand : IconCoin;
-                  return (
-                    <label key={id} className="group relative block cursor-pointer">
-                      <input
-                        type="radio"
-                        name="chat-mode"
-                        value={id}
-                        checked={mode === id}
-                        onChange={() => selectMode(id)}
-                        className="peer sr-only"
-                      />
-                      <div className="h-full rounded-2xl border border-border bg-surface p-5 text-right shadow-card transition-[border-color,box-shadow,transform] duration-200 ease-out group-hover:-translate-y-0.5 group-hover:border-primary-line peer-checked:border-primary peer-checked:shadow-glow peer-focus-visible:ring-2 peer-focus-visible:ring-ring">
-                        <div className="flex items-center gap-3">
-                          <span
-                            className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${
-                              mode === id ? "bg-primary text-primary-foreground shadow-md shadow-primary/25" : "bg-primary-soft text-brand"
-                            }`}
-                          >
-                            <Icon size={20} stroke={2} />
-                          </span>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="text-base font-extrabold text-foreground">{card.label}</span>
-                              {card.badge && (
-                                <span className="rounded-full bg-primary-soft px-2 py-0.5 text-[11px] font-semibold text-brand">
-                                  {card.badge}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <span
-                            aria-hidden="true"
-                            className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border transition-colors ${
-                              mode === id
-                                ? "border-primary bg-primary text-primary-foreground"
-                                : "border-border text-transparent"
-                            }`}
-                          >
-                            <IconCheck size={14} stroke={3} />
-                          </span>
-                        </div>
-
-                        <p className="mt-3 text-sm leading-7 text-secondary-foreground">{card.summary}</p>
-
-                        <ul className="mt-3 space-y-1.5 text-[13px] leading-6 text-muted-foreground">
-                          {card.points.map((point) => (
-                            <li key={point} className="flex items-start gap-2">
-                              <span className="mt-2.5 h-1 w-1 shrink-0 rounded-full bg-primary" aria-hidden="true" />
-                              <span>{point}</span>
-                            </li>
-                          ))}
-                        </ul>
-
-                        <div className="mt-3 rounded-xl border border-border bg-background px-3 py-2.5 text-xs leading-6">
-                          <p className="font-semibold text-brand">خروجی نهایی</p>
-                          <p className="text-secondary-foreground">{card.output}</p>
-                        </div>
-                        <p className="mt-2.5 text-xs text-muted-foreground">{card.fit}</p>
-                      </div>
-                    </label>
-                  );
-                })}
-              </div>
-              )}
-
-              {pathPicker}
-              {!needsProjectPath && (
-                <div className="mt-6 rounded-2xl border border-border bg-surface/60 p-3 shadow-card sm:p-5">
-                  <ChatRobot
-                    busy={false}
-                    stage={null}
-                    uploading={false}
-                    sendingOtp={false}
-                    briefState="idle"
-                    failed={false}
-                    input=""
-                    replyKey=""
-                    waitingForPhone={false}
-                    introduction={ROBOT_INTRODUCTIONS[activeMode === "sales" ? "sales" : projectPath === "source" ? "source" : "designer"]}
-                  />
-                </div>
-              )}
-              <div className="mt-8 text-center">
-                <p className="mb-3 text-xs text-muted-foreground">
-                  {needsProjectPath ? "با انتخاب مسیر، گفتگو فعال می‌شود." : projectPath === "source" && mode === "designer" ? sourceReady ? "سورس ثبت شد؛ حالا درباره پروژه و هدفت از انتشار بنویس." : "ابتدا لینک GitHub یا فایل ZIP سورس را اضافه کن." : "حالا ایده‌ات رو پایین بنویس، یا از یک نمونه شروع کن:"}
-                </p>
-                <div className="flex flex-wrap justify-center gap-2">
-                  {(activeMode === "designer" && projectPath === "source" ? [] : QUICK_STARTS[activeMode]).map((label) => (
+  const composer = (
+    <form onSubmit={handleSubmit} className="w-full">
+      <div className="rounded-2xl border border-input bg-surface p-2 shadow-elevated transition-[border-color,box-shadow] duration-150 focus-within:border-ring focus-within:shadow-[0_0_0_3px_hsl(var(--ring)/0.16)]">
+            {attachments.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-2 px-1 pt-1">
+                {attachments.map((file) => (
+                  <span
+                    key={file.id}
+                    className="relative block h-16 w-16 overflow-hidden rounded-lg border border-border bg-surface-2"
+                  >
+                    {file.content_type?.startsWith("image/") ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={file.url} alt={file.name} className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="flex h-full w-full flex-col items-center justify-center gap-1 px-1 text-[10px] text-muted-foreground">
+                        <IconPaperclip size={15} />
+                        <span className="w-full truncate text-center">{file.name}</span>
+                      </span>
+                    )}
                     <button
-                      key={label}
                       type="button"
-                      onClick={() => submit(label)}
-                      disabled={isLoading || chatBlocked}
-                      className="min-h-10 rounded-full border border-border bg-surface px-4 text-sm font-bold text-secondary-foreground shadow-xs outline-none transition-[border-color,color,transform] duration-150 hover:-translate-y-0.5 hover:border-primary-line hover:text-brand focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                      onClick={() => removeAttachment(file.id)}
+                      className="absolute -right-1 -top-1 grid h-6 w-6 place-items-center rounded-full bg-foreground text-background shadow-md outline-none transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-ring"
+                      aria-label={`حذف فایل ${file.name}`}
                     >
-                      {label}
+                      <IconX size={15} stroke={2.5} />
                     </button>
-                  ))}
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="flex items-end gap-1.5">
+              {!phoneStep && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => fileRef.current?.click()}
+                    disabled={isLoading || chatBlocked}
+                    className="grid h-10 w-10 shrink-0 place-items-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-foreground/5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
+                    aria-label="پیوست فایل یا تصویر"
+                    title="پیوست فایل یا تصویر نمونه"
+                  >
+                    <IconPaperclip size={18} stroke={2.2} />
+                  </button>
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    className="hidden"
+                    accept="image/*,.pdf,.doc,.docx,.txt,.zip,.rar"
+                    onChange={(e) => handleAttachmentChange(e.target.files?.[0])}
+                  />
+                </>
+              )}
+              <label htmlFor="chat-input" className="sr-only">
+                {phoneStep ? "شماره موبایل" : "پیام شما"}
+              </label>
+              <textarea
+                id="chat-input"
+                ref={inputRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleTextareaKeyDown}
+                placeholder={placeholder}
+                disabled={isLoading || chatBlocked}
+                dir={phoneStep ? "ltr" : "rtl"}
+                rows={1}
+                inputMode={phoneStep ? "tel" : "text"}
+                autoComplete={phoneStep ? "tel" : "off"}
+                className="max-h-32 min-h-10 min-w-0 flex-1 resize-none bg-transparent px-1 py-2 text-[16px] leading-6 text-foreground placeholder:text-muted-foreground outline-none disabled:opacity-50 sm:text-[15px]"
+              />
+              <button
+                type="submit"
+                disabled={isLoading || !canSubmit}
+                aria-label="ارسال پیام"
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground outline-none transition-colors hover:bg-primary-hover focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-foreground/10 disabled:text-muted-foreground"
+              >
+                <IconArrowUp size={18} stroke={2.5} />
+              </button>
+            </div>
+      </div>
+      {!isFresh && (
+        <p className="mt-2 text-center text-[11px] text-muted-foreground">
+          <span className="hidden sm:inline">Enter برای ارسال · Shift+Enter برای خط جدید · </span>
+          هوش مصنوعی ممکنه اشتباه کنه؛ نتیجه نهایی رو بررسی کن
+        </p>
+      )}
+    </form>
+  );
+
+  const sidebar = (
+    <div className="flex h-full flex-col">
+      <div className="flex h-16 shrink-0 items-center justify-between px-4">
+        <BrandLogo />
+        <button type="button" onClick={() => setSidebarOpen(false)} aria-label="بستن منو" className="grid h-9 w-9 place-items-center rounded-lg text-muted-foreground outline-none hover:bg-foreground/5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring lg:hidden">
+          <IconX size={18} aria-hidden="true" />
+        </button>
+      </div>
+      <div className="px-3">
+        <button type="button" onClick={startNewChat} disabled={isLoading} className="flex h-10 w-full items-center gap-2 rounded-lg border border-input bg-surface px-3 text-sm font-bold text-foreground outline-none transition-colors hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50">
+          <IconPlus size={17} aria-hidden="true" />
+          گفتگوی جدید
+        </button>
+      </div>
+      <nav aria-label="گفتگوهای اخیر" className="mt-6 min-h-0 flex-1 overflow-y-auto px-3 pb-4">
+        <p className="eyebrow mb-2 px-2.5">گفتگوهای اخیر</p>
+        {customerToken ? (
+          visibleSessions.length ? (
+            <ul className="space-y-0.5">
+              {visibleSessions.map((s) => (
+                <li key={s.id}>
+                  <Link
+                    href={`/chat?session=${s.id}`}
+                    onClick={() => setSidebarOpen(false)}
+                    aria-current={s.id === sessionId ? "page" : undefined}
+                    className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-secondary-foreground outline-none transition-colors hover:bg-foreground/5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:bg-foreground/[0.07] aria-[current=page]:font-bold aria-[current=page]:text-foreground"
+                  >
+                    <IconMessage size={16} className="shrink-0 text-muted-foreground" aria-hidden="true" />
+                    <span className="truncate">{s.title}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="px-2.5 text-xs leading-6 text-muted-foreground">هنوز گفتگویی ذخیره نشده.</p>
+          )
+        ) : (
+          <div className="rounded-xl border border-dashed border-border p-4 text-xs leading-6 text-muted-foreground">
+            برای ذخیره‌ی تاریخچه‌ی گفتگوها و پیگیری پروژه‌ها{" "}
+            <Link href="/login?redirect=/chat" className="font-bold text-brand underline-offset-4 hover:underline">وارد شو</Link>.
+          </div>
+        )}
+      </nav>
+      <div className="flex items-center gap-2 border-t border-border p-3">
+        <Link href={customerToken ? "/panel" : "/login?redirect=/panel"} className="flex h-10 min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2 text-sm font-bold text-foreground outline-none transition-colors hover:bg-foreground/5 focus-visible:ring-2 focus-visible:ring-ring">
+          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-surface-2 text-muted-foreground">
+            <IconUser size={15} aria-hidden="true" />
+          </span>
+          <span className="truncate">{customerToken ? customerName || "پنل کاربری" : "ورود / ثبت‌نام"}</span>
+        </Link>
+        <ThemeToggle />
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="flex h-[100dvh] min-h-[100dvh] overflow-hidden bg-background">
+      {showSidebar && (
+        <aside className="hidden w-72 shrink-0 border-l border-border bg-surface-2/60 lg:block">{sidebar}</aside>
+      )}
+      {showSidebar && sidebarOpen && (
+        <div className="fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true" aria-label="منو">
+          <button type="button" aria-label="بستن منو" className="absolute inset-0 bg-overlay/40 backdrop-blur-[2px]" onClick={() => setSidebarOpen(false)} />
+          <aside className="absolute inset-y-0 right-0 w-[min(20rem,86vw)] animate-in slide-in-from-right border-l border-border bg-background shadow-elevated duration-200">{sidebar}</aside>
+        </div>
+      )}
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className={`z-10 flex h-14 shrink-0 items-center gap-2 px-3 sm:px-5 ${isFresh ? "lg:hidden" : "border-b border-border"}`}>
+          {showSidebar ? (
+            <button type="button" onClick={() => setSidebarOpen(true)} aria-label="باز کردن منو" className="grid h-9 w-9 place-items-center rounded-lg text-muted-foreground outline-none hover:bg-foreground/5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring lg:hidden">
+              <IconMenu2 size={20} aria-hidden="true" />
+            </button>
+          ) : null}
+          <span className={showSidebar ? "lg:hidden" : ""}><BrandLogo size="sm" hideWordmarkOnMobile={Boolean(modeChip)} /></span>
+          {modeChip}
+          <div className="mr-auto flex items-center gap-1.5">
+            {!showSidebar && <ThemeToggle />}
+            {showSidebar && isFresh && <ThemeToggle className="lg:hidden" />}
+          </div>
+        </header>
+
+        {!isFresh && <ChatRobot busy={loading} stage={progressStage} uploading={uploadingFile} sendingOtp={sendingOtp} briefState={briefState} failed={Boolean(error)} input={input} replyKey={messages.at(-1)?.role === "assistant" ? `${messages.length}:${messages.at(-1)?.content}` : ""} waitingForPhone={phoneStep} />}
+
+        <main className={`min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 md:px-8 ${isFresh ? "pb-10 pt-6 lg:pt-[9vh]" : "pb-6 pt-10"}`}>
+          <div className="mx-auto max-w-2xl">
+            {isFresh ? (
+              <section aria-labelledby="chat-hero-title">
+                <div className="text-center">
+                  <h1 id="chat-hero-title" className="text-[1.75rem] font-black leading-[1.4] tracking-tight text-foreground sm:text-4xl sm:leading-[1.35]">
+                    {customerName ? `${customerName}، ` : ""}از کجا شروع کنیم؟
+                  </h1>
+                  <p className="mx-auto mt-3 max-w-md text-[15px] leading-7 text-muted-foreground">
+                    ایده‌ات رو تعریف کن تا با هوش مصنوعی به یک پروژه‌ی دقیق و قابل‌ساخت تبدیلش کنیم.
+                  </p>
                 </div>
+
+                {!botToken && (
+                  <fieldset className="mt-8">
+                    <legend className="sr-only">حالت گفتگو</legend>
+                    <div className="mx-auto grid max-w-md grid-cols-2 gap-1 rounded-xl bg-surface-2 p-1">
+                      {(Object.keys(MODE_CARDS) as ChatMode[]).map((id) => {
+                        const Icon = id === "designer" ? IconWand : IconCoin;
+                        return (
+                          <label key={id} className="cursor-pointer">
+                            <input type="radio" name="chat-mode" value={id} checked={mode === id} onChange={() => selectMode(id)} className="peer sr-only" />
+                            <span className="flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-bold text-muted-foreground transition-colors hover:text-foreground peer-checked:bg-surface peer-checked:text-foreground peer-checked:shadow-card dark:peer-checked:bg-foreground/10 peer-focus-visible:ring-2 peer-focus-visible:ring-ring">
+                              <Icon size={18} aria-hidden="true" />
+                              {MODE_CARDS[id].label}
+                              {MODE_CARDS[id].badge && <span className="hidden rounded-full bg-brand-soft px-1.5 sm:inline text-[10px] font-bold leading-5 text-brand">{MODE_CARDS[id].badge}</span>}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </fieldset>
+                )}
+
+                <div className="mt-4 rounded-xl border border-border bg-surface p-4 sm:p-5">
+                  <p className="text-sm leading-7 text-secondary-foreground">{MODE_CARDS[activeMode].summary}</p>
+                  <ul className="mt-3 space-y-1.5 text-[13px] leading-6 text-muted-foreground">
+                    {MODE_CARDS[activeMode].points.map((point) => (
+                      <li key={point} className="flex items-start gap-2">
+                        <IconCheck size={15} stroke={2.4} className="mt-[5px] shrink-0 text-success" aria-hidden="true" />
+                        <span>{point}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="mt-4 flex items-start gap-2.5 border-t border-border pt-3.5 text-[13px] leading-6">
+                    <IconFileText size={17} className="mt-[3px] shrink-0 text-brand" aria-hidden="true" />
+                    <p className="text-secondary-foreground"><b className="text-foreground">خروجی نهایی: </b>{MODE_CARDS[activeMode].output}</p>
+                  </div>
+                </div>
+
+                {pathPicker}
+
+                <div className="mt-8">
+                  {composer}
+                  <p className="mt-3 text-center text-xs text-muted-foreground">
+                    {needsProjectPath ? "با انتخاب مسیر پروژه، گفتگو فعال می‌شود." : projectPath === "source" && mode === "designer" ? sourceReady ? "سورس ثبت شد؛ حالا درباره پروژه و هدفت از انتشار بنویس." : "ابتدا لینک GitHub یا فایل ZIP سورس را اضافه کن." : "یا با یکی از نمونه‌ها شروع کن:"}
+                  </p>
+                  {!(activeMode === "designer" && projectPath === "source") && (
+                    <div className="mt-3 flex flex-wrap justify-center gap-2">
+                      {QUICK_STARTS[activeMode].map((label) => (
+                        <button
+                          key={label}
+                          type="button"
+                          onClick={() => submit(label)}
+                          disabled={isLoading || chatBlocked}
+                          className="min-h-9 rounded-full border border-border bg-surface px-3.5 text-[13px] font-bold text-secondary-foreground outline-none transition-colors hover:border-foreground/30 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {!needsProjectPath && (
+                  <div className="mt-10 rounded-xl border border-border bg-surface p-3 sm:p-5">
+                    <ChatRobot
+                      busy={false}
+                      stage={null}
+                      uploading={false}
+                      sendingOtp={false}
+                      briefState="idle"
+                      failed={false}
+                      input=""
+                      replyKey=""
+                      waitingForPhone={false}
+                      introduction={ROBOT_INTRODUCTIONS[activeMode === "sales" ? "sales" : projectPath === "source" ? "source" : "designer"]}
+                    />
+                  </div>
+                )}
+
                 {!customerToken && (
-                  <p className="mt-6 text-[11px] leading-6 text-muted-foreground">
+                  <p className="mt-6 text-center text-[11px] leading-6 text-muted-foreground">
                     چت روی همین مرورگر ذخیره می‌شه. برای ثبت نهایی با شماره موبایل وارد می‌شی.
                   </p>
                 )}
+              </section>
+            ) : (
+              <div role="log" aria-live="polite" aria-label="گفتگو">
+                {pathPicker}
+                {messages.map((m, i) =>
+                  i === 0 ? null : <ChatBubble key={i} role={m.role} content={m.content} attachments={m.attachments} />,
+                )}
               </div>
-            </section>
-          ) : (
-            <div role="log" aria-live="polite" aria-label="گفتگو">
-              {pathPicker}
-              {messages.map((m, i) =>
-                i === 0 ? null : <ChatBubble key={i} role={m.role} content={m.content} attachments={m.attachments} />,
-              )}
-            </div>
-          )}
+            )}
 
           {briefOrderId && (
             <section
               aria-labelledby="brief-title"
-              className="mb-5 animate-fade-up rounded-2xl border border-primary-line bg-surface p-5 shadow-glow sm:p-6"
+              className="mb-6 animate-fade-up rounded-xl border border-border bg-surface p-5 sm:p-6"
             >
               <h2 id="brief-title" className="text-base font-extrabold text-foreground">
                 کانفیگ پروژه‌ات آماده‌ست
@@ -1082,14 +1251,14 @@ function ChatPageInner() {
                 <button
                   type="button"
                   onClick={downloadBrief}
-                  className="mt-4 flex min-h-11 items-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground shadow-md shadow-primary/25 outline-none transition-all hover:bg-primary-hover focus-visible:ring-2 focus-visible:ring-ring"
+                  className="mt-4 flex min-h-11 items-center gap-2 rounded-lg bg-brand-solid px-5 text-sm font-bold text-brand-foreground outline-none transition-colors hover:bg-brand-solid/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 >
                   <IconDownload size={18} stroke={2.2} />
                   دانلود کانفیگ پروژه (JSON)
                 </button>
               )}
 
-              <div className="mt-5 rounded-xl border border-border bg-background p-4 text-sm leading-7 text-secondary-foreground">
+              <div className="mt-5 rounded-lg border border-border bg-surface-2 p-4 text-sm leading-7 text-secondary-foreground">
                 <p className="font-semibold text-foreground">برای بهترین نتیجه</p>
                 <p className="mt-1">
                   فایل رو توی یک ابزار کدنویسی مثل <b>Claude Code</b>، <b>Codex</b> یا <b>Cursor</b> باز کن؛ این ابزارها فایل‌ها رو کامل می‌سازن و اجرا می‌کنن، برای همین بک‌اند و دیتابیس هم واقعی ساخته می‌شه.
@@ -1115,16 +1284,14 @@ function ChatPageInner() {
           )}
 
           {isLoading && !isFresh && (
-            <div className="mb-5 flex items-end justify-end gap-2.5" role="status" aria-label="در حال نوشتن">
-              <span className="mb-1 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground shadow-md shadow-primary/25">
-                <IconSparkles size={15} stroke={2.2} />
-              </span>
-              <div className="flex items-center gap-2 rounded-2xl rounded-bl-md border border-border bg-surface-2 px-4 py-3">
+            <div className="mb-6 flex items-center gap-3" role="status" aria-label="در حال نوشتن">
+              <BrandMark size="sm" />
+              <div className="flex items-center gap-2 py-2">
                 <span className="flex gap-1" aria-hidden="true">
                   {[0, 1, 2].map((i) => (
                     <span
                       key={i}
-                      className="h-1.5 w-1.5 rounded-full bg-primary motion-safe:animate-bounce"
+                      className="h-1.5 w-1.5 rounded-full bg-brand-solid motion-safe:animate-bounce"
                       style={{ animationDelay: `${i * 150}ms` }}
                     />
                   ))}
@@ -1155,99 +1322,20 @@ function ChatPageInner() {
               )}
             </div>
           )}
-          <div ref={bottomRef} />
-        </div>
-      </main>
-
-      <footer className="glass shrink-0 border-t border-border/70 px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 backdrop-blur md:px-8">
-        <form onSubmit={handleSubmit} className="mx-auto max-w-2xl">
-          <div className="rounded-2xl border border-input bg-surface p-2 shadow-card transition-[border-color,box-shadow] duration-150 focus-within:border-primary focus-within:shadow-[0_0_0_4px_hsl(var(--primary)/0.14)]">
-            {attachments.length > 0 && (
-              <div className="mb-2 flex flex-wrap gap-2 px-1 pt-1">
-                {attachments.map((file) => (
-                  <span
-                    key={file.id}
-                    className="relative block h-16 w-16 overflow-hidden rounded-xl border border-border bg-background"
-                  >
-                    {file.content_type?.startsWith("image/") ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={file.url} alt={file.name} className="h-full w-full object-cover" />
-                    ) : (
-                      <span className="flex h-full w-full flex-col items-center justify-center gap-1 px-1 text-[10px] text-muted-foreground">
-                        <IconPaperclip size={15} />
-                        <span className="w-full truncate text-center">{file.name}</span>
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => removeAttachment(file.id)}
-                      className="absolute -right-1 -top-1 grid h-6 w-6 place-items-center rounded-full bg-foreground text-background shadow-md outline-none transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-ring"
-                      aria-label={`حذف فایل ${file.name}`}
-                    >
-                      <IconX size={15} stroke={2.5} />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-            <div className="flex items-end gap-1.5">
-              {!phoneStep && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => fileRef.current?.click()}
-                    disabled={isLoading || chatBlocked}
-                    className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-muted-foreground outline-none transition-colors hover:bg-foreground/5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
-                    aria-label="پیوست فایل یا تصویر"
-                    title="پیوست فایل یا تصویر نمونه"
-                  >
-                    <IconPaperclip size={18} stroke={2.2} />
-                  </button>
-                  <input
-                    ref={fileRef}
-                    type="file"
-                    className="hidden"
-                    accept="image/*,.pdf,.doc,.docx,.txt,.zip,.rar"
-                    onChange={(e) => handleAttachmentChange(e.target.files?.[0])}
-                  />
-                </>
-              )}
-              <label htmlFor="chat-input" className="sr-only">
-                {phoneStep ? "شماره موبایل" : "پیام شما"}
-              </label>
-              <textarea
-                id="chat-input"
-                ref={inputRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleTextareaKeyDown}
-                placeholder={placeholder}
-                disabled={isLoading || chatBlocked}
-                dir={phoneStep ? "ltr" : "rtl"}
-                rows={1}
-                inputMode={phoneStep ? "tel" : "text"}
-                autoComplete={phoneStep ? "tel" : "off"}
-                className="max-h-32 min-h-10 min-w-0 flex-1 resize-none bg-transparent px-1 py-2 text-[16px] leading-6 text-foreground placeholder:text-muted-foreground outline-none disabled:opacity-50 sm:text-sm"
-              />
-              <button
-                type="submit"
-                disabled={isLoading || !canSubmit}
-                aria-label="ارسال پیام"
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground shadow-md shadow-primary/25 outline-none transition-all hover:bg-primary-hover focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-muted-foreground disabled:shadow-none"
-              >
-                <IconArrowUp size={18} stroke={2.5} />
-              </button>
-            </div>
+            <div ref={bottomRef} />
           </div>
-          <p className="mt-2 text-center text-[11px] text-muted-foreground">
-            <span className="hidden sm:inline">Enter برای ارسال · Shift+Enter برای خط جدید · </span>
-            هوش مصنوعی ممکنه اشتباه کنه؛ نتیجه نهایی رو بررسی کن
-          </p>
-        </form>
-      </footer>
+        </main>
+
+        {!isFresh && (
+          <footer className="shrink-0 px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-2 md:px-8">
+            <div className="mx-auto max-w-2xl">{composer}</div>
+          </footer>
+        )}
+      </div>
     </div>
   );
 }
+
 
 export default function ChatPage() {
   return (

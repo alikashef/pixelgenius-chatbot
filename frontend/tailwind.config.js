@@ -35,13 +35,13 @@ module.exports = {
           DEFAULT: token("primary"),
           hover: token("primary-hover"),
           foreground: token("primary-foreground"),
-          soft: token("primary-soft"),
-          line: token("primary-line"),
         },
-        brand: token("brand"),
-        accent: {
-          DEFAULT: token("accent"),
-          foreground: token("accent-foreground"),
+        brand: {
+          DEFAULT: token("brand"),
+          solid: token("brand-solid"),
+          foreground: token("brand-foreground"),
+          soft: token("brand-soft"),
+          line: token("brand-line"),
         },
         success: token("success"),
         warning: token("warning"),
@@ -64,9 +64,9 @@ module.exports = {
       },
       boxShadow: {
         xs: "0 1px 2px 0 hsl(var(--shadow-color) / 0.06)",
-        card: "0 1px 2px 0 hsl(var(--shadow-color) / 0.05), 0 4px 16px -4px hsl(var(--shadow-color) / 0.08)",
-        elevated: "0 2px 6px -1px hsl(var(--shadow-color) / 0.08), 0 16px 40px -12px hsl(var(--shadow-color) / 0.22)",
-        glow: "0 0 0 1px hsl(var(--primary) / 0.35), 0 8px 32px -6px hsl(var(--primary) / 0.35)",
+        card: "0 1px 2px 0 hsl(var(--shadow-color) / 0.05)",
+        elevated: "0 1px 2px 0 hsl(var(--shadow-color) / 0.06), 0 12px 32px -12px hsl(var(--shadow-color) / 0.18)",
+        glow: "0 0 0 3px hsl(var(--ring) / 0.16)",
       },
       transitionTimingFunction: {
         out: "cubic-bezier(0.22, 1, 0.36, 1)",

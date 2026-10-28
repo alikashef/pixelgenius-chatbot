@@ -3,84 +3,85 @@
 @tailwind utilities;
 
 /*
- * FreelioAI design tokens — "AI-Native UI" (ui-ux-pro-max).
- * All colors are HSL channels so Tailwind opacity modifiers work (bg-primary/10).
- * Light theme is the :root default; .dark on <html> switches to the dark theme.
+ * FreelioAI "Studio" design tokens.
+ * Warm paper/ink neutrals, monochrome primary actions, saffron as the single brand color.
+ * Colors are HSL channels so Tailwind opacity modifiers work (bg-brand-solid/10).
+ * :root is the light theme; .dark on <html> switches to the dark theme.
  */
 @layer base {
   :root {
     color-scheme: light;
 
-    --background: 260 40% 98.6%;
-    --foreground: 250 32% 12%;
+    --background: 40 20% 97%;
+    --foreground: 30 8% 10%;
     --surface: 0 0% 100%;
-    --surface-2: 258 45% 96.4%;
+    --surface-2: 40 14% 94.5%;
     --card: 0 0% 100%;
-    --card-foreground: 250 32% 12%;
-    --muted: 258 30% 95%;
-    --muted-foreground: 250 11% 40%;
-    --secondary: 258 30% 95%;
-    --secondary-foreground: 250 16% 26%;
-    --border: 256 28% 89%;
-    --input: 256 26% 85%;
+    --card-foreground: 30 8% 10%;
+    --muted: 40 12% 93%;
+    --muted-foreground: 30 5% 38%;
+    --secondary: 40 12% 93%;
+    --secondary-foreground: 30 6% 24%;
+    --border: 36 12% 88%;
+    --input: 36 10% 80%;
 
-    --primary: 262 83% 58%;
-    --primary-hover: 263 70% 50%;
-    --primary-foreground: 0 0% 100%;
-    --primary-soft: 262 90% 96.5%;
-    --primary-line: 262 70% 86%;
-    --brand: 263 70% 46%;
-    --ring: 262 83% 58%;
+    --primary: 30 8% 11%;
+    --primary-hover: 30 6% 24%;
+    --primary-foreground: 40 20% 98%;
 
-    --accent: 189 94% 37%;
-    --accent-foreground: 0 0% 100%;
+    --brand: 22 88% 40%;
+    --brand-solid: 27 96% 53%;
+    --brand-foreground: 30 8% 10%;
+    --brand-soft: 32 100% 95.5%;
+    --brand-line: 30 85% 82%;
+    --ring: 25 95% 50%;
 
-    --success: 160 84% 28%;
-    --warning: 32 95% 36%;
-    --pending: 21 90% 42%;
+    --success: 155 70% 28%;
+    --warning: 38 92% 34%;
+    --pending: 20 85% 42%;
     --danger: 0 72% 46%;
-    --info: 217 80% 45%;
+    --info: 214 75% 44%;
 
-    --overlay: 250 30% 10%;
-    --shadow-color: 252 40% 30%;
-    --radius: 0.875rem;
+    --overlay: 30 10% 6%;
+    --shadow-color: 30 15% 20%;
+    --radius: 0.625rem;
   }
 
   .dark {
     color-scheme: dark;
 
-    --background: 250 24% 5%;
-    --foreground: 250 20% 96%;
-    --surface: 252 22% 8.5%;
-    --surface-2: 252 20% 12%;
-    --card: 252 22% 8.5%;
-    --card-foreground: 250 20% 96%;
-    --muted: 252 18% 13%;
-    --muted-foreground: 250 10% 66%;
-    --secondary: 252 18% 13%;
-    --secondary-foreground: 250 14% 84%;
-    --border: 252 16% 17%;
-    --input: 252 16% 23%;
+    --background: 30 6% 6.5%;
+    --foreground: 40 15% 92%;
+    --surface: 30 5% 9.5%;
+    --surface-2: 30 5% 13%;
+    --card: 30 5% 9.5%;
+    --card-foreground: 40 15% 92%;
+    --muted: 30 5% 13%;
+    --muted-foreground: 35 6% 64%;
+    --secondary: 30 5% 13%;
+    --secondary-foreground: 38 9% 80%;
+    --border: 30 5% 17%;
+    --input: 30 5% 25%;
 
-    --primary: 262 83% 58%;
-    --primary-hover: 262 90% 66%;
-    --primary-foreground: 0 0% 100%;
-    --primary-soft: 263 45% 14%;
-    --primary-line: 263 45% 30%;
-    --brand: 255 92% 80%;
-    --ring: 258 90% 72%;
+    --primary: 40 15% 92%;
+    --primary-hover: 40 10% 80%;
+    --primary-foreground: 30 8% 9%;
 
-    --accent: 187 86% 53%;
-    --accent-foreground: 190 80% 8%;
+    --brand: 30 95% 66%;
+    --brand-solid: 28 95% 56%;
+    --brand-foreground: 30 8% 9%;
+    --brand-soft: 28 35% 12%;
+    --brand-line: 28 40% 27%;
+    --ring: 30 95% 60%;
 
-    --success: 152 62% 52%;
-    --warning: 43 96% 58%;
-    --pending: 27 96% 62%;
-    --danger: 0 86% 70%;
-    --info: 213 94% 70%;
+    --success: 152 55% 55%;
+    --warning: 43 90% 60%;
+    --pending: 25 90% 64%;
+    --danger: 0 80% 70%;
+    --info: 213 85% 72%;
 
-    --overlay: 250 30% 2%;
-    --shadow-color: 250 50% 2%;
+    --overlay: 30 10% 2%;
+    --shadow-color: 30 20% 1%;
   }
 
   * {
@@ -96,8 +97,7 @@
   body {
     @apply bg-background text-foreground font-sans antialiased;
     margin: 0;
-    font-feature-settings: "ss01", "kern";
-    transition: background-color 200ms ease, color 200ms ease;
+    font-feature-settings: "kern";
   }
 
   h1,
@@ -112,7 +112,7 @@
   }
 
   ::selection {
-    background: hsl(var(--primary) / 0.22);
+    background: hsl(var(--brand-solid) / 0.28);
   }
 
   :focus-visible {
@@ -121,7 +121,6 @@
   }
 
   /* Elements that draw their own focus ring opt out of the global outline. */
-  .focus-ring:focus-visible,
   [class*="focus-visible:ring"]:focus-visible {
     outline: none;
   }
@@ -134,13 +133,13 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: hsl(var(--foreground) / 0.14);
+    background: hsl(var(--foreground) / 0.12);
     border: 2px solid transparent;
     background-clip: padding-box;
     border-radius: 999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background-color: hsl(var(--foreground) / 0.26);
+    background-color: hsl(var(--foreground) / 0.24);
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -159,7 +158,7 @@
   .field,
   .admin-input,
   .admin-textarea {
-    @apply w-full rounded-xl border border-input bg-surface px-3.5 py-2.5 text-sm text-foreground shadow-xs outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-muted-foreground/80 disabled:cursor-not-allowed disabled:opacity-60;
+    @apply w-full rounded-lg border border-input bg-surface px-3.5 py-2.5 text-sm text-foreground outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-muted-foreground/80 disabled:cursor-not-allowed disabled:opacity-60;
   }
 
   .admin-textarea {
@@ -170,49 +169,34 @@
   .field:hover,
   .admin-input:hover,
   .admin-textarea:hover {
-    @apply border-primary-line;
+    @apply border-foreground/30;
   }
 
   .field:focus,
   .admin-input:focus,
   .admin-textarea:focus {
-    @apply border-primary;
-    box-shadow: 0 0 0 4px hsl(var(--primary) / 0.16);
+    @apply border-ring;
+    box-shadow: 0 0 0 3px hsl(var(--ring) / 0.18);
   }
 
   .field-label {
-    @apply mb-1.5 block text-xs font-bold text-secondary-foreground;
+    @apply mb-1.5 block text-[13px] font-bold text-secondary-foreground;
+  }
+
+  /* Section eyebrow: small uppercase-style label above headings. */
+  .eyebrow {
+    @apply text-xs font-bold text-muted-foreground;
   }
 }
 
 @layer utilities {
-  .text-gradient {
-    background: linear-gradient(120deg, hsl(var(--brand)) 0%, hsl(var(--primary)) 45%, hsl(var(--accent)) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-
-  .glow-violet {
-    box-shadow: 0 0 60px hsl(var(--primary) / 0.18), 0 0 120px hsl(var(--primary) / 0.08);
-  }
-
-  /* Soft ambient wash behind app shells — the AI-native "aura". */
-  .bg-aura {
-    background-image:
-      radial-gradient(60rem 28rem at 50% -12rem, hsl(var(--primary) / 0.14), transparent 70%),
-      radial-gradient(36rem 20rem at 100% 0%, hsl(var(--accent) / 0.07), transparent 70%);
-    background-attachment: fixed;
-  }
-
-  .bg-grid {
-    background-image:
-      linear-gradient(hsl(var(--primary) / 0.05) 1px, transparent 1px),
-      linear-gradient(90deg, hsl(var(--primary) / 0.05) 1px, transparent 1px);
-    background-size: 48px 48px;
-  }
-
   .glass {
-    @apply bg-background/80 backdrop-blur-xl backdrop-saturate-150;
+    @apply bg-background/90 backdrop-blur-md;
+  }
+
+  /* Faint dotted paper texture for hero/auth surfaces. */
+  .bg-dots {
+    background-image: radial-gradient(hsl(var(--foreground) / 0.09) 1px, transparent 1px);
+    background-size: 22px 22px;
   }
 }

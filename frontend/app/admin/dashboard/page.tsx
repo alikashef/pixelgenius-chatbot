@@ -15,8 +15,8 @@ import {
   updateAISettings,
   Order,
 } from "@/lib/api";
-import ThemeToggle from "@/components/ThemeToggle";
-import { IconCheck, IconLogout, IconShieldLock, IconX } from "@tabler/icons-react";
+import AppShell, { ShellLoading } from "@/components/AppShell";
+import { IconAdjustments, IconCheck, IconClipboardList, IconPalette, IconWorld, IconX } from "@tabler/icons-react";
 
 interface Stats {
   total_orders: number;
@@ -34,12 +34,21 @@ const STATUS_LABEL: Record<Order["status"], string> = {
 };
 
 const STATUS_CLASS: Record<Order["status"], string> = {
-  pending_review: "bg-warning/10 border border-warning/20 text-warning",
-  approved: "bg-info/10 border border-info/20 text-info",
-  awaiting_payment: "bg-pending/10 border border-pending/20 text-pending",
-  paid: "bg-primary-soft text-brand",
-  cancelled: "bg-danger/10 border border-danger/20 text-danger",
+  pending_review: "bg-warning/10 text-warning",
+  approved: "bg-info/10 text-info",
+  awaiting_payment: "bg-pending/10 text-pending",
+  paid: "bg-success/10 text-success",
+  cancelled: "bg-danger/10 text-danger",
 };
+
+type AdminTab = "orders" | "settings" | "skills" | "sites";
+
+const ADMIN_TABS: { key: AdminTab; label: string; title: string; description: string; icon: typeof IconClipboardList }[] = [
+  { key: "orders", label: "سفارشات", title: "سفارشات", description: "درخواست‌های ثبت‌شده را بررسی کن، قیمت نهایی بده و وضعیت پرداخت را دنبال کن.", icon: IconClipboardList },
+  { key: "sites", label: "سایت‌های منتشرشده", title: "سایت‌های منتشرشده", description: "پیش‌نمایش‌ها و انتشارهای فعال؛ تمدید یا حذفشان کن.", icon: IconWorld },
+  { key: "settings", label: "تنظیمات فروش و AI", title: "تنظیمات فروش و AI", description: "رفتار مشاور فروش، شرایط پرداخت و دانش قیمت‌گذاری.", icon: IconAdjustments },
+  { key: "skills", label: "طراحی محصول", title: "طراحی محصول", description: "استک‌ها، مهارت‌ها و تنظیمات تولید تصویر طراح محصول.", icon: IconPalette },
+];
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("fa-IR", {
@@ -191,60 +200,27 @@ export default function AdminDashboard() {
     ? Math.round(parseInt(finalPrice) * parseInt(payPercent) / 100)
     : null;
 
-  if (loading) {
-    return <div className="min-h-screen bg-background flex items-center justify-center">
-      <div className="w-10 h-10 border-4 border-accent border-t-transparent rounded-full animate-spin" />
-    </div>;
-  }
+  if (loading) return <ShellLoading />;
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background">
+    <>
       {savedToast && (
-        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 flex items-center gap-2.5 rounded-2xl border border-success/30 bg-success/15 px-5 py-3 text-sm font-semibold text-success shadow-xl backdrop-blur-xl animate-in fade-in slide-in-from-bottom-3 duration-300">
-          <IconCheck size={18} stroke={2.5} aria-hidden="true" />
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 flex items-center gap-2.5 rounded-xl border border-border bg-surface px-5 py-3 text-sm font-bold text-foreground shadow-elevated animate-in fade-in slide-in-from-bottom-3 duration-300">
+          <IconCheck size={18} stroke={2.5} className="text-success" aria-hidden="true" />
           تنظیمات با موفقیت ذخیره شد
         </div>
       )}
-      <div className="pointer-events-none fixed inset-0 bg-aura" />
-
-      <header className="glass sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-border/70 px-4 sm:px-6">
-        <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-primary to-primary-hover text-primary-foreground shadow-md shadow-primary/30">
-          <IconShieldLock size={18} stroke={2.2} aria-hidden="true" />
-        </span>
-        <h1 className="font-black tracking-tight text-foreground">پنل ادمین</h1>
-        <div className="mr-auto flex items-center gap-2">
-          <ThemeToggle />
-          <button onClick={() => { localStorage.removeItem("admin_token"); router.push("/admin/login"); }}
-            className="flex h-9 items-center gap-1.5 rounded-xl border border-border bg-surface px-3 text-xs font-bold text-muted-foreground outline-none transition-colors hover:border-danger/40 hover:text-danger focus-visible:ring-2 focus-visible:ring-ring">
-            <IconLogout size={14} stroke={2} aria-hidden="true" />
-            خروج
-          </button>
-        </div>
-      </header>
-
-      <main className="relative z-10 max-w-6xl mx-auto px-4 py-8 space-y-8">
-        {error && <p className="text-danger text-center">{error}</p>}
-
-        <div role="tablist" aria-label="بخش‌های پنل ادمین" className="flex gap-1 overflow-x-auto rounded-2xl border border-border bg-surface p-1.5 shadow-card">
-          {[
-            ["orders", "سفارشات"],
-            ["sites", "سایت‌های منتشرشده"],
-            ["settings", "تنظیمات فروش و AI"],
-            ["skills", "طراحی محصول (استک، مهارت، تصویر)"],
-          ].map(([key, label]) => (
-            <button
-              key={key}
-              onClick={() => setActiveTab(key as "orders" | "settings" | "skills" | "sites")}
-              role="tab"
-              aria-selected={activeTab === key}
-              className={`min-h-10 shrink-0 whitespace-nowrap rounded-xl px-4 text-sm font-bold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${
-                activeTab === key ? "bg-primary-soft text-brand" : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+      <AppShell
+        area="ادمین"
+        width="wide"
+        nav={ADMIN_TABS.map(({ key, label, icon }) => ({ key, label, icon, active: activeTab === key, onSelect: () => setActiveTab(key) }))}
+        user={{ name: "مدیر سیستم" }}
+        onLogout={() => { localStorage.removeItem("admin_token"); router.push("/admin/login"); }}
+        title={ADMIN_TABS.find((t) => t.key === activeTab)?.title}
+        description={ADMIN_TABS.find((t) => t.key === activeTab)?.description}
+      >
+        <div className="space-y-8">
+        {error && <p role="alert" className="rounded-lg border border-danger/25 bg-danger/10 px-4 py-2.5 text-sm text-danger">{error}</p>}
 
         {activeTab === "sites" && <PublishedSites orders={orders} />}
 
@@ -257,9 +233,9 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {activeTab === "orders" && <div className="bg-surface border border-border rounded-2xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-border">
-            <h2 className="font-semibold text-foreground">سفارشات</h2>
+        {activeTab === "orders" && <div className="overflow-hidden rounded-xl border border-border bg-surface">
+          <div className="border-b border-border px-5 py-4">
+            <h2 className="font-bold text-foreground">همه سفارش‌ها</h2>
           </div>
           {orders.length === 0 ? (
             <p className="text-muted-foreground text-center py-12">هیچ سفارشی ثبت نشده</p>
@@ -267,7 +243,7 @@ export default function AdminDashboard() {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-border bg-surface-2/60">
+                  <tr className="border-b border-border bg-surface-2/70">
                     {["پروژه", "تخمین قیمت", "قیمت نهایی", "وضعیت", "تاریخ", ""].map((h) => (
                       <th key={h} className="px-5 py-3 text-right text-xs font-bold text-muted-foreground">{h}</th>
                     ))}
@@ -275,20 +251,21 @@ export default function AdminDashboard() {
                 </thead>
                 <tbody>
                   {orders.map((order) => (
-                    <tr key={order.id} className="border-b border-border/60 transition-colors last:border-0 hover:bg-primary-soft/40">
-                      <td className="px-5 py-4 text-sm text-foreground max-w-[180px] truncate">{order.project_name}</td>
+                    <tr key={order.id} className="border-b border-border transition-colors last:border-0 hover:bg-foreground/[0.02]">
+                      <td className="max-w-[220px] truncate px-5 py-4 text-sm font-bold text-foreground">{order.project_name}</td>
                       <td className="px-5 py-4 text-sm text-muted-foreground">{order.price_label}</td>
-                      <td className="px-5 py-4 text-sm text-brand">
+                      <td className="whitespace-nowrap px-5 py-4 text-sm text-foreground">
                         {order.final_price ? `${order.final_price.toLocaleString("fa-IR")} ریال` : "—"}
                       </td>
                       <td className="px-5 py-4">
-                        <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${STATUS_CLASS[order.status]}`}>
+                        <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-bold leading-6 ${STATUS_CLASS[order.status]}`}>
+                          <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
                           {STATUS_LABEL[order.status]}
                         </span>
                       </td>
                       <td className="px-5 py-4 text-xs text-muted-foreground">{formatDate(order.created_at)}</td>
                       <td className="px-5 py-4">
-                        <button onClick={() => router.push(`/admin/orders/${order.id}`)} className="text-brand hover:text-brand text-xs transition-colors">
+                        <button onClick={() => router.push(`/admin/orders/${order.id}`)} className="inline-flex min-h-8 items-center rounded-lg border border-border px-3 text-xs font-bold text-foreground outline-none transition-colors hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ring">
                           مدیریت
                         </button>
                       </td>
@@ -353,8 +330,8 @@ export default function AdminDashboard() {
                       onClick={() => setSettingValue("ai_model", model.key)}
                       className={`flex flex-col items-start gap-1 rounded-xl border px-4 py-3 text-right transition-all ${
                         isSelected
-                          ? "border-primary-line bg-primary-soft text-foreground"
-                          : "border-border bg-background text-muted-foreground hover:border-primary-line hover:text-foreground"
+                          ? "border-brand-line bg-brand-soft text-foreground"
+                          : "border-border bg-background text-muted-foreground hover:border-brand-line hover:text-foreground"
                       }`}
                     >
                       <span className="text-sm font-semibold">{model.label}</span>
@@ -484,13 +461,14 @@ export default function AdminDashboard() {
             </details>
           </div>
         )}
-      </main>
+        </div>
+      </AppShell>
 
       {/* Order Management Modal */}
       {selected && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50"
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/50 p-4 backdrop-blur-[2px]"
           onClick={() => setSelected(null)}>
-          <div className="bg-surface border border-border rounded-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto"
+          <div role="dialog" aria-modal="true" className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl border border-border bg-surface shadow-elevated"
             onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-border sticky top-0 bg-surface">
               <h3 className="font-semibold text-foreground truncate">{selected.project_name}</h3>
@@ -532,7 +510,7 @@ export default function AdminDashboard() {
                         key={`${message.role}-${index}`}
                         className={`rounded-xl px-4 py-3 text-sm leading-relaxed ${
                           message.role === "user"
-                            ? "bg-primary-soft border border-primary-line text-foreground"
+                            ? "bg-brand-soft border border-brand-line text-foreground"
                             : "bg-surface border border-border text-secondary-foreground"
                         }`}
                       >
@@ -562,7 +540,7 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                   {payAmount && (
-                    <div className="bg-primary-soft border border-primary-line rounded-xl px-4 py-3 flex justify-between items-center">
+                    <div className="bg-brand-soft border border-brand-line rounded-xl px-4 py-3 flex justify-between items-center">
                       <p className="text-muted-foreground text-xs">مبلغ قابل پرداخت توسط مشتری</p>
                       <p className="text-brand font-bold">{payAmount.toLocaleString("fa-IR")} ریال</p>
                     </div>
@@ -589,7 +567,7 @@ export default function AdminDashboard() {
                 <input ref={fileRef} type="file" accept=".pdf,.doc,.docx" onChange={handleUpload}
                   className="hidden" />
                 <button onClick={() => fileRef.current?.click()} disabled={uploading}
-                  className="w-full border border-border hover:border-primary-line text-muted-foreground hover:text-foreground rounded-xl py-3 text-sm transition-colors disabled:opacity-60">
+                  className="w-full border border-border hover:border-brand-line text-muted-foreground hover:text-foreground rounded-xl py-3 text-sm transition-colors disabled:opacity-60">
                   {uploading ? "در حال آپلود..." : selected.proposal_file ? "جایگزینی فایل" : "انتخاب و آپلود فایل"}
                 </button>
               </div>
@@ -597,19 +575,18 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
 
 function StatCard({ label, value, accent, warn }: { label: string; value: string; accent?: boolean; warn?: boolean }) {
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-border bg-surface p-5 shadow-card">
-      <span
-        aria-hidden="true"
-        className={`absolute inset-y-4 right-0 w-1 rounded-l-full ${accent ? "bg-primary" : warn ? "bg-warning" : "bg-border"}`}
-      />
-      <p className="mb-2 text-xs font-bold text-muted-foreground">{label}</p>
-      <p className={`text-2xl font-black tracking-tight ${accent ? "text-brand" : warn ? "text-warning" : "text-foreground"}`}>{value}</p>
+    <div className="rounded-xl border border-border bg-surface p-5">
+      <p className="flex items-center gap-2 text-[13px] font-bold text-muted-foreground">
+        <span aria-hidden="true" className={`h-2 w-2 rounded-full ${accent ? "bg-success" : warn ? "bg-warning" : "bg-foreground/25"}`} />
+        {label}
+      </p>
+      <p className="mt-3 text-[1.75rem] font-black leading-none tracking-tight text-foreground">{value}</p>
     </div>
   );
 }
@@ -640,7 +617,7 @@ function EditableList({
     <section className="bg-surface border border-border rounded-2xl p-5 space-y-4">
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-foreground font-semibold">{title}</h3>
-        <button onClick={onAdd} className="border border-border hover:border-primary-line text-foreground rounded-xl px-4 py-2 text-xs transition-colors">
+        <button onClick={onAdd} className="border border-border hover:border-brand-line text-foreground rounded-xl px-4 py-2 text-xs transition-colors">
           افزودن
         </button>
       </div>
@@ -715,7 +692,7 @@ function PublishedSites({ orders }: { orders: Order[] }) {
   return <section className="space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div><h2 className="text-xl font-bold">سایت‌های منتشرشده</h2><p className="mt-2 text-sm text-muted-foreground">تمدید به زمان باقی‌مانده اضافه می‌شود. سایت‌های لیارا پس از انقضا به‌صورت خودکار پاک می‌شوند؛ تمدید زمان، هزینه میزبانی را ادامه می‌دهد.</p></div>
-      <button disabled={loading || !!busy} onClick={load} className="rounded-xl border border-primary-line px-4 py-2 text-brand disabled:opacity-50">به‌روزرسانی</button>
+      <button disabled={loading || !!busy} onClick={load} className="rounded-xl border border-brand-line px-4 py-2 text-brand disabled:opacity-50">به‌روزرسانی</button>
     </div>
     {error && <p role="alert" className="text-danger">{error === "UNAUTHORIZED" ? "نشست ادمین منقضی شده؛ دوباره وارد شوید." : error}</p>}
     {notice && <p role="status" className="text-brand">{notice}</p>}

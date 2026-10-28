@@ -3,9 +3,9 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { IconSparkles } from "@tabler/icons-react";
 import { freelancerRegister } from "@/lib/api";
-import ThemeToggle from "@/components/ThemeToggle";
+import AuthLayout from "@/components/AuthLayout";
+import { Button } from "@/components/ui/button";
 
 export default function FreelancerRegisterPage() {
   const router = useRouter();
@@ -35,70 +35,35 @@ export default function FreelancerRegisterPage() {
   }
 
   return (
-    <div className="relative flex min-h-[100dvh] flex-col items-center justify-center overflow-hidden bg-background bg-aura px-4 py-10">
-      <div className="pointer-events-none absolute inset-0 bg-grid [mask-image:radial-gradient(ellipse_at_top,black,transparent_70%)]" />
-      <ThemeToggle className="absolute left-4 top-4 z-10" />
-      <div className="relative w-full max-w-md">
-        <div className="mb-8 flex flex-col items-center gap-3">
-          <span className="grid h-12 w-12 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-md shadow-primary/25">
-            <IconSparkles size={22} stroke={2} aria-hidden="true" />
-          </span>
-          <h1 className="text-xl font-black text-foreground">ثبت‌نام در FreelioAI</h1>
-          <p className="text-sm text-muted-foreground">چت‌بات هوشمند خودت رو بساز</p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="relative space-y-4 rounded-3xl border border-border bg-surface p-6 shadow-elevated sm:p-7">
-          <div>
-            <label className="field-label">اسم (اختیاری)</label>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="مثلاً علی رضایی"
-              className="admin-input"
-            />
-          </div>
-          <div>
-            <label className="field-label">ایمیل</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              dir="ltr"
-              required
-              className="admin-input"
-            />
-          </div>
-          <div>
-            <label className="field-label">رمز عبور</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="حداقل ۸ کاراکتر"
-              dir="ltr"
-              required
-              minLength={8}
-              className="admin-input"
-            />
-          </div>
-          {error && <p className="text-sm text-danger">{error}</p>}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground shadow-md shadow-primary/25 transition-colors hover:bg-primary-hover disabled:opacity-50"
-          >
-            {loading ? "در حال ثبت‌نام..." : "ثبت‌نام رایگان"}
-          </button>
-        </form>
-
-        <p className="mt-4 text-center text-sm text-muted-foreground">
+    <AuthLayout
+      variant="freelancer"
+      title="چت‌بات هوشمند خودت رو بساز"
+      description="در کمتر از سه دقیقه دستیاری داشته باش که با مشتری‌هات نیازسنجی کنه."
+      footer={
+        <>
           قبلاً ثبت‌نام کردی؟{" "}
-          <Link href="/freelancer/login" className="text-brand hover:text-foreground">
-            ورود
-          </Link>
-        </p>
-      </div>
-    </div>
+          <Link href="/freelancer/login" className="font-bold text-brand underline-offset-4 hover:underline">ورود</Link>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label htmlFor="fl-name" className="field-label">اسم <span className="font-normal text-muted-foreground">(اختیاری)</span></label>
+          <input id="fl-name" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="مثلاً علی رضایی" className="field min-h-12" />
+        </div>
+        <div>
+          <label htmlFor="fl-email" className="field-label">ایمیل</label>
+          <input id="fl-email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" dir="ltr" required className="field min-h-12" />
+        </div>
+        <div>
+          <label htmlFor="fl-password" className="field-label">رمز عبور</label>
+          <input id="fl-password" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="حداقل ۸ کاراکتر" dir="ltr" required minLength={8} className="field min-h-12" />
+        </div>
+        {error && <p role="alert" className="rounded-lg border border-danger/25 bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
+        <Button type="submit" disabled={loading} className="h-12 w-full">
+          {loading ? "در حال ثبت‌نام..." : "ثبت‌نام رایگان"}
+        </Button>
+      </form>
+    </AuthLayout>
   );
 }

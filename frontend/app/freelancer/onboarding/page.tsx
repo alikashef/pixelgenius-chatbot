@@ -2,9 +2,9 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { IconSparkles } from "@tabler/icons-react";
 import { freelancerOnboarding } from "@/lib/api";
-import ThemeToggle from "@/components/ThemeToggle";
+import AuthLayout from "@/components/AuthLayout";
+import { Button } from "@/components/ui/button";
 
 const STEPS = [
   { title: "اسم و موقعیت", desc: "مشتری‌ها با چه عنوانی تو رو می‌شناسن؟" },
@@ -66,49 +66,38 @@ export default function FreelancerOnboardingPage() {
   }
 
   return (
-    <div className="relative flex min-h-[100dvh] flex-col items-center justify-center overflow-hidden bg-background bg-aura px-4 py-10">
-      <div className="pointer-events-none absolute inset-0 bg-grid [mask-image:radial-gradient(ellipse_at_top,black,transparent_70%)]" />
-      <ThemeToggle className="absolute left-4 top-4 z-10" />
-      <div className="relative w-full max-w-lg">
-        <div className="mb-8 flex flex-col items-center gap-3">
-          <span className="grid h-12 w-12 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-md shadow-primary/25">
-            <IconSparkles size={22} stroke={2} aria-hidden="true" />
-          </span>
-          <h1 className="text-xl font-black text-foreground">راه‌اندازی FreelioAI</h1>
-          <p className="text-sm text-muted-foreground">یه‌بار این اطلاعات رو بده تا AI شخصی‌سازی بشه</p>
+    <AuthLayout variant="freelancer" wide title={STEPS[step].title} description={STEPS[step].desc}>
+      <div className="mb-6">
+        <div className="mb-2 flex items-center justify-between text-xs font-bold text-muted-foreground">
+          <span>راه‌اندازی دستیار</span>
+          <span>مرحله {(step + 1).toLocaleString("fa-IR")} از {STEPS.length.toLocaleString("fa-IR")}</span>
         </div>
-
-        <div className="mb-6 flex gap-1.5">
+        <div className="flex gap-1.5" role="progressbar" aria-valuemin={1} aria-valuemax={STEPS.length} aria-valuenow={step + 1} aria-label="پیشرفت راه‌اندازی">
           {STEPS.map((_, i) => (
-            <div
-              key={i}
-              className={`h-1.5 flex-1 rounded-full transition-colors ${i <= step ? "bg-primary" : "bg-border"}`}
-            />
+            <div key={i} className={`h-1 flex-1 rounded-full transition-colors ${i <= step ? "bg-brand-solid" : "bg-foreground/10"}`} />
           ))}
         </div>
-
-        <div className="rounded-2xl border border-border bg-surface p-6 shadow-card">
-          <p className="mb-1 font-bold text-foreground">{STEPS[step].title}</p>
-          <p className="mb-5 text-sm text-muted-foreground">{STEPS[step].desc}</p>
+      </div>
 
           <form onSubmit={handleNext} className="space-y-4">
             {step === 0 && (
               <>
                 <div>
-                  <label className="field-label">اسم کامل</label>
-                  <input value={name} onChange={(e) => setName(e.target.value)} placeholder="مثلاً علی رضایی" className="admin-input" required />
+                  <label htmlFor="ob-1" className="field-label">اسم کامل</label>
+                  <input id="ob-1" value={name} onChange={(e) => setName(e.target.value)} placeholder="مثلاً علی رضایی" className="field min-h-12" required />
                 </div>
                 <div>
-                  <label className="field-label">موقعیت / تخصص</label>
-                  <input value={position} onChange={(e) => setPosition(e.target.value)} placeholder="مثلاً فریلنسر طراحی و توسعه وب" className="admin-input" required />
+                  <label htmlFor="ob-2" className="field-label">موقعیت / تخصص</label>
+                  <input id="ob-2" value={position} onChange={(e) => setPosition(e.target.value)} placeholder="مثلاً فریلنسر طراحی و توسعه وب" className="field min-h-12" required />
                 </div>
               </>
             )}
 
             {step === 1 && (
               <div>
-                <label className="field-label">خدماتی که ارائه می‌دی</label>
+                <label htmlFor="ob-3" className="field-label">خدماتی که ارائه می‌دی</label>
                 <textarea
+                  id="ob-3"
                   value={services}
                   onChange={(e) => setServices(e.target.value)}
                   rows={4}
@@ -121,12 +110,13 @@ export default function FreelancerOnboardingPage() {
 
             {step === 2 && (
               <div>
-                <label className="field-label">بازه قیمتی پروژه‌هات</label>
+                <label htmlFor="ob-4" className="field-label">بازه قیمتی پروژه‌هات</label>
                 <input
+                  id="ob-4"
                   value={priceRange}
                   onChange={(e) => setPriceRange(e.target.value)}
                   placeholder="مثلاً: ۵ تا ۵۰ میلیون تومان"
-                  className="admin-input"
+                  className="field min-h-12"
                   required
                 />
                 <p className="mt-2 text-xs text-muted-foreground">این عدد به AI کمک می‌کنه بودجه مشتری رو بهتر ارزیابی کنه.</p>
@@ -135,12 +125,13 @@ export default function FreelancerOnboardingPage() {
 
             {step === 3 && (
               <div>
-                <label className="field-label">زمان تحویل معمول</label>
+                <label htmlFor="ob-5" className="field-label">زمان تحویل معمول</label>
                 <input
+                  id="ob-5"
                   value={timeline}
                   onChange={(e) => setTimeline(e.target.value)}
                   placeholder="مثلاً: لندینگ ۵ روز، فروشگاه ۳-۴ هفته"
-                  className="admin-input"
+                  className="field min-h-12"
                   required
                 />
               </div>
@@ -148,8 +139,9 @@ export default function FreelancerOnboardingPage() {
 
             {step === 4 && (
               <div>
-                <label className="field-label">نکته مهم (اختیاری)</label>
+                <label htmlFor="ob-6" className="field-label">نکته مهم (اختیاری)</label>
                 <textarea
+                  id="ob-6"
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   rows={4}
@@ -159,33 +151,19 @@ export default function FreelancerOnboardingPage() {
               </div>
             )}
 
-            {error && <p className="text-sm text-danger">{error}</p>}
+            {error && <p role="alert" className="rounded-lg border border-danger/25 bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
 
             <div className="flex gap-3">
               {step > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setStep((s) => s - 1)}
-                  className="flex-1 rounded-xl border border-border py-3 text-sm text-muted-foreground transition-colors hover:border-primary-line hover:text-foreground"
-                >
+                <Button type="button" variant="outline" onClick={() => setStep((s) => s - 1)} className="h-12 flex-1">
                   قبلی
-                </button>
+                </Button>
               )}
-              <button
-                type="submit"
-                disabled={loading || !canAdvance()}
-                className="flex-1 rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground shadow-md shadow-primary/25 transition-colors hover:bg-primary-hover disabled:opacity-50"
-              >
+              <Button type="submit" disabled={loading || !canAdvance()} className="h-12 flex-1">
                 {loading ? "در حال ذخیره..." : isLastStep ? "شروع کار" : "بعدی"}
-              </button>
+              </Button>
             </div>
           </form>
-        </div>
-
-        <p className="mt-4 text-center text-xs text-muted-foreground">
-          مرحله {step + 1} از {STEPS.length}
-        </p>
-      </div>
-    </div>
+    </AuthLayout>
   );
 }

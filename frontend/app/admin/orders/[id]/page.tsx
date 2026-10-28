@@ -20,7 +20,7 @@ const STATUS_CLASS: Record<Order["status"], string> = {
   pending_review: "bg-warning/10 border border-warning/20 text-warning",
   approved: "bg-info/10 border border-info/20 text-info",
   awaiting_payment: "bg-pending/10 border border-pending/20 text-pending",
-  paid: "bg-primary-soft text-brand",
+  paid: "bg-brand-soft text-brand",
   cancelled: "bg-danger/10 border border-danger/20 text-danger",
 };
 
@@ -143,7 +143,7 @@ export default function AdminOrderPage() {
   const payAmount = finalPrice && payPercent ? Math.round(parseInt(finalPrice) * parseInt(payPercent) / 100) : null;
 
   return (
-    <div className="min-h-screen bg-background bg-aura">
+    <div className="min-h-screen bg-background">
       <header className="glass sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-border/70 px-4 sm:px-6">
         <button onClick={() => router.push("/admin/dashboard")} className="flex min-h-9 items-center gap-1 rounded-lg px-2 text-sm text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
           <IconChevronRight size={16} stroke={2.5} aria-hidden="true" />
@@ -168,20 +168,20 @@ export default function AdminOrderPage() {
               <button
                 onClick={handleSummarize}
                 disabled={summarizing}
-                className="flex items-center gap-1.5 rounded-xl border border-primary-line bg-primary-soft px-3 py-1.5 text-xs font-semibold text-brand transition-colors hover:text-foreground disabled:opacity-50"
+                className="flex items-center gap-1.5 rounded-xl border border-brand-line bg-brand-soft px-3 py-1.5 text-xs font-semibold text-brand transition-colors hover:text-foreground disabled:opacity-50"
               >
                 {summarizing ? "در حال تحلیل..." : "خلاصه AI"}
               </button>
             </div>
             {order.ai_summary && (
-              <div className="mb-4 rounded-xl border border-primary-line bg-primary-soft px-4 py-3 text-sm leading-7 text-brand">
+              <div className="mb-4 rounded-xl border border-brand-line bg-brand-soft px-4 py-3 text-sm leading-7 text-brand">
                 <p className="mb-1 text-xs text-brand">خلاصه هوش مصنوعی</p>
                 <p className="whitespace-pre-wrap">{order.ai_summary}</p>
               </div>
             )}
             <div className="space-y-3">
               {(order.chat_history || []).map((message, index) => (
-                <div key={`${message.role}-${index}`} className={`rounded-xl border px-4 py-3 text-sm leading-7 ${message.role === "user" ? "border-primary-line bg-primary-soft text-foreground" : "border-border bg-background text-secondary-foreground"}`}>
+                <div key={`${message.role}-${index}`} className={`rounded-xl border px-4 py-3 text-sm leading-7 ${message.role === "user" ? "border-brand-line bg-brand-soft text-foreground" : "border-border bg-background text-secondary-foreground"}`}>
                   <p className="mb-1 text-xs opacity-70">{message.role === "user" ? "کاربر" : "دستیار"}</p>
                   <p className="whitespace-pre-wrap">{message.content}</p>
                 </div>
@@ -200,7 +200,7 @@ export default function AdminOrderPage() {
             ) : (
               <div className="space-y-2">
                 {order.order_files.map((file) => (
-                  <a key={file.id} href={`${API_URL}${file.url}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground transition-colors hover:border-primary-line">
+                  <a key={file.id} href={`${API_URL}${file.url}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground transition-colors hover:border-brand-line">
                     <span className="truncate">{file.name}</span>
                     <span className="mr-3 shrink-0 text-xs text-muted-foreground">{file.uploaded_by === "admin" ? "ادمین" : "مشتری"} · {formatFileSize(file.size)}</span>
                   </a>
@@ -216,7 +216,7 @@ export default function AdminOrderPage() {
             <div className="space-y-3">
               <input value={finalPrice} onChange={(e) => setFinalPrice(e.target.value)} type="number" placeholder="قیمت نهایی (ریال)" className="admin-input" />
               <input value={payPercent} onChange={(e) => setPayPercent(e.target.value)} type="number" min={10} max={100} placeholder="درصد پیش‌پرداخت" className="admin-input" />
-              {payAmount && <p className="rounded-xl border border-primary-line bg-primary-soft px-4 py-3 text-sm text-brand">مبلغ قابل پرداخت: {payAmount.toLocaleString("fa-IR")} ریال</p>}
+              {payAmount && <p className="rounded-xl border border-brand-line bg-brand-soft px-4 py-3 text-sm text-brand">مبلغ قابل پرداخت: {payAmount.toLocaleString("fa-IR")} ریال</p>}
 
               <div>
                 <div className="mb-2 flex items-center justify-between">
@@ -278,7 +278,7 @@ export default function AdminOrderPage() {
           <div className="rounded-2xl border border-border bg-surface p-5 shadow-card">
             <p className="mb-3 font-semibold text-foreground">پروپوزال</p>
             {order.proposal_file && <a href={`${API_URL}${order.proposal_file}`} target="_blank" rel="noopener noreferrer" className="mb-3 block text-sm text-brand">مشاهده پروپوزال فعلی</a>}
-            <button onClick={() => proposalRef.current?.click()} className="w-full rounded-xl border border-border py-3 text-sm text-muted-foreground transition-colors hover:border-primary-line hover:text-foreground">{uploading === "proposal" ? "در حال آپلود..." : "آپلود / جایگزینی پروپوزال"}</button>
+            <button onClick={() => proposalRef.current?.click()} className="w-full rounded-xl border border-border py-3 text-sm text-muted-foreground transition-colors hover:border-brand-line hover:text-foreground">{uploading === "proposal" ? "در حال آپلود..." : "آپلود / جایگزینی پروپوزال"}</button>
             <input ref={proposalRef} type="file" accept=".pdf,.doc,.docx" className="hidden" onChange={(e) => handleProposalUpload(e.target.files?.[0])} />
           </div>
         </aside>

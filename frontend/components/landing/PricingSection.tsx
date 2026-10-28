@@ -76,8 +76,8 @@ export default function PricingSection() {
             key={plan.name}
             className={`relative flex flex-col p-7 transition-all duration-200 ${
               plan.highlight
-                ? "border-primary-line bg-primary-soft shadow-2xl shadow-primary/25"
-                : "hover:border-primary-line"
+                ? "border-brand-line bg-brand-soft"
+                : "hover:border-brand-line"
             }`}
           >
             {plan.badge && (

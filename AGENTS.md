@@ -132,7 +132,11 @@ frontend/
       Navbar.tsx, HeroSection.tsx, ChatMockup.tsx
       HowItWorksSection.tsx, FeaturesSection.tsx
       PricingSection.tsx, CTASection.tsx, Footer.tsx
-    ChatBubble.tsx                ← حباب پیام (client، پشتیبانی attachment)
+    ChatBubble.tsx                ← پیام چت (client، پشتیبانی attachment)
+    Brand.tsx                     ← لوگو و BrandMark
+    AppShell.tsx                  ← سایدبار پنل‌ها (client)
+    AuthLayout.tsx                ← لِی‌اوت دوبخشی صفحات ورود
+    ThemeToggle.tsx               ← سوییچ تم (client)
   lib/
     utils.ts                      ← cn() با clsx + tailwind-merge
     api.ts                        ← همه fetch calls به backend
@@ -219,44 +223,54 @@ NEXT_PUBLIC_API_URL   ← پیش‌فرض http://localhost:8000
 
 ---
 
-## Design System
+## Design System — "Studio"
 
-سبک: **AI-Native UI** (از اسکیل ui-ux-pro-max) — بنفش برند + فیروزه‌ای accent، کروم مینیمال، کارت‌های سبک با سایه نرم.
+جهت طراحی (بعد از R&D): فاصله گرفتن از کلیشه‌ی «بنفش + گرادیان + glow» محصولات AI.
+پایه‌ی **کاغذ/جوهر** گرم و خنثی، دکمه‌های اصلی **تک‌رنگ** (جوهری)، و **زعفرانی** تنها رنگ برند.
+بدون گرادیان و glow؛ عمق فقط با بوردر و سایه‌ی خیلی نرم. ساختار: سایدبار + محتوای متمرکز.
 
 ### توکن‌ها
 
-همه رنگ‌ها در `frontend/app/globals.css` به‌صورت کانال HSL تعریف شده‌اند (`:root` = لایت، `.dark` = دارک)
-و در `tailwind.config.js` با `<alpha-value>` نگاشت شده‌اند؛ پس `bg-primary/10` و مشابهش کار می‌کند.
+همه رنگ‌ها در `frontend/app/globals.css` به‌صورت کانال HSL (`:root` = لایت، `.dark` = دارک)
+و در `tailwind.config.js` با `<alpha-value>` نگاشت شده‌اند (`bg-brand-solid/10` کار می‌کند).
 
 | کلاس Tailwind | کاربرد |
 |---------------|--------|
-| `bg-background` / `text-foreground` | پس‌زمینه و متن اصلی |
-| `bg-surface` / `bg-surface-2` / `bg-card` | سطح کارت / سطح فرعی |
+| `bg-background` / `text-foreground` | پس‌زمینه کاغذی و متن جوهری |
+| `bg-surface` / `bg-surface-2` | کارت / سطح فرعی (سایدبار، سگمنت، هدر جدول) |
 | `text-muted-foreground` / `text-secondary-foreground` | متن کم‌رنگ / متن ثانویه |
 | `border-border` / `border-input` | بوردر عمومی / بوردر فیلد |
-| `bg-primary` + `text-primary-foreground` / `hover:bg-primary-hover` | دکمه اصلی |
-| `bg-primary-soft` / `border-primary-line` / `text-brand` | سطح، بوردر و متن برند (تینت) |
-| `ring-ring` | فوکوس |
-| `accent` | فیروزه‌ای (گرادیان، تاکید ثانویه) |
-| `success` / `warning` / `pending` / `danger` / `info` | وضعیت‌ها (با `/10` برای پس‌زمینه) |
+| `bg-primary` + `text-primary-foreground` | دکمه اصلی (در لایت مشکی، در دارک روشن) |
+| `bg-brand-solid` + `text-brand-foreground` | زعفرانی؛ فقط برای لوگو، CTA پرداخت و نقاط تأکید |
+| `bg-brand-soft` / `border-brand-line` / `text-brand` | تینت برند و متن برند (کنتراست AA) |
+| `ring-ring` | فوکوس (زعفرانی) |
+| `success` / `warning` / `pending` / `danger` / `info` | وضعیت‌ها؛ pill = `bg-x/10 text-x` + نقطه |
 
-سایه‌ها: `shadow-xs`، `shadow-card`، `shadow-elevated`، `shadow-glow`.
-Utilityها: `bg-aura` (هاله پس‌زمینه)، `glass` (هدر شیشه‌ای)، `text-gradient`، `bg-grid`.
-فیلد فرم: کلاس `field` (و `field-label` برای لیبل).
+سایه‌ها: `shadow-card` (خیلی نرم)، `shadow-elevated` (پاپ‌اور/کامپوزر)، `shadow-glow` (حلقه انتخاب).
+Utilityها: `glass` (هدر)، `bg-dots` (بافت پنل برند). فیلد فرم: `field` و `field-label`؛ برچسب بخش: `eyebrow`.
+شعاع: `--radius` = 10px (`rounded-lg`)؛ کارت‌ها `rounded-xl`.
+
+### کامپوننت‌های ساختاری
+
+| کامپوننت | کاربرد |
+|----------|--------|
+| `components/Brand.tsx` | `BrandMark` (حباب گفتگو + F روی زعفرانی)، `BrandWordmark`، `BrandLogo` — جای آیکون sparkle |
+| `components/AppShell.tsx` | سایدبار (دسکتاپ) / دراور (موبایل) + عنوان صفحه؛ پنل مشتری، ادمین و فریلنسر |
+| `components/AuthLayout.tsx` | صفحه‌ی دوبخشی ورود: فرم + پنل برند معکوس (variant: customer / freelancer / admin) |
+| `components/ThemeToggle.tsx` | روشن / تیره / سیستم |
 
 ### قوانین طراحی
 
-- دو تم **لایت و دارک**؛ پیش‌فرض تابع سیستم. `ThemeToggle` (`components/ThemeToggle.tsx`) بین روشن/تیره/سیستم می‌چرخد
-  و مقدار را در `localStorage.theme_mode` نگه می‌دارد؛ اسکریپت داخل `app/layout.tsx` قبل از رندر کلاس `.dark` را می‌گذارد
-- هر صفحه جدید باید در هدرش `ThemeToggle` داشته باشد و در هر دو تم چک شود
-- فونت: **YekanBakh FaNum** (لوکال در `frontend/app/fonts/` با `next/font/local`، متغیر `--font-yekan`)
-  وزن‌های موجود: Light(300) · Bold(700) · ExtraBold(800) · Black(900) · ExtraBlack(950)
-- direction: **RTL** در html و body
-- رنگ hardcode نکن (نه hex، نه `text-white`، نه palette مثل `violet-300`) — فقط توکن‌های بالا
-- روی پس‌زمینه solid رنگی (`bg-primary`، `bg-danger`) متن `text-primary-foreground`
-- ایموجی به‌عنوان آیکون UI استفاده نکن — از `@tabler/icons-react` با `aria-hidden` کنار متن
-- hover: `hover:border-primary-line` یا `hover:-translate-y-0.5`؛ transition ۱۵۰–۲۰۰ms
-- `prefers-reduced-motion` در globals.css رعایت شده
+- دو تم **لایت و دارک**؛ پیش‌فرض تابع سیستم، ذخیره در `localStorage.theme_mode`؛ اسکریپت `app/layout.tsx` قبل از رندر `.dark` را می‌گذارد
+- صفحه‌ی جدید داخل پنل → `AppShell`؛ صفحه‌ی ورود → `AuthLayout`؛ هر دو `ThemeToggle` دارند
+- فونت: **YekanBakh FaNum** (لوکال در `frontend/app/fonts/`، `--font-yekan`) — Light(300) · Bold(700) · ExtraBold · Black · ExtraBlack
+- direction: **RTL**
+- رنگ hardcode نکن (hex، `text-white`، palette مثل `violet-300`) — فقط توکن‌ها
+- گرادیان، glow و رنگ بنفش استفاده نکن؛ زعفرانی را کم و هدفمند خرج کن
+- انتخاب‌شده‌ها: بوردر `foreground` (کارت) یا سطح `surface` روی `surface-2` (سگمنت)
+- چت: پیام دستیار بدون حباب کنار `BrandMark`؛ پیام کاربر در حباب `surface-2`
+- ایموجی به‌عنوان آیکون UI ممنوع — `@tabler/icons-react` با `aria-hidden`
+- transition ۱۵۰–۲۰۰ms؛ `prefers-reduced-motion` رعایت شده
 
 ### shadcn/ui موجود
 

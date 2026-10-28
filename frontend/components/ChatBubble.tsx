@@ -1,7 +1,8 @@
 "use client";
 
 import { Fragment, ReactNode } from "react";
-import { IconFileText, IconSparkles } from "@tabler/icons-react";
+import { IconFileText } from "@tabler/icons-react";
+import { BrandMark } from "@/components/Brand";
 import { OrderFile } from "@/lib/api";
 
 interface Props {
@@ -54,55 +55,49 @@ function renderRichText(content: string): ReactNode[] {
 
 export default function ChatBubble({ role, content, attachments = [] }: Props) {
   const isUser = role === "user";
-  return (
-    <div
-      className={`mb-5 flex items-end gap-2.5 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:duration-300 ${
-        isUser ? "justify-start" : "justify-end"
-      }`}
-    >
-      {!isUser && (
-        <span
-          aria-hidden="true"
-          className="mb-1 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-primary to-accent text-primary-foreground shadow-md shadow-primary/25"
+  const files = attachments.length > 0 && (
+    <div className={`flex max-w-full flex-col gap-2 ${isUser ? "p-2 pb-0" : "mb-3"}`}>
+      {attachments.map((file) => (
+        <a
+          key={file.id}
+          href={file.url}
+          target="_blank"
+          rel="noreferrer"
+          className={`block overflow-hidden rounded-lg border border-border bg-surface outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+            isImage(file) ? "" : "px-3 py-2"
+          }`}
         >
-          <IconSparkles size={15} stroke={2.2} />
-        </span>
-      )}
-      <div
-        className={`max-w-[85%] overflow-hidden rounded-2xl text-[15px] leading-7 sm:max-w-[78%] ${
-          isUser
-            ? "rounded-br-md bg-primary text-primary-foreground shadow-md shadow-primary/25"
-            : "rounded-bl-md border border-border bg-surface text-foreground shadow-card"
-        }`}
-      >
-        {attachments.length > 0 && (
-          <div className="flex max-w-full flex-col gap-2 p-2 pb-0">
-            {attachments.map((file) => (
-              <a
-                key={file.id}
-                href={file.url}
-                target="_blank"
-                rel="noreferrer"
-                className={`block overflow-hidden rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${
-                  isImage(file) ? "border border-border bg-foreground/5" : "border border-border bg-foreground/5 px-3 py-2"
-                }`}
-              >
-                {isImage(file) ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={file.url} alt={file.name} className="max-h-56 w-full object-cover" />
-                ) : (
-                  <span className="flex min-w-0 items-center gap-2">
-                    <IconFileText size={18} className="shrink-0" />
-                    <span className="truncate text-xs font-semibold">{file.name}</span>
-                  </span>
-                )}
-              </a>
-            ))}
-          </div>
-        )}
-        {content && (
-          <div className="space-y-3 px-4 py-3">{isUser ? <p className="whitespace-pre-wrap">{content}</p> : renderRichText(content)}</div>
-        )}
+          {isImage(file) ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={file.url} alt={file.name} className="max-h-56 w-full object-cover" />
+          ) : (
+            <span className="flex min-w-0 items-center gap-2">
+              <IconFileText size={18} className="shrink-0 text-muted-foreground" aria-hidden="true" />
+              <span className="truncate text-xs font-bold">{file.name}</span>
+            </span>
+          )}
+        </a>
+      ))}
+    </div>
+  );
+
+  if (isUser) {
+    return (
+      <div className="mb-6 flex justify-start motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:duration-300">
+        <div className="max-w-[85%] overflow-hidden rounded-2xl rounded-tr-md bg-surface-2 text-[15px] leading-7 text-foreground sm:max-w-[75%]">
+          {files}
+          {content && <p className="whitespace-pre-wrap px-4 py-2.5">{content}</p>}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-7 flex items-start gap-3 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
+      <BrandMark size="sm" className="mt-0.5" />
+      <div className="min-w-0 flex-1 space-y-3 pt-1 text-[15px] leading-8 text-foreground">
+        {files}
+        {content && renderRichText(content)}
       </div>
     </div>
   );

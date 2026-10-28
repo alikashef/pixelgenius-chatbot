@@ -268,13 +268,13 @@ export default function ProjectWorkspace({
     <section
       className={cn(
         panelClass,
-        "relative overflow-hidden border-primary-line",
+        "relative overflow-hidden border-brand-line",
       )}
       aria-labelledby="deployment-heading"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-center gap-3">
-          <span className="grid h-11 w-11 place-items-center rounded-xl bg-primary-soft text-brand">
+          <span className="grid h-11 w-11 place-items-center rounded-xl bg-brand-soft text-brand">
             <IconCloudUpload size={23} />
           </span>
           <div>
@@ -288,7 +288,7 @@ export default function ProjectWorkspace({
         </div>
         <span
           role="status"
-          className="flex items-center gap-2 rounded-full border border-primary-line bg-primary-soft px-3 py-1.5 text-xs text-brand"
+          className="flex items-center gap-2 rounded-full border border-brand-line bg-brand-soft px-3 py-1.5 text-xs text-brand"
         >
           {deploying && <IconLoader2 size={14} className="animate-spin" />}
           {STATES[state] || state}
@@ -349,7 +349,7 @@ export default function ProjectWorkspace({
           href={safeUrl(deployment?.url)}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-5 flex items-center justify-between gap-3 rounded-xl border border-primary-line bg-background px-4 py-3 text-sm text-brand"
+          className="mt-5 flex items-center justify-between gap-3 rounded-xl border border-brand-line bg-background px-4 py-3 text-sm text-brand"
         >
           <span dir="ltr" className="truncate">
             {deployment?.url}
@@ -391,7 +391,7 @@ export default function ProjectWorkspace({
   );
 
   return (
-    <div className="min-h-screen bg-background bg-aura text-foreground">
+    <div className="min-h-screen bg-background text-foreground">
       <header className="glass sticky top-0 z-20 border-b border-border/70">
         <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 sm:px-6">
           <Link
@@ -405,7 +405,7 @@ export default function ProjectWorkspace({
           <span className="truncate text-sm font-semibold">
             {order.project_name}
           </span>
-          <span className="mr-auto hidden rounded-full border border-primary-line bg-primary-soft px-2.5 py-0.5 text-xs font-bold text-brand sm:block">
+          <span className="mr-auto hidden rounded-full border border-brand-line bg-brand-soft px-2.5 py-0.5 text-xs font-bold text-brand sm:block">
             فضای پروژه
           </span>
           <ThemeToggle className="max-sm:mr-auto" />
@@ -458,7 +458,7 @@ export default function ProjectWorkspace({
         {error && (
           <div
             role="alert"
-            className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary-line bg-primary-soft p-4 text-sm"
+            className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-line bg-brand-soft p-4 text-sm"
           >
             <p>{error}</p>
             <Button
@@ -494,7 +494,7 @@ export default function ProjectWorkspace({
                       (path) => (
                         <div
                           key={path.id}
-                          className="flex items-start gap-3 rounded-xl border border-primary-line bg-primary-soft p-4"
+                          className="flex items-start gap-3 rounded-xl border border-brand-line bg-brand-soft p-4"
                         >
                           <path.icon
                             size={24}
@@ -1041,7 +1041,7 @@ export default function ProjectWorkspace({
                 <section className={panelClass}>
                   <div className="mb-4 flex items-center justify-between gap-3">
                     <h2 className="font-bold">فایل‌ها و سورس</h2>
-                    <label className="cursor-pointer rounded-lg border border-primary-line px-3 py-2 text-xs text-brand">
+                    <label className="cursor-pointer rounded-lg border border-brand-line px-3 py-2 text-xs text-brand">
                       افزودن فایل
                       <input
                         className="sr-only"
@@ -1076,7 +1076,7 @@ export default function ProjectWorkspace({
                         href={`${process.env.NEXT_PUBLIC_API_URL || ""}${file.url}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center justify-between gap-3 rounded-xl border border-border p-3 text-sm hover:border-primary-line"
+                        className="flex items-center justify-between gap-3 rounded-xl border border-border p-3 text-sm hover:border-brand-line"
                       >
                         <span className="truncate">{file.name}</span>
                         <IconArrowUpRight

@@ -22,7 +22,7 @@ const STATUS_CLASS: Record<Order["status"], string> = {
   pending_review: "bg-warning/10 text-warning border-warning/20",
   approved: "bg-info/10 text-info border-info/20",
   awaiting_payment: "bg-pending/10 text-pending border-pending/20",
-  paid: "bg-primary-soft text-brand border-primary-line",
+  paid: "bg-brand-soft text-brand border-brand-line",
   cancelled: "bg-danger/10 text-danger border-danger/20",
 };
 
@@ -112,7 +112,7 @@ export default function OrderDetailPage() {
   if (isDesigner) return <ProjectWorkspace key={order.id} order={order} />;
 
   return (
-    <div className="min-h-screen bg-background bg-aura">
+    <div className="min-h-screen bg-background">
       <header className="glass sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-border/70 px-4 sm:px-6">
         <Link
           href="/panel"
@@ -129,7 +129,7 @@ export default function OrderDetailPage() {
       <main className="mx-auto max-w-3xl space-y-5 px-4 py-8">
         <section>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-lg bg-primary-soft px-2.5 py-1 text-xs font-semibold text-brand">
+            <span className="inline-flex items-center gap-1.5 rounded-lg bg-brand-soft px-2.5 py-1 text-xs font-semibold text-brand">
               {isDesigner ? <IconWand size={13} stroke={2.2} /> : <IconCoin size={13} stroke={2.2} />}
               {isDesigner ? "طراحی محصول" : "مشاوره فروش"}
             </span>
@@ -142,9 +142,9 @@ export default function OrderDetailPage() {
         </section>
 
         {isDesigner ? (
-          <section className="rounded-2xl border border-primary-line bg-surface p-5 shadow-glow">
+          <section className="rounded-2xl border border-brand-line bg-surface p-5 shadow-glow">
             <div className="flex items-start gap-3">
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground shadow-md shadow-primary/25">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground">
                 <IconCheck size={20} stroke={2.5} />
               </span>
               <div className="min-w-0">
@@ -156,7 +156,7 @@ export default function OrderDetailPage() {
             </div>
             <Link
               href={`/chat?brief=${order.id}`}
-              className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground shadow-md shadow-primary/25 outline-none transition-colors hover:bg-primary-hover focus-visible:ring-2 focus-visible:ring-ring"
+              className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground outline-none transition-colors hover:bg-primary-hover focus-visible:ring-2 focus-visible:ring-ring"
             >
               <IconDownload size={18} stroke={2.2} />
               دریافت کانفیگ و آموزش ساخت
@@ -272,7 +272,7 @@ export default function OrderDetailPage() {
                     key={`${message.role}-${index}`}
                     className={`rounded-xl px-4 py-3 text-sm leading-7 ${
                       message.role === "user"
-                        ? "border border-primary-line bg-primary-soft text-foreground"
+                        ? "border border-brand-line bg-brand-soft text-foreground"
                         : "border border-border bg-background text-secondary-foreground"
                     }`}
                   >
@@ -298,7 +298,7 @@ export default function OrderDetailPage() {
           ) : (
             <div className="space-y-2">
               {(order.order_files || []).map((file) => (
-                <a key={file.id} href={`${API_URL}${file.url}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground transition-colors hover:border-primary-line">
+                <a key={file.id} href={`${API_URL}${file.url}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground transition-colors hover:border-brand-line">
                   <span className="truncate">{file.name}</span>
                   <span className="mr-3 shrink-0 text-xs text-muted-foreground">{file.uploaded_by === "admin" ? "ادمین" : "شما"}</span>
                 </a>
@@ -313,9 +313,9 @@ export default function OrderDetailPage() {
             href={`${API_URL}${order.proposal_file}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-3 bg-surface border border-border hover:border-primary-line rounded-xl p-4 transition-colors"
+            className="flex items-center gap-3 bg-surface border border-border hover:border-brand-line rounded-xl p-4 transition-colors"
           >
-            <div className="w-10 h-10 bg-primary-soft rounded-lg flex items-center justify-center flex-shrink-0">
+            <div className="w-10 h-10 bg-brand-soft rounded-lg flex items-center justify-center flex-shrink-0">
               <svg className="w-5 h-5 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
               </svg>
@@ -341,7 +341,7 @@ export default function OrderDetailPage() {
                 <p className="text-foreground font-bold">{order.payment_percentage}٪</p>
               </div>
             </div>
-            <div className="bg-primary-soft border border-primary-line rounded-xl p-4 flex items-center justify-between">
+            <div className="bg-brand-soft border border-brand-line rounded-xl p-4 flex items-center justify-between">
               <p className="text-secondary-foreground text-sm">مبلغ قابل پرداخت</p>
               <p className="text-brand font-bold text-lg">{order.payment_amount.toLocaleString("fa-IR")} ریال</p>
             </div>
@@ -358,7 +358,7 @@ export default function OrderDetailPage() {
         )}
 
         {order.status === "paid" && order.paid_at && (
-          <div className="bg-primary-soft border border-primary-line rounded-xl p-5 text-center">
+          <div className="bg-brand-soft border border-brand-line rounded-xl p-5 text-center">
             <p className="text-brand font-semibold mb-1">پرداخت با موفقیت انجام شد</p>
             <p className="text-muted-foreground text-xs">
               {new Date(order.paid_at).toLocaleDateString("fa-IR", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}

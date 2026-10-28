@@ -6,9 +6,9 @@ import ChatMockup from "./ChatMockup";
 
 export default function HeroSection() {
   return (
-    <section className="relative overflow-hidden border-b border-border bg-grid">
+    <section className="relative overflow-hidden border-b border-border">
       {/* radial glow top center */}
-      <div className="pointer-events-none absolute inset-0 bg-aura" />
+      <div className="pointer-events-none absolute inset-0" />
 
       <div className="relative mx-auto grid min-h-[calc(100vh-73px)] max-w-7xl items-center gap-14 px-4 py-16 lg:grid-cols-[1fr_1fr]">
         {/* text side */}
@@ -21,7 +21,7 @@ export default function HeroSection() {
           <h1 className="text-4xl font-black leading-tight tracking-tight text-foreground md:text-5xl xl:text-6xl">
             دستیار هوشمند
             <br />
-            <span className="text-gradient">فریلنسرهای</span>
+            <span className="text-brand">فریلنسرهای</span>
             <br />
             حرفه‌ای
           </h1>

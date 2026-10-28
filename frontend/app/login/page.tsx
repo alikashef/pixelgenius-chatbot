@@ -2,9 +2,10 @@
 
 import { useState, useEffect, FormEvent, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { IconArrowRight, IconDeviceMobile, IconRefresh, IconShieldCheck } from "@tabler/icons-react";
+import { IconArrowLeft, IconRefresh } from "@tabler/icons-react";
 import { fetchChatHandoff, sendOtp, verifyOtp, submitOrder, Proposal, Message, OrderFile } from "@/lib/api";
-import ThemeToggle from "@/components/ThemeToggle";
+import AuthLayout from "@/components/AuthLayout";
+import { Button } from "@/components/ui/button";
 
 function LoginContent() {
   const router = useRouter();
@@ -173,89 +174,76 @@ function LoginContent() {
     }
   }
 
+  const errorBox = error && (
+    <p role="alert" className="rounded-lg border border-danger/25 bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>
+  );
+
   return (
-    <div className="relative flex min-h-[100dvh] flex-col items-center justify-center overflow-hidden bg-background bg-aura px-4 py-10">
-      <div className="pointer-events-none absolute inset-0 bg-grid [mask-image:radial-gradient(ellipse_at_top,black,transparent_70%)]" />
-      <ThemeToggle className="absolute left-4 top-4 z-10" />
-
-      <div className="relative w-full max-w-sm overflow-hidden rounded-3xl border border-border bg-surface p-7 shadow-elevated">
-        <div className="mb-7 text-center">
-          <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl border border-primary-line bg-primary-soft text-brand shadow-md shadow-primary/25">
-            {step === "phone" ? <IconDeviceMobile size={24} /> : <IconShieldCheck size={24} />}
-          </div>
-          <h1 className="text-xl font-black text-foreground">
-            {step === "phone" ? "ورود و ثبت نام" : "تایید شماره موبایل"}
-          </h1>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            {step === "phone" ? (
-              "لطفاً برای ورود به پنل کاربری خود شماره تلفن همراه خود را وارد کنید و منتظر کد تایید باشید."
-            ) : (
-              <>کد ۵ رقمی به <span className="font-semibold text-brand">{phone}</span> ارسال شد</>
-            )}
-          </p>
-        </div>
-
-        {step === "phone" ? (
-          <form onSubmit={handleSend} className="space-y-4">
-            <div>
-              <label className="field-label">شماره تلفن همراه</label>
-              <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="09xxxxxxxxx"
-                required
-                dir="ltr"
-                className="field px-4 py-3 text-center"
-              />
-            </div>
-            {error && <p className="rounded-xl border border-danger/20 bg-danger/10 px-3 py-2 text-center text-sm text-danger">{error}</p>}
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground shadow-md shadow-primary/25 transition-all hover:bg-primary-hover disabled:opacity-60"
-            >
-              <IconArrowRight size={18} />
-              {loading ? "در حال ارسال..." : "دریافت کد ورود"}
-            </button>
-          </form>
+    <AuthLayout
+      title={step === "phone" ? "ورود یا ثبت‌نام" : "کد تایید رو وارد کن"}
+      description={
+        step === "phone" ? (
+          "شماره موبایلت رو وارد کن تا کد ورود برات پیامک بشه. اگه حساب نداری، خودکار ساخته می‌شه."
         ) : (
-          <form onSubmit={handleVerify} className="space-y-4">
-            <div>
-              <label className="field-label">کد تایید</label>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={code}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 5))}
-                placeholder="• • • • •"
-                required
-                dir="ltr"
-                className="field px-4 py-3 text-center text-2xl tracking-[0.5em]"
-              />
-            </div>
-            {error && <p className="rounded-xl border border-danger/20 bg-danger/10 px-3 py-2 text-center text-sm text-danger">{error}</p>}
-            <button
-              type="submit"
-              disabled={loading || code.length !== 5}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground shadow-md shadow-primary/25 transition-all hover:bg-primary-hover disabled:opacity-60"
-            >
-              <IconShieldCheck size={18} />
-              {loading ? "در حال تایید..." : "ورود و مشاهده درخواست"}
-            </button>
-            <button
-              type="button"
-              disabled={countdown > 0}
-              onClick={() => { setStep("phone"); setCode(""); setError(""); }}
-              className="flex w-full items-center justify-center gap-2 py-1 text-sm text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40"
-            >
-              <IconRefresh size={17} />
-              {countdown > 0 ? `ارسال مجدد تا ${countdown} ثانیه` : "ارسال مجدد کد"}
-            </button>
-          </form>
-        )}
-      </div>
-    </div>
+          <>کد ۵ رقمی به <span dir="ltr" className="font-bold text-foreground">{phone}</span> ارسال شد.</>
+        )
+      }
+    >
+      {step === "phone" ? (
+        <form onSubmit={handleSend} className="space-y-4">
+          <div>
+            <label htmlFor="login-phone" className="field-label">شماره موبایل</label>
+            <input
+              id="login-phone"
+              type="tel"
+              autoComplete="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="09xxxxxxxxx"
+              required
+              dir="ltr"
+              className="field min-h-12 text-left text-base tracking-wider"
+            />
+          </div>
+          {errorBox}
+          <Button type="submit" disabled={loading} className="h-12 w-full">
+            {loading ? "در حال ارسال..." : "دریافت کد ورود"}
+            <IconArrowLeft size={18} aria-hidden="true" />
+          </Button>
+        </form>
+      ) : (
+        <form onSubmit={handleVerify} className="space-y-4">
+          <div>
+            <label htmlFor="login-code" className="field-label">کد تایید</label>
+            <input
+              id="login-code"
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 5))}
+              placeholder="• • • • •"
+              required
+              dir="ltr"
+              className="field min-h-14 text-center text-2xl font-bold tracking-[0.6em]"
+            />
+          </div>
+          {errorBox}
+          <Button type="submit" disabled={loading || code.length !== 5} className="h-12 w-full">
+            {loading ? "در حال تایید..." : "ورود و مشاهده درخواست"}
+          </Button>
+          <button
+            type="button"
+            disabled={countdown > 0}
+            onClick={() => { setStep("phone"); setCode(""); setError(""); }}
+            className="mx-auto flex items-center gap-1.5 rounded text-[13px] font-bold text-secondary-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:text-muted-foreground"
+          >
+            <IconRefresh size={15} aria-hidden="true" />
+            {countdown > 0 ? `ارسال مجدد تا ${countdown.toLocaleString("fa-IR")} ثانیه` : "تغییر شماره یا ارسال مجدد کد"}
+          </button>
+        </form>
+      )}
+    </AuthLayout>
   );
 }
 

@@ -139,8 +139,8 @@ export default function ChatRobot({
   const previousBrief = useRef(briefState);
 
   useEffect(() => {
-    // robot-heads only accepts hex colors, so the brand violet is passed directly.
-    setColors({ color: "#7c3aed", trimColor: "#a78bfa", screenColor: "#a78bfa" });
+    // robot-heads only accepts hex colors, so the ink body and saffron trim are passed directly.
+    setColors({ color: "#36312b", trimColor: "#f28c28", screenColor: "#ffc48a" });
     const wake = () => {
       activityAt.current = Date.now();
       setClock(Date.now());
@@ -303,7 +303,7 @@ export default function ChatRobot({
         aria-hidden="true"
         className="relative grid h-[176px] w-[224px] place-items-center"
       >
-        <span className="pointer-events-none absolute inset-x-6 bottom-4 h-10 rounded-full bg-primary-soft blur-2xl" />
+        <span className="pointer-events-none absolute inset-x-6 bottom-4 h-10 rounded-full bg-brand-soft blur-2xl" />
         <RobotHead
           shape="rectangle"
           state={speaking && introduction ? "speaking" : mood.state}
@@ -328,7 +328,7 @@ export default function ChatRobot({
         onClick={toggleVoice}
         aria-pressed={voiceEnabled}
         aria-label={introduction ? voiceEnabled ? "قطع صدای راهنمای شروع" : "پخش راهنمای شروع با صدای روبات" : voiceEnabled ? "خاموش کردن صدای روبات" : "روشن کردن صدای روبات"}
-        className="mt-1 flex min-h-8 items-center gap-1.5 rounded-lg px-2 text-xs text-brand transition-colors hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="mt-1 flex min-h-8 items-center gap-1.5 rounded-lg px-2 text-xs text-brand transition-colors hover:bg-brand-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         {voiceEnabled ? <IconVolume size={16} aria-hidden="true" /> : <IconVolumeOff size={16} aria-hidden="true" />}
         {introduction ? voiceEnabled ? "قطع صدای راهنما" : "پخش راهنمای شروع" : voiceEnabled ? "صدا روشن" : "صدای روبات"}

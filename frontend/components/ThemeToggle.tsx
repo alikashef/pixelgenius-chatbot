@@ -92,7 +92,7 @@ export default function ThemeToggle({ className, variant = "icon" }: { className
       aria-label={`حالت نمایش: ${LABELS[mode]} — تغییر به ${LABELS[next]}`}
       title={`حالت نمایش: ${LABELS[mode]}`}
       className={cn(
-        "grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-border bg-surface text-muted-foreground outline-none transition-colors hover:border-primary-line hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
+        "grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-border bg-surface text-muted-foreground outline-none transition-colors hover:border-brand-line hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
         className
       )}
     >

@@ -2,9 +2,9 @@ export default function ChatMockup() {
   return (
     <div className="relative mx-auto w-full max-w-lg">
       {/* glow behind the card */}
-      <div className="absolute inset-0 rounded-3xl bg-primary-soft blur-3xl animate-glow-pulse" />
+      <div className="absolute inset-0 rounded-3xl bg-brand-soft blur-3xl animate-glow-pulse" />
 
-      <div className="relative overflow-hidden rounded-3xl border border-primary-line bg-surface shadow-2xl shadow-overlay/20">
+      <div className="relative overflow-hidden rounded-3xl border border-brand-line bg-surface shadow-2xl shadow-overlay/20">
         {/* browser bar */}
         <div className="flex items-center gap-2 border-b border-border bg-background px-4 py-3">
           <span className="h-2.5 w-2.5 rounded-full bg-danger/60" />
@@ -57,7 +57,7 @@ export default function ChatMockup() {
         <div className="border-t border-border bg-background/60 p-5">
           <div className="mb-3 flex items-center justify-between">
             <span className="text-xs font-bold text-muted-foreground">پیشنهاد اولیه</span>
-            <span className="rounded-full bg-primary-soft border border-primary-line px-2.5 py-0.5 text-xs font-semibold text-brand">
+            <span className="rounded-full bg-brand-soft border border-brand-line px-2.5 py-0.5 text-xs font-semibold text-brand">
               در حال آماده‌سازی...
             </span>
           </div>

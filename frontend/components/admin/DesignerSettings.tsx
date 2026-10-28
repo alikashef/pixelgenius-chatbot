@@ -223,7 +223,7 @@ export default function DesignerSettings({ getToken: getTokenProp, settings, onS
           <button
             onClick={runTest}
             disabled={testing || !testPrompt.trim()}
-            className="border border-border hover:border-primary-line disabled:opacity-50 rounded-xl px-4 py-2 text-xs text-foreground transition-colors"
+            className="border border-border hover:border-brand-line disabled:opacity-50 rounded-xl px-4 py-2 text-xs text-foreground transition-colors"
           >
             {testing ? "در حال ساخت تصویر..." : "ساخت تصویر آزمایشی"}
           </button>
@@ -269,8 +269,8 @@ function MultiSelect({ label, options, value, onChange }: { label: string; optio
               className={cn(
                 "rounded-full border px-2.5 py-1 text-[11px] transition-colors",
                 on
-                  ? "border-primary bg-primary-soft text-brand"
-                  : "border-border text-muted-foreground hover:border-primary-line",
+                  ? "border-primary bg-brand-soft text-brand"
+                  : "border-border text-muted-foreground hover:border-brand-line",
               )}
             >
               {option}

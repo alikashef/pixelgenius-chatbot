@@ -31,7 +31,7 @@ export default function Footer() {
                 <IconSparkles size={18} stroke={2.2} />
               </span>
               <span>
-                Freelio<span className="text-gradient">AI</span>
+                Freelio<span className="text-brand">AI</span>
               </span>
             </Link>
             <p className="mt-4 max-w-xs text-sm leading-7 text-muted-foreground">

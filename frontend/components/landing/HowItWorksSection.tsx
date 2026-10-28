@@ -46,20 +46,20 @@ export default function HowItWorksSection() {
 
       <div className="relative grid gap-6 md:grid-cols-3">
         {/* connector line */}
-        <div className="absolute left-[16.67%] right-[16.67%] top-10 hidden h-px bg-gradient-to-l from-transparent via-primary-line to-transparent md:block" />
+        <div className="absolute left-[16.67%] right-[16.67%] top-10 hidden h-px bg-gradient-to-l from-transparent via-brand-line to-transparent md:block" />
 
         {STEPS.map((step) => {
           const Icon = step.icon;
           return (
             <div
               key={step.number}
-              className="relative rounded-3xl border border-border bg-surface p-7 transition-colors hover:border-primary-line shadow-card"
+              className="relative rounded-3xl border border-border bg-surface p-7 transition-colors hover:border-brand-line shadow-card"
             >
               <div className="mb-5 flex items-start justify-between">
-                <span className="text-3xl font-black text-primary-line">
+                <span className="text-3xl font-black text-brand-line">
                   {step.number}
                 </span>
-                <span className="grid h-11 w-11 place-items-center rounded-2xl bg-primary-soft border border-primary-line text-brand">
+                <span className="grid h-11 w-11 place-items-center rounded-2xl bg-brand-soft border border-brand-line text-brand">
                   <Icon size={22} stroke={1.8} />
                 </span>
               </div>
@@ -69,7 +69,7 @@ export default function HowItWorksSection() {
                 {step.description}
               </p>
 
-              <div className="mt-5 inline-flex items-center gap-1.5 rounded-full border border-primary-line bg-primary-soft px-3 py-1 text-xs font-semibold text-brand">
+              <div className="mt-5 inline-flex items-center gap-1.5 rounded-full border border-brand-line bg-brand-soft px-3 py-1 text-xs font-semibold text-brand">
                 {step.highlight}
               </div>
             </div>

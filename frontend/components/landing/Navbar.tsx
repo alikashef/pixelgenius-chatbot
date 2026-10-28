@@ -7,12 +7,12 @@ export default function Navbar() {
     <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
         <Link href="/" className="flex items-center gap-2.5 font-black text-foreground">
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary text-primary-foreground shadow-md shadow-primary/25">
+          <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary text-primary-foreground">
             <IconSparkles size={19} stroke={2.2} />
           </span>
           <span>
             Freelio
-            <span className="text-gradient">AI</span>
+            <span className="text-brand">AI</span>
           </span>
         </Link>
 

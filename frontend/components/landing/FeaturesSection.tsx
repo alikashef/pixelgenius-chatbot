@@ -76,9 +76,9 @@ export default function FeaturesSection() {
             return (
               <Card
                 key={feature.title}
-                className={`p-6 transition-all duration-200 hover:-translate-y-1 hover:border-primary-line ${
+                className={`p-6 transition-all duration-200 hover:-translate-y-1 hover:border-brand-line ${
                   feature.accent
-                    ? "border-primary-line bg-primary-soft"
+                    ? "border-brand-line bg-brand-soft"
                     : ""
                 }`}
               >
@@ -86,7 +86,7 @@ export default function FeaturesSection() {
                   <span
                     className={`mb-5 grid h-12 w-12 place-items-center rounded-2xl ${
                       feature.accent
-                        ? "bg-primary text-primary-foreground shadow-md shadow-primary/25"
+                        ? "bg-primary text-primary-foreground"
                         : "bg-surface-2 text-brand border border-border"
                     }`}
                   >

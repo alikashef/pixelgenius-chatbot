@@ -9,7 +9,7 @@ import { verifyPayment } from "@/lib/api";
 
 function Shell({ children }: { children: ReactNode }) {
   return (
-    <div className="relative flex min-h-[100dvh] items-center justify-center bg-background bg-aura p-4">
+    <div className="relative flex min-h-[100dvh] items-center justify-center bg-background p-4">
       <ThemeToggle className="absolute left-4 top-4" />
       {children}
     </div>

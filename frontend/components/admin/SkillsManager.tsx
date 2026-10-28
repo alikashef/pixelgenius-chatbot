@@ -192,7 +192,7 @@ export default function SkillsManager({ getToken: getTokenProp, settings, onSett
               onClick={async () => {
                 if (await run(() => reindexSkills(getToken()), "ایندکس وکتور از نو ساخته می‌شود.")) await run(load);
               }}
-              className="border border-border hover:border-primary-line rounded-xl px-4 py-2 text-xs text-foreground transition-colors"
+              className="border border-border hover:border-brand-line rounded-xl px-4 py-2 text-xs text-foreground transition-colors"
             >
               ساخت مجدد ایندکس
             </button>
@@ -208,8 +208,8 @@ export default function SkillsManager({ getToken: getTokenProp, settings, onSett
             className={cn(
               "rounded-2xl border p-3 text-right transition-all hover:-translate-y-1",
               active === c.key
-                ? "border-primary bg-primary-soft shadow-primary/25"
-                : "border-border bg-surface hover:border-primary-line",
+                ? "border-primary bg-brand-soft"
+                : "border-border bg-surface hover:border-brand-line",
             )}
           >
             <span className="block text-xs font-semibold text-foreground leading-5">{c.label}</span>
@@ -270,7 +270,7 @@ export default function SkillsManager({ getToken: getTokenProp, settings, onSett
             onClick={() => fileInput.current?.click()}
             className={cn(
               "cursor-pointer rounded-2xl border-2 border-dashed px-6 py-10 text-center transition-colors",
-              dragging ? "border-primary bg-primary-soft" : "border-border hover:border-primary-line",
+              dragging ? "border-primary bg-brand-soft" : "border-border hover:border-brand-line",
             )}
           >
             <p className="text-sm text-foreground">{busy ? "در حال آپلود..." : "فایل را اینجا رها کنید یا کلیک کنید"}</p>
@@ -365,7 +365,7 @@ export function Switch({ checked, onChange }: { checked: boolean; onChange: () =
 
 function Badge({ tone, children }: { tone: "violet" | "green" | "yellow" | "muted"; children: React.ReactNode }) {
   const tones = {
-    violet: "bg-primary-soft text-brand border-primary-line",
+    violet: "bg-brand-soft text-brand border-brand-line",
     green: "bg-success/10 text-success border-success/20",
     yellow: "bg-warning/10 text-warning border-warning/20",
     muted: "bg-transparent text-muted-foreground border-border",
