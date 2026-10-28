@@ -115,11 +115,11 @@ export default function OrderDetailPage() {
     <div className="min-h-screen bg-background">
       <header className="glass sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-border/70 px-4 sm:px-6">
         <Link
-          href="/panel"
+          href="/panel?tab=orders"
           className="flex min-h-9 items-center gap-1 rounded-lg px-2 text-sm text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <IconChevronRight size={16} stroke={2.5} />
-          پروژه‌ها
+          <IconChevronRight size={16} stroke={2.5} aria-hidden="true" />
+          سفارش‌ها
         </Link>
         <span className="h-4 w-px bg-border" aria-hidden="true" />
         <p className="min-w-0 truncate text-sm font-bold text-foreground">{order.project_name}</p>

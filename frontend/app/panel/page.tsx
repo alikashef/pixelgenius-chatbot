@@ -75,11 +75,34 @@ function readChatSessions(customerId: string): ChatSessionListItem[] {
   }
 }
 
+// Product-design projects (config briefs) and sales orders (priced, paid) are separate workflows.
 const TABS = [
-  { key: "orders", label: "پروژه‌ها", icon: IconClipboardList },
-  { key: "chats", label: "گفتگوهای ناتمام", icon: IconMessage },
-  { key: "account", label: "تنظیمات حساب", icon: IconSettings },
+  { key: "design", group: "طراحی محصول", label: "پروژه‌های طراحی", icon: IconWand },
+  { key: "orders", group: "فروش", label: "سفارش‌ها", icon: IconClipboardList },
+  { key: "chats", group: "حساب کاربری", label: "گفتگوهای ناتمام", icon: IconMessage },
+  { key: "account", group: "حساب کاربری", label: "تنظیمات حساب", icon: IconSettings },
 ] as const;
+
+function isTabKey(value: string | null): value is TabKey {
+  return TABS.some((t) => t.key === value);
+}
+
+const EMPTY_STATE: Record<"design" | "orders", { mode: "designer" | "sales"; icon: typeof IconWand; title: string; body: string; cta: string }> = {
+  design: {
+    mode: "designer",
+    icon: IconWand,
+    title: "اولین پروژه‌ات رو طراحی کن",
+    body: "ایده‌ات رو به طراح محصول بگو، با چند سوال کوتاه ساختار پروژه مشخص می‌شه و یک کانفیگ آماده می‌گیری.",
+    cta: "گفتگو با طراح محصول",
+  },
+  orders: {
+    mode: "sales",
+    icon: IconCoin,
+    title: "هنوز سفارشی ثبت نکردی",
+    body: "اگه می‌خوای تیم توسعه پروژه‌ات رو بسازه، با مشاور فروش صحبت کن تا برآورد قیمت و زمان بگیری.",
+    cta: "گفتگو با مشاور فروش",
+  },
+};
 
 function hasPrice(order: Order) {
   const label = (order.price_label || "").trim();
@@ -177,7 +200,7 @@ export default function PanelPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [chatSessions, setChatSessions] = useState<ChatSessionListItem[]>([]);
   const [profile, setProfile] = useState<CustomerProfile | null>(null);
-  const [activeTab, setActiveTab] = useState<TabKey>("orders");
+  const [activeTab, setActiveTab] = useState<TabKey>("design");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [businessType, setBusinessType] = useState("");
@@ -192,6 +215,9 @@ export default function PanelPage() {
     Promise.all([fetchMyOrders(token), fetchCustomerProfile(token)])
       .then(([ordersData, profileData]) => {
         setOrders(ordersData);
+        const requested = new URLSearchParams(window.location.search).get("tab");
+        if (isTabKey(requested)) setActiveTab(requested);
+        else if (!ordersData.some((o) => o.mode === "designer") && ordersData.length > 0) setActiveTab("orders");
         setChatSessions(readChatSessions(profileData.id));
         setProfile(profileData);
         setFirstName(profileData.first_name || "");
@@ -247,13 +273,28 @@ export default function PanelPage() {
 
   if (loading) return <ShellLoading />;
 
-  const greeting = profile?.first_name ? `سلام ${profile.first_name}` : "سلام";
+  const designOrders = orders.filter((o) => o.mode === "designer");
+  const salesOrders = orders.filter((o) => o.mode !== "designer");
+  const listed = activeTab === "design" ? designOrders : activeTab === "orders" ? salesOrders : [];
+
+  function selectTab(tab: TabKey) {
+    setActiveTab(tab);
+    window.history.replaceState(null, "", tab === "design" ? "/panel" : `/panel?tab=${tab}`);
+  }
+
+  function startChat(mode: "designer" | "sales") {
+    localStorage.setItem("chat_mode", mode);
+    router.push("/chat?new=1");
+  }
+
   const SECTION_COPY: Record<TabKey, { title: string; description: string }> = {
+    design: {
+      title: "پروژه‌های طراحی محصول",
+      description: "کانفیگ‌هایی که با طراح محصول ساختی؛ دانلودشون کن یا فضای پروژه رو باز کن.",
+    },
     orders: {
-      title: greeting,
-      description: orders.length > 0
-        ? "پروژه‌هات اینجاست. کانفیگ هر پروژه رو بگیر یا وضعیتش رو دنبال کن."
-        : "هنوز پروژه‌ای نداری. یه گفتگو با طراح محصول شروع کن تا پروژه‌ات ساخته بشه.",
+      title: "سفارش‌های فروش",
+      description: "درخواست‌هایی که برای ساخت توسط تیم توسعه ثبت کردی؛ وضعیت، قیمت و پرداخت‌ها.",
     },
     chats: { title: "گفتگوهای ناتمام", description: "گفتگوهایی که هنوز به پروژه تبدیل نشده‌اند را ادامه بده." },
     account: { title: "تنظیمات حساب", description: "این اطلاعات برای شخصی‌سازی گفتگو استفاده می‌شه." },
@@ -270,13 +311,14 @@ export default function PanelPage() {
 
   return (
     <AppShell
-      nav={TABS.map(({ key, label, icon }) => ({
+      nav={TABS.map(({ key, group, label, icon }) => ({
         key,
+        group,
         label,
         icon,
         active: activeTab === key,
-        onSelect: () => setActiveTab(key),
-        count: key === "orders" ? orders.length : key === "chats" ? chatSessions.length : undefined,
+        onSelect: () => selectTab(key),
+        count: key === "design" ? designOrders.length : key === "orders" ? salesOrders.length : key === "chats" ? chatSessions.length : undefined,
       }))}
       primaryAction={newProjectLink}
       user={{ name: [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || "کاربر", detail: profile?.phone }}
@@ -290,28 +332,26 @@ export default function PanelPage() {
         </p>
       )}
 
-      {activeTab === "orders" && orders.length === 0 && (
-        <div className="flex flex-col items-center rounded-xl border border-dashed border-input px-6 py-16 text-center">
-          <span className="mb-4 grid h-12 w-12 place-items-center rounded-xl bg-brand-soft text-brand">
-            <IconWand size={24} stroke={1.8} aria-hidden="true" />
-          </span>
-          <h2 className="mb-1 text-base font-bold text-foreground">اولین پروژه‌ات رو بساز</h2>
-          <p className="mb-6 max-w-sm text-sm leading-7 text-muted-foreground">
-            ایده‌ات رو به طراح محصول بگو، با چند سوال کوتاه ساختار پروژه مشخص می‌شه و یک کانفیگ آماده می‌گیری.
-          </p>
-          <Link
-            href="/chat?new=1"
-            className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-bold text-primary-foreground outline-none transition-colors hover:bg-primary-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-          >
-            <IconPlus size={16} stroke={2.2} aria-hidden="true" />
-            شروع گفتگو
-          </Link>
-        </div>
-      )}
+      {(activeTab === "design" || activeTab === "orders") && listed.length === 0 && (() => {
+        const empty = EMPTY_STATE[activeTab];
+        return (
+          <div className="flex flex-col items-center rounded-xl border border-dashed border-input px-6 py-16 text-center">
+            <span className="mb-4 grid h-12 w-12 place-items-center rounded-xl bg-brand-soft text-brand">
+              <empty.icon size={24} stroke={1.8} aria-hidden="true" />
+            </span>
+            <h2 className="mb-1 text-base font-bold text-foreground">{empty.title}</h2>
+            <p className="mb-6 max-w-sm text-sm leading-7 text-muted-foreground">{empty.body}</p>
+            <Button onClick={() => startChat(empty.mode)} className="min-h-11">
+              <IconPlus size={16} stroke={2.2} aria-hidden="true" />
+              {empty.cta}
+            </Button>
+          </div>
+        );
+      })()}
 
-      {activeTab === "orders" && orders.length > 0 && (
+      {(activeTab === "design" || activeTab === "orders") && listed.length > 0 && (
         <div className="space-y-3">
-          {orders.map((order) => (
+          {listed.map((order) => (
             <ProjectCard key={order.id} order={order} />
           ))}
         </div>
