@@ -8,6 +8,7 @@ import { fetchCustomerProfile, fetchMyOrders, updateCustomerProfile, CustomerPro
 import AppShell, { NewProjectLink, ShellLoading, useAccountNav } from "@/components/AppShell";
 import McpTour, { isMcpTourDone } from "@/components/McpTour";
 import HostingSites from "@/components/HostingSites";
+import SalesOrders, { toman } from "@/components/SalesOrders";
 import GuidedTour, { startTour } from "@/components/GuidedTour";
 import { Button } from "@/components/ui/button";
 
@@ -42,11 +43,6 @@ function formatDate(iso: string) {
     month: "long",
     day: "numeric",
   });
-}
-
-function formatMoney(value: number | null) {
-  if (!value) return null;
-  return `${value.toLocaleString("fa-IR")} تومان`;
 }
 
 interface ChatSessionListItem {
@@ -149,7 +145,7 @@ function ProjectCard({ order }: { order: Order }) {
             {!isDesigner && hasPrice(order) && (
               <div>
                 <dt className="sr-only">مبلغ</dt>
-                <dd className="font-bold text-foreground">{formatMoney(order.final_price) || order.price_label}</dd>
+                <dd className="font-bold text-foreground">{toman(order.final_price) || order.price_label}</dd>
               </div>
             )}
           </dl>
@@ -367,7 +363,9 @@ export default function PanelPage() {
         </div>
       )}
 
-      {(activeTab === "design" || activeTab === "orders") && listed.length > 0 && (
+      {activeTab === "orders" && salesOrders.length > 0 && <SalesOrders orders={salesOrders} />}
+
+      {activeTab === "design" && listed.length > 0 && (
         <div className="space-y-3">
           {listed.map((order) => (
             <ProjectCard key={order.id} order={order} />
