@@ -30,6 +30,7 @@ STAGE="$STATE/staging/$RUN"
 BACKUP="$STATE/backups/$RUN"
 PHASE=prepare
 SWITCHED=0
+IMAGES_SAVED=0
 TAG="rollback-$RUN"
 
 say() { printf '\n[deploy] %s\n' "$*"; }
@@ -59,12 +60,14 @@ failed() {
   trap - ERR HUP INT TERM
   set +e
   say "FAILED in phase: $PHASE (exit $status). Log: $LOG"
+  if (( IMAGES_SAVED )); then
+    docker image tag "$PROJECT-backend:$TAG" "$PROJECT-backend:latest"
+    docker image tag "$PROJECT-frontend:$TAG" "$PROJECT-frontend:latest"
+  fi
   if (( SWITCHED )); then
     say 'Restoring previous code and images. Database backup is retained; live data is not overwritten.'
     compose logs --tail=50 backend frontend
     sync_code "$BACKUP/code"
-    docker image tag "$PROJECT-backend:$TAG" "$PROJECT-backend:latest"
-    docker image tag "$PROJECT-frontend:$TAG" "$PROJECT-frontend:latest"
     if compose up -d --no-build backend frontend preview-gateway && proxy_reload && health; then
       say 'Rollback succeeded; the previous version is running.'
     else
@@ -88,6 +91,11 @@ mkdir -p "$STAGE" "$BACKUP/code"
 git archive "$revision" | tar -x -C "$STAGE"
 test -f "$STAGE/scripts/deploy-server.sh"
 candidate config -q
+for service in backend frontend; do
+  image=$(docker inspect --format '{{.Image}}' "$(compose ps -q "$service")")
+  docker image tag "$image" "$PROJECT-$service:$TAG"
+done
+IMAGES_SAVED=1
 
 PHASE=build
 say 'Building frontend (pnpm build, TypeScript and lint) and backend.'
@@ -109,10 +117,6 @@ say 'Backing up database, code, configuration and running images.'
 compose exec -T db pg_dump -U postgres -Fc freelance_intake > "$BACKUP/database.dump"
 compose exec -T db pg_restore -l < "$BACKUP/database.dump" > /dev/null
 rsync -a --exclude='.git' --exclude='node_modules' --exclude='.next' "$APP/" "$BACKUP/code/"
-for service in backend frontend; do
-  image=$(docker inspect --format '{{.Image}}' "$(compose ps -q "$service")")
-  docker image tag "$image" "$PROJECT-$service:$TAG"
-done
 
 PHASE=activate
 SWITCHED=1
