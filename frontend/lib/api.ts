@@ -317,8 +317,10 @@ export async function sendChat(
   sourceType?: "github" | "zip",
   sourceFile?: OrderFile,
   progressId?: string,
+  signal?: AbortSignal,
 ): Promise<string> {
   const res = await fetch(`${API_URL}/api/chat`, {
+    signal,
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ messages, attachments, mode, bot_token: botToken || null, finalize, project_path: projectPath || null, source_url: sourceUrl, source_type: sourceType || null, source_file: sourceFile || null, progress_id: progressId || null }),

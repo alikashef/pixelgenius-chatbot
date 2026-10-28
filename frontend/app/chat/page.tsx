@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, FormEvent, KeyboardEvent, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { IconArrowUp, IconBrandGithub, IconChevronLeft, IconCode, IconCloudUpload, IconLayout, IconCheck, IconCoin, IconCopy, IconDownload, IconFileText, IconHelp, IconFileZip, IconMenu2, IconMessageCircle, IconPaperclip, IconPlus, IconRefresh, IconUser, IconWand, IconX } from "@tabler/icons-react";
+import { IconArrowUp, IconPlayerStopFilled, IconBrandGithub, IconChevronLeft, IconCode, IconCloudUpload, IconLayout, IconCheck, IconCoin, IconCopy, IconDownload, IconFileText, IconHelp, IconFileZip, IconMenu2, IconMessageCircle, IconPaperclip, IconPlus, IconRefresh, IconUser, IconWand, IconX } from "@tabler/icons-react";
 import { BrandLogo, BrandMark } from "@/components/Brand";
 import { accentStyle, robotColors } from "@/lib/widget";
 import { Button } from "@/components/ui/button";
@@ -468,6 +468,9 @@ function ChatPageInner() {
   const fileRef = useRef<HTMLInputElement>(null);
   const sourceFileRef = useRef<HTMLInputElement>(null);
   const lastAttemptRef = useRef<{ messages: Message[]; attachments: OrderFile[]; finalize: boolean } | null>(null);
+  // The in-flight assistant request; set while the answer can still be stopped.
+  const replyAbortRef = useRef<AbortController | null>(null);
+  const [stoppable, setStoppable] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -729,6 +732,15 @@ function ChatPageInner() {
     return () => { stopped = true; clearTimeout(timer); controller.abort(); };
   }, [progressId, loading]);
 
+  useEffect(() => {
+    if (!loading || !stoppable) return;
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Escape") replyAbortRef.current?.abort();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [loading, stoppable]);
+
   async function runReply(newMessages: Message[], currentAttachments: OrderFile[], finalize = false) {
     lastAttemptRef.current = { messages: newMessages, attachments: currentAttachments, finalize };
     const requestProgressId = crypto.randomUUID();
@@ -736,6 +748,9 @@ function ChatPageInner() {
     setProgressStage("thinking");
     setLoading(true);
     setError("");
+    const abort = new AbortController();
+    replyAbortRef.current = abort;
+    setStoppable(true);
 
     try {
       let currentDbSession = dbSessionId;
@@ -744,7 +759,10 @@ function ChatPageInner() {
       }
 
       const apiMessages = newMessages.slice(1);
-      const reply = await sendChat(apiMessages, currentAttachments, activeMode, botToken, finalize, activeMode === "designer" ? projectPath : undefined, activeMode === "designer" && projectPath === "source" && sourceType === "github" ? sourceUrl : "", activeMode === "designer" && projectPath === "source" ? sourceType : undefined, activeMode === "designer" && projectPath === "source" && sourceType === "zip" ? sourceArchive : undefined, requestProgressId);
+      const reply = await sendChat(apiMessages, currentAttachments, activeMode, botToken, finalize, activeMode === "designer" ? projectPath : undefined, activeMode === "designer" && projectPath === "source" && sourceType === "github" ? sourceUrl : "", activeMode === "designer" && projectPath === "source" ? sourceType : undefined, activeMode === "designer" && projectPath === "source" && sourceType === "zip" ? sourceArchive : undefined, requestProgressId, abort.signal);
+      // Past this point the answer is being applied (and maybe an order created), so it can no longer be stopped.
+      replyAbortRef.current = null;
+      setStoppable(false);
       const lead = parseLeadAnalysis(reply);
       const allMessages = lead
         ? [...newMessages, { role: "assistant" as const, content: lead.client_message || "" }]
@@ -785,12 +803,28 @@ function ChatPageInner() {
 
       setMessages([...newMessages, { role: "assistant", content: reply }]);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "خطای ناشناخته");
+      if (abort.signal.aborted) {
+        // Stopped by the user: take the unanswered message back into the composer so it can be edited.
+        const last = newMessages[newMessages.length - 1];
+        if (last?.role === "user") {
+          setMessages(newMessages.slice(0, -1));
+          setInput(last.content);
+          setAttachments(last.attachments || []);
+        }
+      } else {
+        setError(err instanceof Error ? err.message : "خطای ناشناخته");
+      }
     } finally {
+      replyAbortRef.current = null;
+      setStoppable(false);
       setLoading(false);
       setProgressId(null);
       inputRef.current?.focus();
     }
+  }
+
+  function stopReply() {
+    replyAbortRef.current?.abort();
   }
 
   async function handlePhoneSubmit(phone: string) {
@@ -1036,14 +1070,26 @@ function ChatPageInner() {
                 autoComplete={phoneStep ? "tel" : "off"}
                 className="max-h-32 min-h-10 min-w-0 flex-1 resize-none bg-transparent px-1 py-2 text-[16px] leading-6 text-foreground placeholder:text-muted-foreground outline-none disabled:opacity-50 sm:text-[15px]"
               />
-              <button
-                type="submit"
-                disabled={isLoading || !canSubmit}
-                aria-label="ارسال پیام"
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground outline-none transition-colors hover:bg-primary-hover focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-foreground/10 disabled:text-muted-foreground"
-              >
-                <IconArrowUp size={18} stroke={2.5} />
-              </button>
+              {loading && stoppable ? (
+                <button
+                  type="button"
+                  onClick={stopReply}
+                  aria-label="توقف پاسخ"
+                  title="توقف (Esc)"
+                  className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-foreground text-background outline-none transition-colors hover:bg-foreground/85 focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <IconPlayerStopFilled size={16} aria-hidden="true" />
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={isLoading || !canSubmit}
+                  aria-label="ارسال پیام"
+                  className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground outline-none transition-colors hover:bg-primary-hover focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-foreground/10 disabled:text-muted-foreground"
+                >
+                  <IconArrowUp size={18} stroke={2.5} />
+                </button>
+              )}
             </div>
       </div>
       {!showSidebar && (
