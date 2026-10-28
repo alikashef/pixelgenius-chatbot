@@ -494,6 +494,11 @@ export default function PreviewReview({
                           </Button>
                         </div>
                       )}
+                      {(c.status === "open" || c.status === "in_progress") && (
+                        <button type="button" disabled={busy} onClick={() => onStatus(c.id, "approved")} title="اگر ایجنت اصلاح را تمام نکرده یا نیازی به اصلاح نیست، خودت تأییدش کن" className="mt-1.5 block rounded text-[11px] font-bold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+                          تأیید دستی
+                        </button>
+                      )}
                       {c.status === "approved" && (
                         <button type="button" disabled={busy} onClick={() => onStatus(c.id, "open")} className="mt-1.5 block rounded text-[11px] font-bold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
                           بازگشایی
