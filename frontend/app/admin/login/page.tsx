@@ -4,6 +4,7 @@ import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { IconLock, IconLogin2, IconShieldLock } from "@tabler/icons-react";
 import { adminLogin } from "@/lib/api";
+import ThemeToggle from "@/components/ThemeToggle";
 
 export default function AdminLoginPage() {
   const [username, setUsername] = useState("");
@@ -28,47 +29,47 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[hsl(var(--background))] p-4">
-      <div className="pointer-events-none absolute inset-0 bg-grid opacity-70" />
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-[radial-gradient(ellipse_60%_50%_at_50%_0%,rgba(124,58,237,0.22),transparent)]" />
+    <div className="relative flex min-h-[100dvh] flex-col items-center justify-center overflow-hidden bg-background bg-aura px-4 py-10">
+      <div className="pointer-events-none absolute inset-0 bg-grid [mask-image:radial-gradient(ellipse_at_top,black,transparent_70%)]" />
+      <ThemeToggle className="absolute left-4 top-4 z-10" />
 
-      <div className="relative w-full max-w-sm overflow-hidden rounded-3xl border border-[hsl(var(--border))] bg-[--surface] p-7 shadow-2xl shadow-black/40">
+      <div className="relative w-full max-w-sm overflow-hidden rounded-3xl border border-border bg-surface p-7 shadow-elevated">
         <div className="mb-7 text-center">
-          <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl border border-[--violet-border] bg-[--violet-glow] text-violet-300 shadow-lg shadow-[--violet-glow]">
+          <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl border border-primary-line bg-primary-soft text-brand shadow-md shadow-primary/25">
             <IconShieldLock size={24} />
           </div>
-          <h1 className="text-xl font-black text-[hsl(var(--foreground))]">ورود به پنل ادمین</h1>
-          <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">دسترسی امن برای مدیریت سفارش‌ها و تنظیمات AI</p>
+          <h1 className="text-xl font-black text-foreground">ورود به پنل ادمین</h1>
+          <p className="mt-2 text-sm text-muted-foreground">دسترسی امن برای مدیریت سفارش‌ها و تنظیمات AI</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="mb-2 block text-xs font-semibold text-[hsl(var(--muted-foreground))]">نام کاربری</label>
+            <label className="field-label">نام کاربری</label>
             <input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
-              className="w-full rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-4 py-3 text-sm text-[hsl(var(--foreground))] outline-none transition-colors focus:border-[--violet-border]"
+              className="field px-4 py-3"
             />
           </div>
           <div>
-            <label className="mb-2 block text-xs font-semibold text-[hsl(var(--muted-foreground))]">رمز عبور</label>
+            <label className="field-label">رمز عبور</label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-4 py-3 text-sm text-[hsl(var(--foreground))] outline-none transition-colors focus:border-[--violet-border]"
+              className="field px-4 py-3"
             />
           </div>
 
-          {error && <p className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-center text-sm text-red-400">{error}</p>}
+          {error && <p className="rounded-xl border border-danger/20 bg-danger/10 px-3 py-2 text-center text-sm text-danger">{error}</p>}
 
           <button
             type="submit"
             disabled={loading}
-            className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-[--violet] py-3 text-sm font-bold text-white shadow-lg shadow-[--violet-glow] transition-all hover:bg-violet-700 disabled:opacity-60"
+            className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground shadow-md shadow-primary/25 transition-all hover:bg-primary-hover disabled:opacity-60"
           >
             {loading ? <IconLock size={18} /> : <IconLogin2 size={18} />}
             {loading ? "در حال ورود..." : "ورود"}

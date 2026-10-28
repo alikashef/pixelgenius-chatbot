@@ -4,6 +4,7 @@ import { useState, useEffect, FormEvent, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { IconArrowRight, IconDeviceMobile, IconRefresh, IconShieldCheck } from "@tabler/icons-react";
 import { fetchChatHandoff, sendOtp, verifyOtp, submitOrder, Proposal, Message, OrderFile } from "@/lib/api";
+import ThemeToggle from "@/components/ThemeToggle";
 
 function LoginContent() {
   const router = useRouter();
@@ -173,23 +174,23 @@ function LoginContent() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[hsl(var(--background))] p-4">
-      <div className="pointer-events-none absolute inset-0 bg-grid opacity-70" />
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-[radial-gradient(ellipse_60%_50%_at_50%_0%,rgba(124,58,237,0.22),transparent)]" />
+    <div className="relative flex min-h-[100dvh] flex-col items-center justify-center overflow-hidden bg-background bg-aura px-4 py-10">
+      <div className="pointer-events-none absolute inset-0 bg-grid [mask-image:radial-gradient(ellipse_at_top,black,transparent_70%)]" />
+      <ThemeToggle className="absolute left-4 top-4 z-10" />
 
-      <div className="relative w-full max-w-sm overflow-hidden rounded-3xl border border-[hsl(var(--border))] bg-[--surface] p-7 shadow-2xl shadow-black/40">
+      <div className="relative w-full max-w-sm overflow-hidden rounded-3xl border border-border bg-surface p-7 shadow-elevated">
         <div className="mb-7 text-center">
-          <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl border border-[--violet-border] bg-[--violet-glow] text-violet-300 shadow-lg shadow-[--violet-glow]">
+          <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl border border-primary-line bg-primary-soft text-brand shadow-md shadow-primary/25">
             {step === "phone" ? <IconDeviceMobile size={24} /> : <IconShieldCheck size={24} />}
           </div>
-          <h1 className="text-xl font-black text-[hsl(var(--foreground))]">
+          <h1 className="text-xl font-black text-foreground">
             {step === "phone" ? "ورود و ثبت نام" : "تایید شماره موبایل"}
           </h1>
-          <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
             {step === "phone" ? (
               "لطفاً برای ورود به پنل کاربری خود شماره تلفن همراه خود را وارد کنید و منتظر کد تایید باشید."
             ) : (
-              <>کد ۵ رقمی به <span className="font-semibold text-violet-300">{phone}</span> ارسال شد</>
+              <>کد ۵ رقمی به <span className="font-semibold text-brand">{phone}</span> ارسال شد</>
             )}
           </p>
         </div>
@@ -197,7 +198,7 @@ function LoginContent() {
         {step === "phone" ? (
           <form onSubmit={handleSend} className="space-y-4">
             <div>
-              <label className="mb-2 block text-xs font-semibold text-[hsl(var(--muted-foreground))]">شماره تلفن همراه</label>
+              <label className="field-label">شماره تلفن همراه</label>
               <input
                 type="tel"
                 value={phone}
@@ -205,14 +206,14 @@ function LoginContent() {
                 placeholder="09xxxxxxxxx"
                 required
                 dir="ltr"
-                className="w-full rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-4 py-3 text-center text-sm text-[hsl(var(--foreground))] outline-none transition-colors placeholder:text-[hsl(var(--muted-foreground))] focus:border-[--violet-border]"
+                className="field px-4 py-3 text-center"
               />
             </div>
-            {error && <p className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-center text-sm text-red-400">{error}</p>}
+            {error && <p className="rounded-xl border border-danger/20 bg-danger/10 px-3 py-2 text-center text-sm text-danger">{error}</p>}
             <button
               type="submit"
               disabled={loading}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[--violet] py-3 text-sm font-bold text-white shadow-lg shadow-[--violet-glow] transition-all hover:bg-violet-700 disabled:opacity-60"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground shadow-md shadow-primary/25 transition-all hover:bg-primary-hover disabled:opacity-60"
             >
               <IconArrowRight size={18} />
               {loading ? "در حال ارسال..." : "دریافت کد ورود"}
@@ -221,7 +222,7 @@ function LoginContent() {
         ) : (
           <form onSubmit={handleVerify} className="space-y-4">
             <div>
-              <label className="mb-2 block text-xs font-semibold text-[hsl(var(--muted-foreground))]">کد تایید</label>
+              <label className="field-label">کد تایید</label>
               <input
                 type="text"
                 inputMode="numeric"
@@ -230,14 +231,14 @@ function LoginContent() {
                 placeholder="• • • • •"
                 required
                 dir="ltr"
-                className="w-full rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-4 py-3 text-center text-2xl text-[hsl(var(--foreground))] tracking-[0.5em] outline-none transition-colors placeholder:text-[hsl(var(--muted-foreground))] focus:border-[--violet-border]"
+                className="field px-4 py-3 text-center text-2xl tracking-[0.5em]"
               />
             </div>
-            {error && <p className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-center text-sm text-red-400">{error}</p>}
+            {error && <p className="rounded-xl border border-danger/20 bg-danger/10 px-3 py-2 text-center text-sm text-danger">{error}</p>}
             <button
               type="submit"
               disabled={loading || code.length !== 5}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[--violet] py-3 text-sm font-bold text-white shadow-lg shadow-[--violet-glow] transition-all hover:bg-violet-700 disabled:opacity-60"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground shadow-md shadow-primary/25 transition-all hover:bg-primary-hover disabled:opacity-60"
             >
               <IconShieldCheck size={18} />
               {loading ? "در حال تایید..." : "ورود و مشاهده درخواست"}
@@ -246,7 +247,7 @@ function LoginContent() {
               type="button"
               disabled={countdown > 0}
               onClick={() => { setStep("phone"); setCode(""); setError(""); }}
-              className="flex w-full items-center justify-center gap-2 py-1 text-sm text-[hsl(var(--muted-foreground))] transition-colors hover:text-white disabled:opacity-40"
+              className="flex w-full items-center justify-center gap-2 py-1 text-sm text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40"
             >
               <IconRefresh size={17} />
               {countdown > 0 ? `ارسال مجدد تا ${countdown} ثانیه` : "ارسال مجدد کد"}
@@ -260,7 +261,7 @@ function LoginContent() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[hsl(var(--background))]" />}>
+    <Suspense fallback={<div className="min-h-screen bg-background" />}>
       <LoginContent />
     </Suspense>
   );

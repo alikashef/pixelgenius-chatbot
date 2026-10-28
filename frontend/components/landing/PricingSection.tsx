@@ -61,11 +61,11 @@ export default function PricingSection() {
   return (
     <section id="pricing" className="mx-auto max-w-7xl px-4 py-24">
       <div className="mb-14 text-center">
-        <p className="mb-3 text-sm font-semibold text-violet-400">قیمت‌گذاری</p>
-        <h2 className="text-3xl font-black text-white md:text-4xl">
+        <p className="mb-3 text-sm font-semibold text-brand">قیمت‌گذاری</p>
+        <h2 className="text-3xl font-black text-foreground md:text-4xl">
           ساده، شفاف، بدون هزینه پنهان
         </h2>
-        <p className="mx-auto mt-4 max-w-xl text-[hsl(var(--muted-foreground))]">
+        <p className="mx-auto mt-4 max-w-xl text-muted-foreground">
           با پلن رایگان شروع کن. هر وقت آماده بودی ارتقا بده.
         </p>
       </div>
@@ -76,8 +76,8 @@ export default function PricingSection() {
             key={plan.name}
             className={`relative flex flex-col p-7 transition-all duration-200 ${
               plan.highlight
-                ? "border-[--violet-border] bg-[--violet-glow] shadow-2xl shadow-[--violet-glow]"
-                : "hover:border-[--violet-border]"
+                ? "border-primary-line bg-primary-soft shadow-2xl shadow-primary/25"
+                : "hover:border-primary-line"
             }`}
           >
             {plan.badge && (
@@ -87,12 +87,12 @@ export default function PricingSection() {
             )}
 
             <div className="mb-6">
-              <p className="text-sm font-bold text-[hsl(var(--muted-foreground))]">{plan.name}</p>
+              <p className="text-sm font-bold text-muted-foreground">{plan.name}</p>
               <div className="mt-2 flex items-baseline gap-1">
-                <span className="text-4xl font-black text-white">{plan.price}</span>
-                <span className="text-sm text-[hsl(var(--muted-foreground))]">{plan.period}</span>
+                <span className="text-4xl font-black text-foreground">{plan.price}</span>
+                <span className="text-sm text-muted-foreground">{plan.period}</span>
               </div>
-              <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">{plan.description}</p>
+              <p className="mt-2 text-sm text-muted-foreground">{plan.description}</p>
             </div>
 
             <ul className="mb-8 flex-1 space-y-3">
@@ -100,10 +100,10 @@ export default function PricingSection() {
                 <li key={feature} className="flex items-start gap-2.5 text-sm">
                   <IconCheck
                     size={16}
-                    className="mt-0.5 shrink-0 text-violet-400"
+                    className="mt-0.5 shrink-0 text-brand"
                     stroke={2.5}
                   />
-                  <span className="text-[hsl(var(--muted-foreground))]">{feature}</span>
+                  <span className="text-muted-foreground">{feature}</span>
                 </li>
               ))}
             </ul>

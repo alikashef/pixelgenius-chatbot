@@ -150,21 +150,21 @@ export default function SkillsManager({ getToken: getTokenProp, settings, onSett
 
   return (
     <div className="space-y-5">
-      <section className="bg-[--surface] border border-[hsl(var(--border))] rounded-2xl p-5 space-y-4">
+      <section className="bg-surface border border-border rounded-2xl p-5 space-y-4">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="font-semibold text-[hsl(var(--foreground))]">مهارت‌ها و دانش چت طراحی محصول</h2>
-            <p className="text-[hsl(var(--muted-foreground))] text-xs mt-1 leading-6">
+            <h2 className="font-semibold text-foreground">مهارت‌ها و دانش چت طراحی محصول</h2>
+            <p className="text-muted-foreground text-xs mt-1 leading-6">
               فایل یا متن تخصصی هر بخش (هوش مصنوعی/RAG، فرانت، بک‌اند، دیتابیس، معماری…) را اضافه کنید. در هر گفتگو، مرتبط‌ترین
               بخش‌های هر دسته با جستجوی کلیدواژه و وکتور انتخاب و به پرامپت طراح اضافه می‌شود.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <label className="flex items-center gap-2 text-xs text-[hsl(var(--foreground))] cursor-pointer">
+            <label className="flex items-center gap-2 text-xs text-foreground cursor-pointer">
               <Switch checked={skillsEnabled} onChange={() => saveGlobal({ skills_enabled: !skillsEnabled })} />
               استفاده در چت
             </label>
-            <label className="flex items-center gap-2 text-xs text-[hsl(var(--muted-foreground))]">
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
               قطعه در هر دسته
               <select
                 value={topK}
@@ -176,7 +176,7 @@ export default function SkillsManager({ getToken: getTokenProp, settings, onSett
                 ))}
               </select>
             </label>
-            <label className="flex items-center gap-2 text-xs text-[hsl(var(--muted-foreground))]">
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
               مهارت در JSON هر دسته
               <select
                 value={briefTopK}
@@ -192,7 +192,7 @@ export default function SkillsManager({ getToken: getTokenProp, settings, onSett
               onClick={async () => {
                 if (await run(() => reindexSkills(getToken()), "ایندکس وکتور از نو ساخته می‌شود.")) await run(load);
               }}
-              className="border border-[hsl(var(--border))] hover:border-[--violet-border] rounded-xl px-4 py-2 text-xs text-[hsl(var(--foreground))] transition-colors"
+              className="border border-border hover:border-primary-line rounded-xl px-4 py-2 text-xs text-foreground transition-colors"
             >
               ساخت مجدد ایندکس
             </button>
@@ -208,12 +208,12 @@ export default function SkillsManager({ getToken: getTokenProp, settings, onSett
             className={cn(
               "rounded-2xl border p-3 text-right transition-all hover:-translate-y-1",
               active === c.key
-                ? "border-[--violet] bg-[--violet-glow] shadow-[--violet-glow]"
-                : "border-[hsl(var(--border))] bg-[--surface] hover:border-[--violet-border]",
+                ? "border-primary bg-primary-soft shadow-primary/25"
+                : "border-border bg-surface hover:border-primary-line",
             )}
           >
-            <span className="block text-xs font-semibold text-[hsl(var(--foreground))] leading-5">{c.label}</span>
-            <span className="block text-[11px] text-[hsl(var(--muted-foreground))] mt-1">
+            <span className="block text-xs font-semibold text-foreground leading-5">{c.label}</span>
+            <span className="block text-[11px] text-muted-foreground mt-1">
               {c.enabled_count.toLocaleString("fa-IR")} فعال از {c.count.toLocaleString("fa-IR")}
             </span>
           </button>
@@ -225,26 +225,26 @@ export default function SkillsManager({ getToken: getTokenProp, settings, onSett
           className={cn(
             "rounded-xl border px-4 py-3 text-sm",
             message.type === "ok"
-              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
-              : "border-red-500/30 bg-red-500/10 text-red-400",
+              ? "border-success/30 bg-success/10 text-success"
+              : "border-danger/30 bg-danger/10 text-danger",
           )}
         >
           {message.text}
         </p>
       )}
 
-      <section className="bg-[--surface] border border-[hsl(var(--border))] rounded-2xl p-5 space-y-4">
+      <section className="bg-surface border border-border rounded-2xl p-5 space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h3 className="font-semibold text-[hsl(var(--foreground))]">افزودن به «{activeCategory?.label}»</h3>
-            <p className="text-[hsl(var(--muted-foreground))] text-xs mt-1">{activeCategory?.hint}</p>
+            <h3 className="font-semibold text-foreground">افزودن به «{activeCategory?.label}»</h3>
+            <p className="text-muted-foreground text-xs mt-1">{activeCategory?.hint}</p>
           </div>
-          <div className="flex rounded-xl border border-[hsl(var(--border))] overflow-hidden text-xs">
+          <div className="flex rounded-xl border border-border overflow-hidden text-xs">
             {(["file", "text"] as const).map((m) => (
               <button
                 key={m}
                 onClick={() => setMode(m)}
-                className={cn("px-4 py-2 transition-colors", mode === m ? "bg-[--violet] text-white" : "text-[hsl(var(--muted-foreground))]")}
+                className={cn("px-4 py-2 transition-colors", mode === m ? "bg-primary text-primary-foreground" : "text-muted-foreground")}
               >
                 {m === "file" ? "آپلود فایل" : "نوشتن متن"}
               </button>
@@ -270,11 +270,11 @@ export default function SkillsManager({ getToken: getTokenProp, settings, onSett
             onClick={() => fileInput.current?.click()}
             className={cn(
               "cursor-pointer rounded-2xl border-2 border-dashed px-6 py-10 text-center transition-colors",
-              dragging ? "border-[--violet] bg-[--violet-glow]" : "border-[hsl(var(--border))] hover:border-[--violet-border]",
+              dragging ? "border-primary bg-primary-soft" : "border-border hover:border-primary-line",
             )}
           >
-            <p className="text-sm text-[hsl(var(--foreground))]">{busy ? "در حال آپلود..." : "فایل را اینجا رها کنید یا کلیک کنید"}</p>
-            <p className="text-xs text-[hsl(var(--muted-foreground))] mt-2">MD، TXT، JSON، CSV و PDF — حداکثر ۵ مگابایت</p>
+            <p className="text-sm text-foreground">{busy ? "در حال آپلود..." : "فایل را اینجا رها کنید یا کلیک کنید"}</p>
+            <p className="text-xs text-muted-foreground mt-2">MD، TXT، JSON، CSV و PDF — حداکثر ۵ مگابایت</p>
             <input ref={fileInput} type="file" accept={ACCEPT} multiple hidden onChange={(e) => e.target.files && handleFiles(e.target.files)} />
           </div>
         ) : (
@@ -288,7 +288,7 @@ export default function SkillsManager({ getToken: getTokenProp, settings, onSett
             <button
               onClick={handleAddText}
               disabled={busy || !title.trim() || content.trim().length < 20}
-              className="bg-[--violet] hover:bg-violet-700 disabled:opacity-50 text-white font-bold rounded-xl px-5 py-3 text-sm transition-colors"
+              className="bg-primary hover:bg-primary-hover disabled:opacity-50 text-primary-foreground font-bold rounded-xl px-5 py-3 text-sm transition-colors"
             >
               {busy ? "در حال ذخیره..." : "ذخیره مهارت"}
             </button>
@@ -297,9 +297,9 @@ export default function SkillsManager({ getToken: getTokenProp, settings, onSett
       </section>
 
       <section className="space-y-3">
-        {loading && <p className="text-center text-sm text-[hsl(var(--muted-foreground))]">در حال بارگذاری...</p>}
+        {loading && <p className="text-center text-sm text-muted-foreground">در حال بارگذاری...</p>}
         {!loading && skills.length === 0 && (
-          <p className="rounded-2xl border border-dashed border-[hsl(var(--border))] py-10 text-center text-sm text-[hsl(var(--muted-foreground))]">
+          <p className="rounded-2xl border border-dashed border-border py-10 text-center text-sm text-muted-foreground">
             هنوز مهارتی در این دسته نیست.
           </p>
         )}
@@ -309,7 +309,7 @@ export default function SkillsManager({ getToken: getTokenProp, settings, onSett
             <article
               key={skill.id}
               className={cn(
-                "bg-[--surface] border border-[hsl(var(--border))] rounded-2xl p-4 transition-opacity",
+                "bg-surface border border-border rounded-2xl p-4 transition-opacity",
                 !skill.enabled && "opacity-55",
               )}
             >
@@ -317,28 +317,28 @@ export default function SkillsManager({ getToken: getTokenProp, settings, onSett
                 <Switch checked={skill.enabled} onChange={() => toggle(skill)} />
                 <div className="flex-1 min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h4 className="font-semibold text-sm text-[hsl(var(--foreground))]">{skill.title}</h4>
+                    <h4 className="font-semibold text-sm text-foreground">{skill.title}</h4>
                     {skill.builtin && <Badge tone="violet">پیش‌فرض</Badge>}
                     {skill.source_name && <Badge tone="muted">{skill.source_name}</Badge>}
                     <Badge tone={vectorReady ? "green" : "yellow"}>
                       {vectorReady ? "وکتور آماده" : `وکتور ${skill.embedded_count}/${skill.chunk_count}`}
                     </Badge>
-                    <span className="text-[11px] text-[hsl(var(--muted-foreground))]">
+                    <span className="text-[11px] text-muted-foreground">
                       {skill.chunk_count.toLocaleString("fa-IR")} قطعه · {skill.size.toLocaleString("fa-IR")} کاراکتر
                     </span>
                   </div>
                   {skill.keywords.length > 0 && (
-                    <p className="mt-1 text-[11px] text-violet-300">{skill.keywords.join(" · ")}</p>
+                    <p className="mt-1 text-[11px] text-brand">{skill.keywords.join(" · ")}</p>
                   )}
-                  <p className="mt-2 text-xs leading-6 text-[hsl(var(--muted-foreground))] whitespace-pre-wrap">
+                  <p className="mt-2 text-xs leading-6 text-muted-foreground whitespace-pre-wrap">
                     {expanded[skill.id] ?? `${skill.preview}${skill.size > 200 ? "…" : ""}`}
                   </p>
                 </div>
                 <div className="flex shrink-0 flex-col gap-1 text-xs">
-                  <button onClick={() => toggleExpand(skill)} className="px-2 py-1 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]">
+                  <button onClick={() => toggleExpand(skill)} className="px-2 py-1 text-muted-foreground hover:text-foreground">
                     {expanded[skill.id] !== undefined ? "بستن" : "متن کامل"}
                   </button>
-                  <button onClick={() => remove(skill)} className="px-2 py-1 text-red-400 hover:text-red-300">حذف</button>
+                  <button onClick={() => remove(skill)} className="px-2 py-1 text-danger hover:text-danger">حذف</button>
                 </div>
               </div>
             </article>
@@ -356,7 +356,7 @@ export function Switch({ checked, onChange }: { checked: boolean; onChange: () =
       role="switch"
       aria-checked={checked}
       onClick={onChange}
-      className={cn("relative mt-0.5 h-5 w-9 shrink-0 rounded-full transition-colors", checked ? "bg-[--violet]" : "bg-[hsl(var(--border))]")}
+      className={cn("relative mt-0.5 h-5 w-9 shrink-0 rounded-full transition-colors", checked ? "bg-primary" : "bg-border")}
     >
       <span className={cn("absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all", checked ? "right-0.5" : "right-[18px]")} />
     </button>
@@ -365,10 +365,10 @@ export function Switch({ checked, onChange }: { checked: boolean; onChange: () =
 
 function Badge({ tone, children }: { tone: "violet" | "green" | "yellow" | "muted"; children: React.ReactNode }) {
   const tones = {
-    violet: "bg-[--violet-glow] text-violet-300 border-[--violet-border]",
-    green: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-    yellow: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
-    muted: "bg-transparent text-[hsl(var(--muted-foreground))] border-[hsl(var(--border))]",
+    violet: "bg-primary-soft text-brand border-primary-line",
+    green: "bg-success/10 text-success border-success/20",
+    yellow: "bg-warning/10 text-warning border-warning/20",
+    muted: "bg-transparent text-muted-foreground border-border",
   };
   return <span dir="auto" className={cn("rounded-full border px-2 py-0.5 text-[11px]", tones[tone])}>{children}</span>;
 }

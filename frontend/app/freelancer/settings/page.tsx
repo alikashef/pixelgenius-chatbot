@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { IconSparkles, IconArrowRight } from "@tabler/icons-react";
 import { fetchFreelancerSettings, freelancerOnboarding } from "@/lib/api";
+import ThemeToggle from "@/components/ThemeToggle";
 
 export default function FreelancerSettingsPage() {
   const router = useRouter();
@@ -66,77 +67,78 @@ export default function FreelancerSettingsPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[hsl(var(--background))]">
-        <span className="h-10 w-10 animate-spin rounded-full border-4 border-[--violet] border-t-transparent" />
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <span className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[hsl(var(--background))]">
-      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-[hsl(var(--border))] bg-[hsl(var(--background))]/90 px-6 py-4 backdrop-blur">
-        <button onClick={() => router.push("/freelancer/dashboard")} className="text-[hsl(var(--muted-foreground))] transition-colors hover:text-white">
-          <IconArrowRight size={18} />
+    <div className="min-h-screen bg-background bg-aura">
+      <header className="glass sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-border/70 px-4 sm:px-6">
+        <button onClick={() => router.push("/freelancer/dashboard")} aria-label="بازگشت به داشبورد" className="grid h-9 w-9 place-items-center rounded-xl text-muted-foreground outline-none transition-colors hover:bg-foreground/5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+          <IconArrowRight size={18} aria-hidden="true" />
         </button>
-        <span className="grid h-7 w-7 place-items-center rounded-lg bg-[--violet]">
-          <IconSparkles size={14} stroke={2} className="text-white" />
+        <span className="grid h-8 w-8 place-items-center rounded-xl bg-gradient-to-br from-primary to-primary-hover text-primary-foreground shadow-md shadow-primary/30">
+          <IconSparkles size={14} stroke={2} aria-hidden="true" />
         </span>
-        <h1 className="font-bold text-white">تنظیمات AI</h1>
+        <h1 className="font-bold text-foreground">تنظیمات AI</h1>
         {saved && (
-          <span className="mr-auto rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-400">
-            ذخیره شد ✓
+          <span className="mr-auto rounded-full border border-success/30 bg-success/10 px-3 py-1 text-xs font-semibold text-success">
+            ذخیره شد
           </span>
         )}
+        <ThemeToggle className={saved ? "" : "mr-auto"} />
       </header>
 
       <main className="mx-auto max-w-2xl px-4 py-8">
-        <p className="mb-6 text-sm text-[hsl(var(--muted-foreground))]">
+        <p className="mb-6 text-sm text-muted-foreground">
           این اطلاعات در system prompt دستیار هوشمند استفاده می‌شه تا مکالمه با مشتری شخصی‌سازی بشه.
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="rounded-2xl border border-[hsl(var(--border))] bg-[--surface] p-6 space-y-4">
-            <p className="font-semibold text-white">اطلاعات پایه</p>
+          <div className="rounded-2xl border border-border bg-surface p-6 space-y-4 shadow-card">
+            <p className="font-semibold text-foreground">اطلاعات پایه</p>
             <div>
-              <label className="mb-1.5 block text-xs text-[hsl(var(--muted-foreground))]">اسم کامل</label>
+              <label className="field-label">اسم کامل</label>
               <input value={name} onChange={(e) => setName(e.target.value)} placeholder="مثلاً علی رضایی" className="admin-input" required />
             </div>
             <div>
-              <label className="mb-1.5 block text-xs text-[hsl(var(--muted-foreground))]">موقعیت / تخصص</label>
+              <label className="field-label">موقعیت / تخصص</label>
               <input value={position} onChange={(e) => setPosition(e.target.value)} placeholder="مثلاً فریلنسر طراحی و توسعه وب" className="admin-input" required />
             </div>
           </div>
 
-          <div className="rounded-2xl border border-[hsl(var(--border))] bg-[--surface] p-6 space-y-4">
-            <p className="font-semibold text-white">خدمات و قیمت</p>
+          <div className="rounded-2xl border border-border bg-surface p-6 space-y-4 shadow-card">
+            <p className="font-semibold text-foreground">خدمات و قیمت</p>
             <div>
-              <label className="mb-1.5 block text-xs text-[hsl(var(--muted-foreground))]">خدماتی که ارائه می‌دی</label>
+              <label className="field-label">خدماتی که ارائه می‌دی</label>
               <textarea value={services} onChange={(e) => setServices(e.target.value)} rows={3} placeholder="مثلاً: طراحی لندینگ پیج، فروشگاه آنلاین، پنل مدیریت، سئو" className="admin-textarea" required />
             </div>
             <div>
-              <label className="mb-1.5 block text-xs text-[hsl(var(--muted-foreground))]">بازه قیمتی</label>
+              <label className="field-label">بازه قیمتی</label>
               <input value={priceRange} onChange={(e) => setPriceRange(e.target.value)} placeholder="مثلاً: ۵ تا ۵۰ میلیون تومان" className="admin-input" required />
             </div>
             <div>
-              <label className="mb-1.5 block text-xs text-[hsl(var(--muted-foreground))]">زمان تحویل معمول</label>
+              <label className="field-label">زمان تحویل معمول</label>
               <input value={timeline} onChange={(e) => setTimeline(e.target.value)} placeholder="مثلاً: لندینگ ۵ روز، فروشگاه ۳-۴ هفته" className="admin-input" required />
             </div>
           </div>
 
-          <div className="rounded-2xl border border-[hsl(var(--border))] bg-[--surface] p-6 space-y-4">
-            <p className="font-semibold text-white">نکات اضافه برای AI</p>
+          <div className="rounded-2xl border border-border bg-surface p-6 space-y-4 shadow-card">
+            <p className="font-semibold text-foreground">نکات اضافه برای AI</p>
             <div>
-              <label className="mb-1.5 block text-xs text-[hsl(var(--muted-foreground))]">نکته مهم (اختیاری)</label>
+              <label className="field-label">نکته مهم (اختیاری)</label>
               <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} placeholder="چیزی که AI حتماً در مکالمه با مشتری رعایت کنه..." className="admin-textarea" />
             </div>
           </div>
 
-          {error && <p className="text-sm text-red-400">{error}</p>}
+          {error && <p className="text-sm text-danger">{error}</p>}
 
           <button
             type="submit"
             disabled={saving}
-            className="w-full rounded-xl bg-[--violet] py-3 text-sm font-bold text-white shadow-md shadow-[--violet-glow] transition-colors hover:bg-violet-700 disabled:opacity-50"
+            className="w-full rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground shadow-md shadow-primary/25 transition-colors hover:bg-primary-hover disabled:opacity-50"
           >
             {saving ? "در حال ذخیره..." : "ذخیره تغییرات"}
           </button>

@@ -112,7 +112,7 @@ Deploy:    Docker Compose + Caddy (TLS auto)
 ```
 frontend/
   app/
-    layout.tsx                    ← root layout (html, body, CSS vars, Vazirmatn)
+    layout.tsx                    ← root layout (html, body, YekanBakh font, theme script)
     (landing)/
       layout.tsx                  ← layout اختصاصی لندینگ
       page.tsx                    ← صفحه اصلی (server component)
@@ -221,30 +221,42 @@ NEXT_PUBLIC_API_URL   ← پیش‌فرض http://localhost:8000
 
 ## Design System
 
-### رنگ‌ها
+سبک: **AI-Native UI** (از اسکیل ui-ux-pro-max) — بنفش برند + فیروزه‌ای accent، کروم مینیمال، کارت‌های سبک با سایه نرم.
 
-```css
---background:    #09090b                    /* پس‌زمینه اصلی */
---foreground:    hsl(0 0% 95%)              /* متن */
---card:          hsl(258 30% 8%)            /* سطح کارت */
---primary:       #7c3aed                    /* violet accent */
---border:        hsl(258 25% 16%)           /* بوردر */
---violet:        #7c3aed
---violet-light:  #a78bfa
---violet-glow:   rgba(124, 58, 237, 0.18)
---violet-border: rgba(124, 58, 237, 0.25)
---surface:       #110f1e
---surface-2:     #1a1730
-```
+### توکن‌ها
+
+همه رنگ‌ها در `frontend/app/globals.css` به‌صورت کانال HSL تعریف شده‌اند (`:root` = لایت، `.dark` = دارک)
+و در `tailwind.config.js` با `<alpha-value>` نگاشت شده‌اند؛ پس `bg-primary/10` و مشابهش کار می‌کند.
+
+| کلاس Tailwind | کاربرد |
+|---------------|--------|
+| `bg-background` / `text-foreground` | پس‌زمینه و متن اصلی |
+| `bg-surface` / `bg-surface-2` / `bg-card` | سطح کارت / سطح فرعی |
+| `text-muted-foreground` / `text-secondary-foreground` | متن کم‌رنگ / متن ثانویه |
+| `border-border` / `border-input` | بوردر عمومی / بوردر فیلد |
+| `bg-primary` + `text-primary-foreground` / `hover:bg-primary-hover` | دکمه اصلی |
+| `bg-primary-soft` / `border-primary-line` / `text-brand` | سطح، بوردر و متن برند (تینت) |
+| `ring-ring` | فوکوس |
+| `accent` | فیروزه‌ای (گرادیان، تاکید ثانویه) |
+| `success` / `warning` / `pending` / `danger` / `info` | وضعیت‌ها (با `/10` برای پس‌زمینه) |
+
+سایه‌ها: `shadow-xs`، `shadow-card`، `shadow-elevated`، `shadow-glow`.
+Utilityها: `bg-aura` (هاله پس‌زمینه)، `glass` (هدر شیشه‌ای)، `text-gradient`، `bg-grid`.
+فیلد فرم: کلاس `field` (و `field-label` برای لیبل).
 
 ### قوانین طراحی
 
-- تم همیشه **تاریک** — هیچ light mode نداریم
-- فونت: **Vazirmatn** همه‌جا
+- دو تم **لایت و دارک**؛ پیش‌فرض تابع سیستم. `ThemeToggle` (`components/ThemeToggle.tsx`) بین روشن/تیره/سیستم می‌چرخد
+  و مقدار را در `localStorage.theme_mode` نگه می‌دارد؛ اسکریپت داخل `app/layout.tsx` قبل از رندر کلاس `.dark` را می‌گذارد
+- هر صفحه جدید باید در هدرش `ThemeToggle` داشته باشد و در هر دو تم چک شود
+- فونت: **YekanBakh FaNum** (لوکال در `frontend/app/fonts/` با `next/font/local`، متغیر `--font-yekan`)
+  وزن‌های موجود: Light(300) · Bold(700) · ExtraBold(800) · Black(900) · ExtraBlack(950)
 - direction: **RTL** در html و body
-- رنگ hardcode نکن — فقط از CSS variables یا `violet-*` Tailwind palette
-- hover استاندارد: `hover:-translate-y-1` یا `hover:border-[--violet-border]`
-- glow روی primary: `shadow-[--violet-glow]`
+- رنگ hardcode نکن (نه hex، نه `text-white`، نه palette مثل `violet-300`) — فقط توکن‌های بالا
+- روی پس‌زمینه solid رنگی (`bg-primary`، `bg-danger`) متن `text-primary-foreground`
+- ایموجی به‌عنوان آیکون UI استفاده نکن — از `@tabler/icons-react` با `aria-hidden` کنار متن
+- hover: `hover:border-primary-line` یا `hover:-translate-y-0.5`؛ transition ۱۵۰–۲۰۰ms
+- `prefers-reduced-motion` در globals.css رعایت شده
 
 ### shadcn/ui موجود
 

@@ -4,25 +4,25 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-bold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex cursor-pointer select-none items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-bold outline-none transition-[background-color,border-color,color,box-shadow,transform] duration-150 ease-out focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
         default:
-          "bg-[--violet] text-white shadow-lg shadow-[--violet-glow] hover:-translate-y-0.5 hover:bg-violet-700 focus-visible:ring-violet-500",
+          "bg-primary text-primary-foreground shadow-md shadow-primary/25 hover:bg-primary-hover hover:shadow-lg hover:shadow-primary/30",
         outline:
-          "border border-[--violet-border] bg-transparent text-violet-300 hover:bg-[--violet-glow] hover:text-white",
+          "border border-primary-line bg-surface text-brand hover:border-primary hover:bg-primary-soft",
         ghost:
-          "text-muted-foreground hover:text-foreground hover:bg-white/5",
+          "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
         secondary:
-          "bg-[--surface-2] text-foreground border border-[hsl(var(--border))] hover:bg-white/10",
+          "border border-border bg-surface text-foreground shadow-xs hover:border-primary-line hover:bg-surface-2",
         destructive:
-          "bg-red-600 text-white hover:bg-red-700",
+          "bg-danger text-primary-foreground hover:bg-danger/90",
       },
       size: {
-        default: "h-11 px-6 py-2.5",
-        sm: "h-9 px-4 text-xs",
-        lg: "h-13 px-8 py-3.5 text-base",
+        default: "h-11 px-5",
+        sm: "h-9 px-3.5 text-xs",
+        lg: "h-12 px-7 text-base",
         icon: "h-10 w-10",
       },
     },

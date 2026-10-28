@@ -139,12 +139,8 @@ export default function ChatRobot({
   const previousBrief = useRef(briefState);
 
   useEffect(() => {
-    const style = getComputedStyle(document.documentElement);
-    setColors({
-      color: style.getPropertyValue("--violet").trim() || undefined,
-      trimColor: style.getPropertyValue("--violet-light").trim() || undefined,
-      screenColor: style.getPropertyValue("--violet-light").trim() || undefined,
-    });
+    // robot-heads only accepts hex colors, so the brand violet is passed directly.
+    setColors({ color: "#7c3aed", trimColor: "#a78bfa", screenColor: "#a78bfa" });
     const wake = () => {
       activityAt.current = Date.now();
       setClock(Date.now());
@@ -301,13 +297,13 @@ export default function ChatRobot({
     <section
       aria-label="همراه گفتگو"
       data-robot-state={mood.state}
-      className="relative z-10 flex shrink-0 flex-col items-center bg-[hsl(var(--background))] px-4 pb-3 pt-2 sm:pt-3"
+      className={`relative z-10 flex shrink-0 flex-col items-center px-4 pb-3 pt-2 sm:pt-3 ${introduction ? "" : "glass"}`}
     >
       <div
         aria-hidden="true"
         className="relative grid h-[176px] w-[224px] place-items-center"
       >
-        <span className="pointer-events-none absolute inset-x-6 bottom-4 h-10 rounded-full bg-[--violet-glow] blur-2xl" />
+        <span className="pointer-events-none absolute inset-x-6 bottom-4 h-10 rounded-full bg-primary-soft blur-2xl" />
         <RobotHead
           shape="rectangle"
           state={speaking && introduction ? "speaking" : mood.state}
@@ -318,12 +314,12 @@ export default function ChatRobot({
           floorShadow
         />
       </div>
-      {introduction && <h2 className="mb-3 text-base font-bold text-violet-200">چطور نیازمندی‌ات را توضیح بدهی؟</h2>}
+      {introduction && <h2 className="mb-3 text-base font-bold text-brand">چطور نیازمندی‌ات را توضیح بدهی؟</h2>}
       <p
         role="status"
         aria-live="polite"
         aria-atomic="true"
-        className={introduction ? "max-w-xl text-start text-sm leading-8 text-[hsl(var(--foreground))]" : "min-h-5 text-center text-xs leading-5 text-[hsl(var(--muted-foreground))]"}
+        className={introduction ? "max-w-xl text-start text-sm leading-8 text-foreground" : "min-h-5 text-center text-xs leading-5 text-muted-foreground"}
       >
         {mood.label}
       </p>
@@ -332,15 +328,15 @@ export default function ChatRobot({
         onClick={toggleVoice}
         aria-pressed={voiceEnabled}
         aria-label={introduction ? voiceEnabled ? "قطع صدای راهنمای شروع" : "پخش راهنمای شروع با صدای روبات" : voiceEnabled ? "خاموش کردن صدای روبات" : "روشن کردن صدای روبات"}
-        className="mt-1 flex min-h-8 items-center gap-1.5 rounded-lg px-2 text-xs text-violet-300 transition-colors hover:bg-[--violet-glow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[--violet-light]"
+        className="mt-1 flex min-h-8 items-center gap-1.5 rounded-lg px-2 text-xs text-brand transition-colors hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         {voiceEnabled ? <IconVolume size={16} aria-hidden="true" /> : <IconVolumeOff size={16} aria-hidden="true" />}
         {introduction ? voiceEnabled ? "قطع صدای راهنما" : "پخش راهنمای شروع" : voiceEnabled ? "صدا روشن" : "صدای روبات"}
       </button>
-      {voiceError && <p role="status" className="text-center text-xs text-[hsl(var(--muted-foreground))]">صدا پخش نشد؛ برای تلاش دوباره دکمه صدا را بزن.</p>}
+      {voiceError && <p role="status" className="text-center text-xs text-muted-foreground">صدا پخش نشد؛ برای تلاش دوباره دکمه صدا را بزن.</p>}
       {!introduction && <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-full h-12 bg-gradient-to-b from-[hsl(var(--background))] to-transparent"
+        className="pointer-events-none absolute inset-x-0 top-full h-12 bg-gradient-to-b from-background/80 to-transparent"
       />}
     </section>
   );

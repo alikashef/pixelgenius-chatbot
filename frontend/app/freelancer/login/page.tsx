@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { IconSparkles } from "@tabler/icons-react";
 import { freelancerLogin } from "@/lib/api";
+import ThemeToggle from "@/components/ThemeToggle";
 
 export default function FreelancerLoginPage() {
   const router = useRouter();
@@ -32,19 +33,21 @@ export default function FreelancerLoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[hsl(var(--background))] px-4">
-      <div className="w-full max-w-md">
+    <div className="relative flex min-h-[100dvh] flex-col items-center justify-center overflow-hidden bg-background bg-aura px-4 py-10">
+      <div className="pointer-events-none absolute inset-0 bg-grid [mask-image:radial-gradient(ellipse_at_top,black,transparent_70%)]" />
+      <ThemeToggle className="absolute left-4 top-4 z-10" />
+      <div className="relative w-full max-w-md">
         <div className="mb-8 flex flex-col items-center gap-3">
-          <span className="grid h-12 w-12 place-items-center rounded-2xl bg-[--violet] shadow-lg shadow-[--violet-glow]">
-            <IconSparkles size={22} stroke={2} className="text-white" />
+          <span className="grid h-12 w-12 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-md shadow-primary/25">
+            <IconSparkles size={22} stroke={2} aria-hidden="true" />
           </span>
-          <h1 className="text-xl font-black text-white">ورود به FreelioAI</h1>
-          <p className="text-sm text-[hsl(var(--muted-foreground))]">پنل مدیریت فریلنسر</p>
+          <h1 className="text-xl font-black text-foreground">ورود به FreelioAI</h1>
+          <p className="text-sm text-muted-foreground">پنل مدیریت فریلنسر</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-[hsl(var(--border))] bg-[--surface] p-6">
+        <form onSubmit={handleSubmit} className="relative space-y-4 rounded-3xl border border-border bg-surface p-6 shadow-elevated sm:p-7">
           <div>
-            <label className="mb-1.5 block text-xs text-[hsl(var(--muted-foreground))]">ایمیل</label>
+            <label className="field-label">ایمیل</label>
             <input
               type="email"
               value={email}
@@ -56,7 +59,7 @@ export default function FreelancerLoginPage() {
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-xs text-[hsl(var(--muted-foreground))]">رمز عبور</label>
+            <label className="field-label">رمز عبور</label>
             <input
               type="password"
               value={password}
@@ -67,19 +70,19 @@ export default function FreelancerLoginPage() {
               className="admin-input"
             />
           </div>
-          {error && <p className="text-sm text-red-400">{error}</p>}
+          {error && <p className="text-sm text-danger">{error}</p>}
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-xl bg-[--violet] py-3 text-sm font-bold text-white shadow-md shadow-[--violet-glow] transition-colors hover:bg-violet-700 disabled:opacity-50"
+            className="w-full rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground shadow-md shadow-primary/25 transition-colors hover:bg-primary-hover disabled:opacity-50"
           >
             {loading ? "در حال ورود..." : "ورود"}
           </button>
         </form>
 
-        <p className="mt-4 text-center text-sm text-[hsl(var(--muted-foreground))]">
+        <p className="mt-4 text-center text-sm text-muted-foreground">
           هنوز ثبت‌نام نکردی؟{" "}
-          <Link href="/freelancer/register" className="text-violet-400 hover:text-white">
+          <Link href="/freelancer/register" className="text-brand hover:text-foreground">
             ثبت‌نام رایگان
           </Link>
         </p>

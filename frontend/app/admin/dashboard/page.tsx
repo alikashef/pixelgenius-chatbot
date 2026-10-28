@@ -15,6 +15,8 @@ import {
   updateAISettings,
   Order,
 } from "@/lib/api";
+import ThemeToggle from "@/components/ThemeToggle";
+import { IconCheck, IconLogout, IconShieldLock, IconX } from "@tabler/icons-react";
 
 interface Stats {
   total_orders: number;
@@ -32,11 +34,11 @@ const STATUS_LABEL: Record<Order["status"], string> = {
 };
 
 const STATUS_CLASS: Record<Order["status"], string> = {
-  pending_review: "bg-yellow-500/10 border border-yellow-500/20 text-yellow-400",
-  approved: "bg-blue-500/10 border border-blue-500/20 text-blue-400",
-  awaiting_payment: "bg-orange-500/10 border border-orange-500/20 text-orange-400",
-  paid: "bg-[--violet-glow] text-violet-300",
-  cancelled: "bg-red-500/10 border border-red-500/20 text-red-400",
+  pending_review: "bg-warning/10 border border-warning/20 text-warning",
+  approved: "bg-info/10 border border-info/20 text-info",
+  awaiting_payment: "bg-pending/10 border border-pending/20 text-pending",
+  paid: "bg-primary-soft text-brand",
+  cancelled: "bg-danger/10 border border-danger/20 text-danger",
 };
 
 function formatDate(iso: string) {
@@ -190,32 +192,40 @@ export default function AdminDashboard() {
     : null;
 
   if (loading) {
-    return <div className="min-h-screen bg-[hsl(var(--background))] flex items-center justify-center">
+    return <div className="min-h-screen bg-background flex items-center justify-center">
       <div className="w-10 h-10 border-4 border-accent border-t-transparent rounded-full animate-spin" />
     </div>;
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[hsl(var(--background))]">
+    <div className="relative min-h-screen overflow-hidden bg-background">
       {savedToast && (
-        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 flex items-center gap-2.5 rounded-2xl border border-emerald-500/30 bg-emerald-500/15 px-5 py-3 text-sm font-semibold text-emerald-400 shadow-xl backdrop-blur-xl animate-in fade-in slide-in-from-bottom-3 duration-300">
-          <span className="text-base">✓</span>
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 flex items-center gap-2.5 rounded-2xl border border-success/30 bg-success/15 px-5 py-3 text-sm font-semibold text-success shadow-xl backdrop-blur-xl animate-in fade-in slide-in-from-bottom-3 duration-300">
+          <IconCheck size={18} stroke={2.5} aria-hidden="true" />
           تنظیمات با موفقیت ذخیره شد
         </div>
       )}
-      <div className="pointer-events-none fixed inset-0 bg-grid opacity-60" />
-      <div className="pointer-events-none fixed inset-x-0 top-0 h-72 bg-[radial-gradient(ellipse_60%_50%_at_50%_0%,rgba(124,58,237,0.18),transparent)]" />
+      <div className="pointer-events-none fixed inset-0 bg-aura" />
 
-      <header className="relative z-10 border-b border-[hsl(var(--border))] bg-[hsl(var(--background))]/80 backdrop-blur px-6 py-4 flex items-center justify-between">
-        <h1 className="font-bold text-[hsl(var(--foreground))]">پنل ادمین</h1>
-        <button onClick={() => { localStorage.removeItem("admin_token"); router.push("/admin/login"); }}
-          className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] text-sm transition-colors">خروج</button>
+      <header className="glass sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-border/70 px-4 sm:px-6">
+        <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-primary to-primary-hover text-primary-foreground shadow-md shadow-primary/30">
+          <IconShieldLock size={18} stroke={2.2} aria-hidden="true" />
+        </span>
+        <h1 className="font-black tracking-tight text-foreground">پنل ادمین</h1>
+        <div className="mr-auto flex items-center gap-2">
+          <ThemeToggle />
+          <button onClick={() => { localStorage.removeItem("admin_token"); router.push("/admin/login"); }}
+            className="flex h-9 items-center gap-1.5 rounded-xl border border-border bg-surface px-3 text-xs font-bold text-muted-foreground outline-none transition-colors hover:border-danger/40 hover:text-danger focus-visible:ring-2 focus-visible:ring-ring">
+            <IconLogout size={14} stroke={2} aria-hidden="true" />
+            خروج
+          </button>
+        </div>
       </header>
 
       <main className="relative z-10 max-w-6xl mx-auto px-4 py-8 space-y-8">
-        {error && <p className="text-red-400 text-center">{error}</p>}
+        {error && <p className="text-danger text-center">{error}</p>}
 
-        <div className="flex gap-2 border-b border-[hsl(var(--border))]">
+        <div role="tablist" aria-label="بخش‌های پنل ادمین" className="flex gap-1 overflow-x-auto rounded-2xl border border-border bg-surface p-1.5 shadow-card">
           {[
             ["orders", "سفارشات"],
             ["sites", "سایت‌های منتشرشده"],
@@ -225,8 +235,10 @@ export default function AdminDashboard() {
             <button
               key={key}
               onClick={() => setActiveTab(key as "orders" | "settings" | "skills" | "sites")}
-              className={`px-4 py-3 text-sm transition-colors ${
-                activeTab === key ? "border-b-2 border-[--violet] text-violet-300" : "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
+              role="tab"
+              aria-selected={activeTab === key}
+              className={`min-h-10 shrink-0 whitespace-nowrap rounded-xl px-4 text-sm font-bold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${
+                activeTab === key ? "bg-primary-soft text-brand" : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
               }`}
             >
               {label}
@@ -245,28 +257,28 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {activeTab === "orders" && <div className="bg-[--surface] border border-[hsl(var(--border))] rounded-2xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-[hsl(var(--border))]">
-            <h2 className="font-semibold text-[hsl(var(--foreground))]">سفارشات</h2>
+        {activeTab === "orders" && <div className="bg-surface border border-border rounded-2xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-border">
+            <h2 className="font-semibold text-foreground">سفارشات</h2>
           </div>
           {orders.length === 0 ? (
-            <p className="text-[hsl(var(--muted-foreground))] text-center py-12">هیچ سفارشی ثبت نشده</p>
+            <p className="text-muted-foreground text-center py-12">هیچ سفارشی ثبت نشده</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-[hsl(var(--border))]">
+                  <tr className="border-b border-border bg-surface-2/60">
                     {["پروژه", "تخمین قیمت", "قیمت نهایی", "وضعیت", "تاریخ", ""].map((h) => (
-                      <th key={h} className="text-right text-[hsl(var(--muted-foreground))] text-xs px-5 py-3 font-medium">{h}</th>
+                      <th key={h} className="px-5 py-3 text-right text-xs font-bold text-muted-foreground">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {orders.map((order) => (
-                    <tr key={order.id} className="border-b border-[hsl(var(--border))]/50 hover:bg-[hsl(var(--background))]/50 transition-colors">
-                      <td className="px-5 py-4 text-sm text-[hsl(var(--foreground))] max-w-[180px] truncate">{order.project_name}</td>
-                      <td className="px-5 py-4 text-sm text-[hsl(var(--muted-foreground))]">{order.price_label}</td>
-                      <td className="px-5 py-4 text-sm text-violet-300">
+                    <tr key={order.id} className="border-b border-border/60 transition-colors last:border-0 hover:bg-primary-soft/40">
+                      <td className="px-5 py-4 text-sm text-foreground max-w-[180px] truncate">{order.project_name}</td>
+                      <td className="px-5 py-4 text-sm text-muted-foreground">{order.price_label}</td>
+                      <td className="px-5 py-4 text-sm text-brand">
                         {order.final_price ? `${order.final_price.toLocaleString("fa-IR")} ریال` : "—"}
                       </td>
                       <td className="px-5 py-4">
@@ -274,9 +286,9 @@ export default function AdminDashboard() {
                           {STATUS_LABEL[order.status]}
                         </span>
                       </td>
-                      <td className="px-5 py-4 text-xs text-[hsl(var(--muted-foreground))]">{formatDate(order.created_at)}</td>
+                      <td className="px-5 py-4 text-xs text-muted-foreground">{formatDate(order.created_at)}</td>
                       <td className="px-5 py-4">
-                        <button onClick={() => router.push(`/admin/orders/${order.id}`)} className="text-violet-300 hover:text-violet-200 text-xs transition-colors">
+                        <button onClick={() => router.push(`/admin/orders/${order.id}`)} className="text-brand hover:text-brand text-xs transition-colors">
                           مدیریت
                         </button>
                       </td>
@@ -307,26 +319,26 @@ export default function AdminDashboard() {
 
         {activeTab === "settings" && (
           <div className="space-y-5">
-            <div className="bg-[--surface] border border-[hsl(var(--border))] rounded-2xl px-6 py-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="bg-surface border border-border rounded-2xl px-6 py-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
-                <h2 className="font-semibold text-[hsl(var(--foreground))]">تنظیمات فروش و هوش مصنوعی</h2>
-                <p className="text-[hsl(var(--muted-foreground))] text-xs mt-1">
+                <h2 className="font-semibold text-foreground">تنظیمات فروش و هوش مصنوعی</h2>
+                <p className="text-muted-foreground text-xs mt-1">
                   این فرم‌ها مستقیماً روی رفتار چت‌بات اثر می‌گذارند؛ بدون تغییر کد می‌توانید قیمت، بودجه، سوال‌ها و قوانین فروش را اصلاح کنید.
                 </p>
               </div>
               <button
                 onClick={handleSaveSettings}
                 disabled={savingSettings}
-                className="bg-[--violet] hover:bg-violet-700 disabled:opacity-60 text-white font-bold rounded-xl px-5 py-3 text-sm transition-colors"
+                className="bg-primary hover:bg-primary-hover disabled:opacity-60 text-primary-foreground font-bold rounded-xl px-5 py-3 text-sm transition-colors"
               >
                 {savingSettings ? "در حال ذخیره..." : "ذخیره همه تنظیمات"}
               </button>
             </div>
 
-            <section className="bg-[--surface] border border-[hsl(var(--border))] rounded-2xl p-5 space-y-4">
+            <section className="bg-surface border border-border rounded-2xl p-5 space-y-4">
               <div>
-                <h3 className="text-[hsl(var(--foreground))] font-semibold">مدل هوش مصنوعی</h3>
-                <p className="text-[hsl(var(--muted-foreground))] text-xs mt-1">مدلی که چت‌بات برای پاسخ به مشتریان استفاده می‌کند.</p>
+                <h3 className="text-foreground font-semibold">مدل هوش مصنوعی</h3>
+                <p className="text-muted-foreground text-xs mt-1">مدلی که چت‌بات برای پاسخ به مشتریان استفاده می‌کند.</p>
               </div>
               <div className="grid gap-3 md:grid-cols-3">
                 {[
@@ -341,21 +353,21 @@ export default function AdminDashboard() {
                       onClick={() => setSettingValue("ai_model", model.key)}
                       className={`flex flex-col items-start gap-1 rounded-xl border px-4 py-3 text-right transition-all ${
                         isSelected
-                          ? "border-[--violet-border] bg-[--violet-glow] text-white"
-                          : "border-[hsl(var(--border))] bg-[hsl(var(--background))] text-[hsl(var(--muted-foreground))] hover:border-[--violet-border] hover:text-white"
+                          ? "border-primary-line bg-primary-soft text-foreground"
+                          : "border-border bg-background text-muted-foreground hover:border-primary-line hover:text-foreground"
                       }`}
                     >
                       <span className="text-sm font-semibold">{model.label}</span>
                       <span className="text-xs opacity-70">{model.desc}</span>
-                      {isSelected && <span className="mt-1 text-[10px] font-bold text-violet-400">● فعال</span>}
+                      {isSelected && <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold text-brand"><span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />فعال</span>}
                     </button>
                   );
                 })}
               </div>
             </section>
 
-            <section className="bg-[--surface] border border-[hsl(var(--border))] rounded-2xl p-5 space-y-4">
-              <h3 className="text-[hsl(var(--foreground))] font-semibold">واحد پول و شرایط پرداخت</h3>
+            <section className="bg-surface border border-border rounded-2xl p-5 space-y-4">
+              <h3 className="text-foreground font-semibold">واحد پول و شرایط پرداخت</h3>
               <div className="grid gap-4 md:grid-cols-3">
                 <Field label="برچسب ارز">
                   <input value={String(settings.currency_label || "")} onChange={(e) => setSettingValue("currency_label", e.target.value)}
@@ -438,8 +450,8 @@ export default function AdminDashboard() {
               onRemove={(index) => removeArrayItem("timeline_estimates", index)}
             />
 
-            <section className="bg-[--surface] border border-[hsl(var(--border))] rounded-2xl p-5 space-y-4">
-              <h3 className="text-[hsl(var(--foreground))] font-semibold">قالب‌های پاسخ آماده</h3>
+            <section className="bg-surface border border-border rounded-2xl p-5 space-y-4">
+              <h3 className="text-foreground font-semibold">قالب‌های پاسخ آماده</h3>
               {Object.entries((settings.predefined_response_templates || {}) as Record<string, string>).map(([key, value]) => (
                 <Field key={key} label={key}>
                   <textarea
@@ -464,9 +476,9 @@ export default function AdminDashboard() {
               onRemove={(index) => removeArrayItem("lead_scoring_rules", index)}
             />
 
-            <details className="bg-[--surface] border border-[hsl(var(--border))] rounded-2xl p-5">
-              <summary className="cursor-pointer text-[hsl(var(--foreground))] font-semibold">نمایش JSON خام برای بررسی فنی</summary>
-              <pre dir="ltr" className="mt-4 overflow-auto rounded-xl bg-[hsl(var(--background))] p-4 text-xs leading-6 text-[hsl(var(--secondary-foreground))]">
+            <details className="bg-surface border border-border rounded-2xl p-5">
+              <summary className="cursor-pointer text-foreground font-semibold">نمایش JSON خام برای بررسی فنی</summary>
+              <pre dir="ltr" className="mt-4 overflow-auto rounded-xl bg-background p-4 text-xs leading-6 text-secondary-foreground">
                 {JSON.stringify(Object.fromEntries(SETTING_SECTIONS.map((key) => [key, settings[key]])), null, 2)}
               </pre>
             </details>
@@ -478,28 +490,28 @@ export default function AdminDashboard() {
       {selected && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50"
           onClick={() => setSelected(null)}>
-          <div className="bg-[--surface] border border-[hsl(var(--border))] rounded-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto"
+          <div className="bg-surface border border-border rounded-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[hsl(var(--border))] sticky top-0 bg-[--surface]">
-              <h3 className="font-semibold text-[hsl(var(--foreground))] truncate">{selected.project_name}</h3>
-              <button onClick={() => setSelected(null)} className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors flex-shrink-0 mr-4">✕</button>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border sticky top-0 bg-surface">
+              <h3 className="font-semibold text-foreground truncate">{selected.project_name}</h3>
+              <button onClick={() => setSelected(null)} aria-label="بستن" className="mr-4 grid h-9 w-9 shrink-0 place-items-center rounded-xl text-muted-foreground outline-none transition-colors hover:bg-foreground/5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"><IconX size={18} aria-hidden="true" /></button>
             </div>
 
             <div className="p-6 space-y-6">
               {/* Info */}
               <div className="space-y-3 text-sm">
-                <p className="text-[hsl(var(--muted-foreground))] text-xs">خلاصه</p>
-                <p className="text-[hsl(var(--secondary-foreground))] leading-relaxed">{selected.summary}</p>
+                <p className="text-muted-foreground text-xs">خلاصه</p>
+                <p className="text-secondary-foreground leading-relaxed">{selected.summary}</p>
                 <ul className="space-y-1 mt-2">
                   {selected.features.map((f, i) => (
-                    <li key={i} className="text-[hsl(var(--muted-foreground))] flex gap-2"><span className="text-violet-300">•</span>{f}</li>
+                    <li key={i} className="text-muted-foreground flex gap-2"><span className="text-brand">•</span>{f}</li>
                   ))}
                 </ul>
                 <div className="grid grid-cols-2 gap-3 pt-1">
-                  <div><p className="text-[hsl(var(--muted-foreground))] text-xs mb-1">تکنولوژی</p><p className="text-[hsl(var(--secondary-foreground))]">{selected.tech_stack}</p></div>
-                  <div><p className="text-[hsl(var(--muted-foreground))] text-xs mb-1">تحویل</p><p className="text-[hsl(var(--secondary-foreground))]">{selected.delivery_days} روز</p></div>
-                  <div><p className="text-[hsl(var(--muted-foreground))] text-xs mb-1">تخمین اولیه</p><p className="text-[hsl(var(--secondary-foreground))]">{selected.price_label}</p></div>
-                  <div><p className="text-[hsl(var(--muted-foreground))] text-xs mb-1">وضعیت</p>
+                  <div><p className="text-muted-foreground text-xs mb-1">تکنولوژی</p><p className="text-secondary-foreground">{selected.tech_stack}</p></div>
+                  <div><p className="text-muted-foreground text-xs mb-1">تحویل</p><p className="text-secondary-foreground">{selected.delivery_days} روز</p></div>
+                  <div><p className="text-muted-foreground text-xs mb-1">تخمین اولیه</p><p className="text-secondary-foreground">{selected.price_label}</p></div>
+                  <div><p className="text-muted-foreground text-xs mb-1">وضعیت</p>
                     <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_CLASS[selected.status]}`}>
                       {STATUS_LABEL[selected.status]}
                     </span>
@@ -507,10 +519,10 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              <div className="border-t border-[hsl(var(--border))] pt-5 space-y-3">
-                <p className="text-[hsl(var(--foreground))] text-sm font-medium">تاریخچه چت این پروژه</p>
+              <div className="border-t border-border pt-5 space-y-3">
+                <p className="text-foreground text-sm font-medium">تاریخچه چت این پروژه</p>
                 {(selected.chat_history || []).length === 0 ? (
-                  <p className="text-sm text-[hsl(var(--muted-foreground))]">
+                  <p className="text-sm text-muted-foreground">
                     برای این سفارش تاریخچه چت ثبت نشده (احتمالاً سفارش قدیمی است).
                   </p>
                 ) : (
@@ -520,8 +532,8 @@ export default function AdminDashboard() {
                         key={`${message.role}-${index}`}
                         className={`rounded-xl px-4 py-3 text-sm leading-relaxed ${
                           message.role === "user"
-                            ? "bg-[--violet-glow] border border-[--violet-border] text-[hsl(var(--foreground))]"
-                            : "bg-[--surface] border border-[hsl(var(--border))] text-[hsl(var(--secondary-foreground))]"
+                            ? "bg-primary-soft border border-primary-line text-foreground"
+                            : "bg-surface border border-border text-secondary-foreground"
                         }`}
                       >
                         <p className="text-xs mb-1 opacity-70">{message.role === "user" ? "کاربر" : "دستیار"}</p>
@@ -534,50 +546,50 @@ export default function AdminDashboard() {
 
               {/* Approve Section */}
               {selected.status !== "paid" && selected.status !== "cancelled" && (
-                <div className="border-t border-[hsl(var(--border))] pt-5 space-y-4">
-                  <p className="text-[hsl(var(--foreground))] text-sm font-medium">تایید و تعیین مبلغ</p>
+                <div className="border-t border-border pt-5 space-y-4">
+                  <p className="text-foreground text-sm font-medium">تایید و تعیین مبلغ</p>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[hsl(var(--muted-foreground))] text-xs mb-2">قیمت نهایی (ریال)</label>
+                      <label className="block text-muted-foreground text-xs mb-2">قیمت نهایی (ریال)</label>
                       <input type="number" value={finalPrice} onChange={(e) => setFinalPrice(e.target.value)}
                         placeholder="مثال: 18000000"
-                        className="w-full bg-[--surface] border border-[hsl(var(--border))] rounded-xl px-3 py-2.5 text-sm text-[hsl(var(--foreground))] outline-none focus:border-[--violet] transition-colors" />
+                        className="field" />
                     </div>
                     <div>
-                      <label className="block text-[hsl(var(--muted-foreground))] text-xs mb-2">درصد پیش‌پرداخت</label>
+                      <label className="block text-muted-foreground text-xs mb-2">درصد پیش‌پرداخت</label>
                       <input type="number" min={10} max={100} value={payPercent} onChange={(e) => setPayPercent(e.target.value)}
-                        className="w-full bg-[--surface] border border-[hsl(var(--border))] rounded-xl px-3 py-2.5 text-sm text-[hsl(var(--foreground))] outline-none focus:border-[--violet] transition-colors" />
+                        className="field" />
                     </div>
                   </div>
                   {payAmount && (
-                    <div className="bg-[--violet-glow] border border-[--violet-border] rounded-xl px-4 py-3 flex justify-between items-center">
-                      <p className="text-[hsl(var(--muted-foreground))] text-xs">مبلغ قابل پرداخت توسط مشتری</p>
-                      <p className="text-violet-300 font-bold">{payAmount.toLocaleString("fa-IR")} ریال</p>
+                    <div className="bg-primary-soft border border-primary-line rounded-xl px-4 py-3 flex justify-between items-center">
+                      <p className="text-muted-foreground text-xs">مبلغ قابل پرداخت توسط مشتری</p>
+                      <p className="text-brand font-bold">{payAmount.toLocaleString("fa-IR")} ریال</p>
                     </div>
                   )}
                   <div>
-                    <label className="block text-[hsl(var(--muted-foreground))] text-xs mb-2">یادداشت برای مشتری (اختیاری)</label>
+                    <label className="block text-muted-foreground text-xs mb-2">یادداشت برای مشتری (اختیاری)</label>
                     <textarea value={adminNote} onChange={(e) => setAdminNote(e.target.value)} rows={2}
-                      className="w-full bg-[--surface] border border-[hsl(var(--border))] rounded-xl px-3 py-2.5 text-sm text-[hsl(var(--foreground))] outline-none focus:border-[--violet] transition-colors resize-none" />
+                      className="field resize-none" />
                   </div>
-                  {error && <p className="text-red-400 text-sm">{error}</p>}
+                  {error && <p className="text-danger text-sm">{error}</p>}
                   <button onClick={handleApprove} disabled={approving || !finalPrice}
-                    className="w-full bg-[--violet] hover:bg-violet-700 disabled:opacity-60 text-white font-bold rounded-xl py-3 text-sm transition-colors">
+                    className="w-full bg-primary hover:bg-primary-hover disabled:opacity-60 text-primary-foreground font-bold rounded-xl py-3 text-sm transition-colors">
                     {approving ? "در حال ثبت..." : selected.status === "awaiting_payment" ? "به‌روزرسانی" : "تایید و ارسال به مشتری"}
                   </button>
                 </div>
               )}
 
               {/* Upload Proposal */}
-              <div className="border-t border-[hsl(var(--border))] pt-5">
-                <p className="text-[hsl(var(--foreground))] text-sm font-medium mb-3">آپلود پروپوزال PDF</p>
+              <div className="border-t border-border pt-5">
+                <p className="text-foreground text-sm font-medium mb-3">آپلود پروپوزال PDF</p>
                 {selected.proposal_file && (
-                  <p className="text-violet-300 text-xs mb-2">✓ فایل آپلود شده: {selected.proposal_file.split("/").pop()}</p>
+                  <p className="mb-2 flex items-center gap-1 text-xs text-brand"><IconCheck size={14} aria-hidden="true" /> فایل آپلود شده: {selected.proposal_file.split("/").pop()}</p>
                 )}
                 <input ref={fileRef} type="file" accept=".pdf,.doc,.docx" onChange={handleUpload}
                   className="hidden" />
                 <button onClick={() => fileRef.current?.click()} disabled={uploading}
-                  className="w-full border border-[hsl(var(--border))] hover:border-[--violet-border] text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] rounded-xl py-3 text-sm transition-colors disabled:opacity-60">
+                  className="w-full border border-border hover:border-primary-line text-muted-foreground hover:text-foreground rounded-xl py-3 text-sm transition-colors disabled:opacity-60">
                   {uploading ? "در حال آپلود..." : selected.proposal_file ? "جایگزینی فایل" : "انتخاب و آپلود فایل"}
                 </button>
               </div>
@@ -591,9 +603,13 @@ export default function AdminDashboard() {
 
 function StatCard({ label, value, accent, warn }: { label: string; value: string; accent?: boolean; warn?: boolean }) {
   return (
-    <div className="bg-[--surface] border border-[hsl(var(--border))] rounded-xl p-5 text-center">
-      <p className="text-[hsl(var(--muted-foreground))] text-xs mb-2">{label}</p>
-      <p className={`font-bold text-xl ${accent ? "text-violet-300" : warn ? "text-amber-600" : "text-[hsl(var(--foreground))]"}`}>{value}</p>
+    <div className="relative overflow-hidden rounded-2xl border border-border bg-surface p-5 shadow-card">
+      <span
+        aria-hidden="true"
+        className={`absolute inset-y-4 right-0 w-1 rounded-l-full ${accent ? "bg-primary" : warn ? "bg-warning" : "bg-border"}`}
+      />
+      <p className="mb-2 text-xs font-bold text-muted-foreground">{label}</p>
+      <p className={`text-2xl font-black tracking-tight ${accent ? "text-brand" : warn ? "text-warning" : "text-foreground"}`}>{value}</p>
     </div>
   );
 }
@@ -601,7 +617,7 @@ function StatCard({ label, value, accent, warn }: { label: string; value: string
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="block text-[hsl(var(--muted-foreground))] text-xs mb-2">{label}</span>
+      <span className="field-label">{label}</span>
       {children}
     </label>
   );
@@ -621,19 +637,19 @@ function EditableList({
   onRemove: (index: number) => void;
 }) {
   return (
-    <section className="bg-[--surface] border border-[hsl(var(--border))] rounded-2xl p-5 space-y-4">
+    <section className="bg-surface border border-border rounded-2xl p-5 space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-[hsl(var(--foreground))] font-semibold">{title}</h3>
-        <button onClick={onAdd} className="border border-[hsl(var(--border))] hover:border-[--violet-border] text-[hsl(var(--foreground))] rounded-xl px-4 py-2 text-xs transition-colors">
+        <h3 className="text-foreground font-semibold">{title}</h3>
+        <button onClick={onAdd} className="border border-border hover:border-primary-line text-foreground rounded-xl px-4 py-2 text-xs transition-colors">
           افزودن
         </button>
       </div>
       <div className="space-y-3">
         {items.map((item, index) => (
-          <div key={index} className="bg-[--surface] border border-[hsl(var(--border))] rounded-xl p-4">
+          <div key={index} className="bg-surface border border-border rounded-xl p-4">
             <div className="flex items-start gap-3">
               <div className="flex-1">{renderItem(item, index)}</div>
-              <button onClick={() => onRemove(index)} className="text-red-400 hover:text-red-300 text-xs px-2 py-2">
+              <button onClick={() => onRemove(index)} className="text-danger hover:text-danger text-xs px-2 py-2">
                 حذف
               </button>
             </div>
@@ -646,10 +662,10 @@ function EditableList({
 
 function SettingsTextarea({ title, value, onChange }: { title: string; value: string; onChange: (value: string) => void }) {
   return (
-    <section className="bg-[--surface] border border-[hsl(var(--border))] rounded-2xl p-5 space-y-4">
+    <section className="bg-surface border border-border rounded-2xl p-5 space-y-4">
       <div>
-        <h3 className="text-[hsl(var(--foreground))] font-semibold">{title}</h3>
-        <p className="text-[hsl(var(--muted-foreground))] text-xs mt-1">هر خط یک مورد جداگانه است.</p>
+        <h3 className="text-foreground font-semibold">{title}</h3>
+        <p className="text-muted-foreground text-xs mt-1">هر خط یک مورد جداگانه است.</p>
       </div>
       <textarea value={value} onChange={(e) => onChange(e.target.value)} className="admin-textarea min-h-[180px]" />
     </section>
@@ -698,37 +714,37 @@ function PublishedSites({ orders }: { orders: Order[] }) {
   const states: Record<string, string> = { READY: "فعال", BUILDING: "در حال ساخت", PREPARING: "آماده‌سازی", UPLOADING: "در حال بارگذاری", FAILED: "ناموفق", EXPIRED: "منقضی‌شده", UNKNOWN: "وضعیت در دسترس نیست", UNHEALTHY: "ناسالم", CANCELED: "لغوشده", TIMEDOUT: "پایان مهلت ساخت" };
   return <section className="space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <div><h2 className="text-xl font-bold">سایت‌های منتشرشده</h2><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">تمدید به زمان باقی‌مانده اضافه می‌شود. سایت‌های لیارا پس از انقضا به‌صورت خودکار پاک می‌شوند؛ تمدید زمان، هزینه میزبانی را ادامه می‌دهد.</p></div>
-      <button disabled={loading || !!busy} onClick={load} className="rounded-xl border border-[--violet-border] px-4 py-2 text-violet-300 disabled:opacity-50">به‌روزرسانی</button>
+      <div><h2 className="text-xl font-bold">سایت‌های منتشرشده</h2><p className="mt-2 text-sm text-muted-foreground">تمدید به زمان باقی‌مانده اضافه می‌شود. سایت‌های لیارا پس از انقضا به‌صورت خودکار پاک می‌شوند؛ تمدید زمان، هزینه میزبانی را ادامه می‌دهد.</p></div>
+      <button disabled={loading || !!busy} onClick={load} className="rounded-xl border border-primary-line px-4 py-2 text-brand disabled:opacity-50">به‌روزرسانی</button>
     </div>
-    {error && <p role="alert" className="text-red-400">{error === "UNAUTHORIZED" ? "نشست ادمین منقضی شده؛ دوباره وارد شوید." : error}</p>}
-    {notice && <p role="status" className="text-violet-300">{notice}</p>}
+    {error && <p role="alert" className="text-danger">{error === "UNAUTHORIZED" ? "نشست ادمین منقضی شده؛ دوباره وارد شوید." : error}</p>}
+    {notice && <p role="status" className="text-brand">{notice}</p>}
     {loading ? <p role="status">در حال دریافت سایت‌ها…</p> : sites.length === 0 ? <p>هنوز سایتی منتشر نشده است.</p> : <div className="grid gap-4 md:grid-cols-2">{sites.map((site) => {
       const key = `${site.kind}:${site.slug}`;
       const order = orders.find((item) => item.id === site.order_id);
       const remaining = Math.max(0, Math.ceil((site.expires_at * 1000 - now) / 60000));
-      return <article key={key} className="space-y-4 rounded-2xl border border-[hsl(var(--border))] bg-[--surface] p-5">
-        <div className="flex items-start justify-between gap-3"><h3 className="font-bold">{order?.project_name || site.slug}</h3><span className="text-sm text-violet-300">{remaining === 0 ? "منقضی‌شده" : states[site.state] || site.state}</span></div>
-        <a href={site.url} target="_blank" rel="noopener noreferrer" dir="ltr" className="block break-all text-sm text-violet-300 underline">{site.url}</a>
-        <dl className="space-y-2 text-sm text-[hsl(var(--muted-foreground))]">
+      return <article key={key} className="space-y-4 rounded-2xl border border-border bg-surface p-5 shadow-card">
+        <div className="flex items-start justify-between gap-3"><h3 className="font-bold">{order?.project_name || site.slug}</h3><span className="text-sm text-brand">{remaining === 0 ? "منقضی‌شده" : states[site.state] || site.state}</span></div>
+        <a href={site.url} target="_blank" rel="noopener noreferrer" dir="ltr" className="block break-all text-sm text-brand underline">{site.url}</a>
+        <dl className="space-y-2 text-sm text-muted-foreground">
           <div>میزبان: {site.kind === "dynamic" ? `لیارا · ${site.platform}` : "فایل‌سرور استاتیک"}</div>
           {site.app && <div dir="ltr">{site.app}</div>}
           <div>انقضا: {new Date(site.expires_at * 1000).toLocaleString("fa-IR", { timeZone: "Asia/Tehran" })} (تهران)</div>
           <div>باقی‌مانده: {Math.floor(remaining / 60).toLocaleString("fa-IR")} ساعت و {(remaining % 60).toLocaleString("fa-IR")} دقیقه</div>
         </dl>
-        {site.order_id && <a className="block text-sm text-violet-300 underline" href={`/admin/orders/${site.order_id}`}>مشاهده پروژه</a>}
+        {site.order_id && <a className="block text-sm text-brand underline" href={`/admin/orders/${site.order_id}`}>مشاهده پروژه</a>}
         <div className="flex flex-wrap items-end gap-2">
-          <label className="text-sm">افزایش زمان (ساعت)<input aria-label={`ساعت تمدید ${site.slug}`} type="number" min="1" max="8760" step="1" value={hours[key] || "24"} onChange={(e) => setHours((old) => ({ ...old, [key]: e.target.value }))} className="mt-2 block w-28 rounded-xl border border-[hsl(var(--border))] bg-[--background] p-2" /></label>
+          <label className="text-sm">افزایش زمان (ساعت)<input aria-label={`ساعت تمدید ${site.slug}`} type="number" min="1" max="8760" step="1" value={hours[key] || "24"} onChange={(e) => setHours((old) => ({ ...old, [key]: e.target.value }))} className="mt-2 block w-28 rounded-xl border border-border bg-background p-2" /></label>
           <button disabled={!!busy} onClick={() => act(site, false)} className="rounded-xl bg-violet-600 px-4 py-2 disabled:opacity-50">{busy === key ? "در حال انجام…" : "تمدید"}</button>
-          <button disabled={!!busy} onClick={() => { setDeleting(site); setError(""); }} className="rounded-xl border border-red-500/30 px-4 py-2 text-red-400 disabled:opacity-50">{site.kind === "dynamic" ? "حذف از لیارا" : "حذف سایت"}</button>
+          <button disabled={!!busy} onClick={() => { setDeleting(site); setError(""); }} className="rounded-xl border border-danger/30 px-4 py-2 text-danger disabled:opacity-50">{site.kind === "dynamic" ? "حذف از لیارا" : "حذف سایت"}</button>
         </div>
       </article>;
     })}</div>}
-    {deleting && <div className="fixed inset-0 z-50 flex items-center justify-center bg-[--background]/90 p-4"><div role="dialog" aria-modal="true" aria-labelledby="delete-site-title" className="w-full max-w-md space-y-4 rounded-2xl border border-[hsl(var(--border))] bg-[--surface] p-6">
+    {deleting && <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/90 p-4"><div role="dialog" aria-modal="true" aria-labelledby="delete-site-title" className="w-full max-w-md space-y-4 rounded-2xl border border-border bg-surface p-6 shadow-card">
       <h3 id="delete-site-title" className="font-bold">حذف دائمی سایت</h3>
       <p className="break-all" dir="ltr">{deleting.url}</p>
       <p>{deleting.kind === "dynamic" ? `اپلیکیشن${deleting.has_database ? " و دیتابیس وابسته" : ""} از لیارا پاک می‌شود و سایت از دسترس خارج می‌شود.` : "فایل‌های سایت پاک می‌شوند و سایت از دسترس خارج می‌شود."} این عملیات قابل بازگشت نیست؛ اطلاعات سفارش حفظ می‌شود.</p>
-      <div className="flex gap-3"><button disabled={!!busy} onClick={() => act(deleting, true)} className="rounded-xl bg-red-600 px-4 py-2 disabled:opacity-50">{busy ? "در حال حذف…" : "حذف دائمی"}</button><button disabled={!!busy} onClick={() => setDeleting(null)} className="rounded-xl border border-[hsl(var(--border))] px-4 py-2">انصراف</button></div>
+      <div className="flex gap-3"><button disabled={!!busy} onClick={() => act(deleting, true)} className="rounded-xl bg-danger px-4 py-2 font-bold text-primary-foreground disabled:opacity-50">{busy ? "در حال حذف…" : "حذف دائمی"}</button><button disabled={!!busy} onClick={() => setDeleting(null)} className="rounded-xl border border-border px-4 py-2">انصراف</button></div>
     </div></div>}
   </section>;
 }

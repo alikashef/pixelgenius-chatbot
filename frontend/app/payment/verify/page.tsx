@@ -1,8 +1,24 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, Suspense, ReactNode } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import { IconCheck, IconX } from "@tabler/icons-react";
+import { Button } from "@/components/ui/button";
+import ThemeToggle from "@/components/ThemeToggle";
 import { verifyPayment } from "@/lib/api";
+
+function Shell({ children }: { children: ReactNode }) {
+  return (
+    <div className="relative flex min-h-[100dvh] items-center justify-center bg-background bg-aura p-4">
+      <ThemeToggle className="absolute left-4 top-4" />
+      {children}
+    </div>
+  );
+}
+
+function Spinner() {
+  return <div className="mx-auto h-11 w-11 rounded-full border-4 border-primary border-t-transparent motion-safe:animate-spin" aria-hidden="true" />;
+}
 
 function VerifyContent() {
   const params = useSearchParams();
@@ -36,94 +52,77 @@ function VerifyContent() {
 
   if (state === "loading") {
     return (
-      <div className="min-h-screen bg-[#f7fbf9] flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="w-12 h-12 border-4 border-accent border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-slate-600">در حال تایید پرداخت...</p>
+      <Shell>
+        <div role="status" className="space-y-4 text-center">
+          <Spinner />
+          <p className="text-sm text-muted-foreground">در حال تایید پرداخت...</p>
         </div>
-      </div>
+      </Shell>
     );
   }
 
-  if (state === "success") {
-    return (
-      <div className="min-h-screen bg-[#f7fbf9] flex items-center justify-center p-4">
-        <div className="bg-white border border-border rounded-2xl p-8 max-w-md w-full text-center space-y-6">
-          <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto">
-            <svg className="w-8 h-8 text-emerald-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900 mb-2">پرداخت موفق!</h1>
-            <p className="text-slate-500 text-sm">سفارش شما با موفقیت ثبت شد</p>
-          </div>
-          <div className="space-y-3">
-            {refId && (
-              <div className="bg-[#f7fbf9] border border-border rounded-xl p-4">
-                <p className="text-slate-500 text-xs mb-1">کد پیگیری پرداخت</p>
-                <p className="text-emerald-700 font-mono font-bold text-lg">{refId}</p>
-              </div>
-            )}
-            {orderId && (
-              <div className="bg-[#f7fbf9] border border-border rounded-xl p-4">
-                <p className="text-slate-500 text-xs mb-1">شماره سفارش</p>
-                <p className="text-slate-700 font-mono text-sm break-all">{orderId}</p>
-              </div>
-            )}
-          </div>
-          <p className="text-slate-500 text-xs">
-            تیم ما در اسرع وقت با شما تماس خواهد گرفت
-          </p>
-          <button
-            onClick={() => router.push("/chat")}
-            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl py-3 text-sm transition-colors"
-          >
-            سفارش جدید
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const success = state === "success";
 
   return (
-    <div className="min-h-screen bg-[#f7fbf9] flex items-center justify-center p-4">
-      <div className="bg-white border border-border rounded-2xl p-8 max-w-md w-full text-center space-y-6">
-        <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto">
-          <svg className="w-8 h-8 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-          </svg>
+    <Shell>
+      <div className="w-full max-w-md animate-fade-up space-y-6 rounded-3xl border border-border bg-surface p-8 text-center shadow-elevated">
+        <div
+          className={`mx-auto grid h-16 w-16 place-items-center rounded-full ring-8 ${
+            success ? "bg-success/15 text-success ring-success/5" : "bg-danger/15 text-danger ring-danger/5"
+          }`}
+        >
+          {success ? <IconCheck size={30} stroke={2.5} aria-hidden="true" /> : <IconX size={30} stroke={2.5} aria-hidden="true" />}
         </div>
         <div>
-          <h1 className="text-xl font-bold text-slate-900 mb-2">پرداخت ناموفق</h1>
-          <p className="text-slate-500 text-sm">{message}</p>
+          <h1 className="mb-2 text-xl font-black text-foreground">{success ? "پرداخت موفق!" : "پرداخت ناموفق"}</h1>
+          <p className="text-sm text-muted-foreground">{success ? "سفارش شما با موفقیت ثبت شد" : message}</p>
         </div>
-        <div className="flex gap-3">
-          <button
-            onClick={() => router.push("/proposal")}
-            className="flex-1 border border-border text-slate-500 hover:text-slate-800 rounded-xl py-3 text-sm transition-colors"
-          >
-            تلاش مجدد
-          </button>
-          <button
-            onClick={() => router.push("/chat")}
-            className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl py-3 text-sm transition-colors"
-          >
-            شروع مجدد
-          </button>
-        </div>
+
+        {success ? (
+          <>
+            <dl className="space-y-3 text-right">
+              {refId && (
+                <div className="rounded-xl border border-border bg-surface-2 p-4">
+                  <dt className="mb-1 text-xs text-muted-foreground">کد پیگیری پرداخت</dt>
+                  <dd className="font-mono text-lg font-bold text-success" dir="ltr">{refId}</dd>
+                </div>
+              )}
+              {orderId && (
+                <div className="rounded-xl border border-border bg-surface-2 p-4">
+                  <dt className="mb-1 text-xs text-muted-foreground">شماره سفارش</dt>
+                  <dd className="break-all font-mono text-sm text-secondary-foreground" dir="ltr">{orderId}</dd>
+                </div>
+              )}
+            </dl>
+            <p className="text-xs text-muted-foreground">تیم ما در اسرع وقت با شما تماس خواهد گرفت</p>
+            <Button className="w-full" onClick={() => router.push("/chat")}>
+              سفارش جدید
+            </Button>
+          </>
+        ) : (
+          <div className="flex gap-3">
+            <Button variant="secondary" className="flex-1" onClick={() => router.push("/proposal")}>
+              تلاش مجدد
+            </Button>
+            <Button className="flex-1" onClick={() => router.push("/chat")}>
+              شروع مجدد
+            </Button>
+          </div>
+        )}
       </div>
-    </div>
+    </Shell>
   );
 }
 
 export default function PaymentVerifyPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-[#f7fbf9] flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-accent border-t-transparent rounded-full animate-spin" />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <Shell>
+          <Spinner />
+        </Shell>
+      }
+    >
       <VerifyContent />
     </Suspense>
   );

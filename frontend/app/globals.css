@@ -1,116 +1,218 @@
-@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * FreelioAI design tokens — "AI-Native UI" (ui-ux-pro-max).
+ * All colors are HSL channels so Tailwind opacity modifiers work (bg-primary/10).
+ * Light theme is the :root default; .dark on <html> switches to the dark theme.
+ */
 @layer base {
   :root {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 95%;
-    --card: 258 30% 8%;
-    --card-foreground: 0 0% 95%;
-    --primary: 263 70% 56%;
+    color-scheme: light;
+
+    --background: 260 40% 98.6%;
+    --foreground: 250 32% 12%;
+    --surface: 0 0% 100%;
+    --surface-2: 258 45% 96.4%;
+    --card: 0 0% 100%;
+    --card-foreground: 250 32% 12%;
+    --muted: 258 30% 95%;
+    --muted-foreground: 250 11% 40%;
+    --secondary: 258 30% 95%;
+    --secondary-foreground: 250 16% 26%;
+    --border: 256 28% 89%;
+    --input: 256 26% 85%;
+
+    --primary: 262 83% 58%;
+    --primary-hover: 263 70% 50%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 258 20% 12%;
-    --secondary-foreground: 0 0% 85%;
-    --muted: 258 20% 12%;
-    --muted-foreground: 0 0% 55%;
-    --accent: 263 70% 56%;
+    --primary-soft: 262 90% 96.5%;
+    --primary-line: 262 70% 86%;
+    --brand: 263 70% 46%;
+    --ring: 262 83% 58%;
+
+    --accent: 189 94% 37%;
     --accent-foreground: 0 0% 100%;
-    --border: 258 25% 16%;
-    --radius: 0.75rem;
 
-    /* direct color tokens */
-    --violet: #7c3aed;
-    --violet-light: #a78bfa;
-    --violet-glow: rgba(124, 58, 237, 0.18);
-    --violet-border: rgba(124, 58, 237, 0.25);
-    --surface: #110f1e;
-    --surface-2: #1a1730;
+    --success: 160 84% 28%;
+    --warning: 32 95% 36%;
+    --pending: 21 90% 42%;
+    --danger: 0 72% 46%;
+    --info: 217 80% 45%;
+
+    --overlay: 250 30% 10%;
+    --shadow-color: 252 40% 30%;
+    --radius: 0.875rem;
   }
-}
 
-* {
-  box-sizing: border-box;
-  border-color: hsl(var(--border));
-}
+  .dark {
+    color-scheme: dark;
 
-html,
-body {
-  background-color: hsl(var(--background));
-  color: hsl(var(--foreground));
-  font-family: 'Vazirmatn', sans-serif;
-  direction: rtl;
-  margin: 0;
-  padding: 0;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
+    --background: 250 24% 5%;
+    --foreground: 250 20% 96%;
+    --surface: 252 22% 8.5%;
+    --surface-2: 252 20% 12%;
+    --card: 252 22% 8.5%;
+    --card-foreground: 250 20% 96%;
+    --muted: 252 18% 13%;
+    --muted-foreground: 250 10% 66%;
+    --secondary: 252 18% 13%;
+    --secondary-foreground: 250 14% 84%;
+    --border: 252 16% 17%;
+    --input: 252 16% 23%;
 
-::-webkit-scrollbar {
-  width: 5px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: #2d1b52;
-  border-radius: 4px;
-}
+    --primary: 262 83% 58%;
+    --primary-hover: 262 90% 66%;
+    --primary-foreground: 0 0% 100%;
+    --primary-soft: 263 45% 14%;
+    --primary-line: 263 45% 30%;
+    --brand: 255 92% 80%;
+    --ring: 258 90% 72%;
 
-/* gradient text utility */
-.text-gradient {
-  background: linear-gradient(135deg, #a78bfa 0%, #7c3aed 50%, #c084fc 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
+    --accent: 187 86% 53%;
+    --accent-foreground: 190 80% 8%;
 
-/* violet glow utility */
-.glow-violet {
-  box-shadow: 0 0 60px var(--violet-glow), 0 0 120px rgba(124, 58, 237, 0.08);
-}
+    --success: 152 62% 52%;
+    --warning: 43 96% 58%;
+    --pending: 27 96% 62%;
+    --danger: 0 86% 70%;
+    --info: 213 94% 70%;
 
-/* subtle grid background */
-.bg-grid {
-  background-image:
-    linear-gradient(rgba(124, 58, 237, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(124, 58, 237, 0.04) 1px, transparent 1px);
-  background-size: 48px 48px;
+    --overlay: 250 30% 2%;
+    --shadow-color: 250 50% 2%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    direction: rtl;
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    margin: 0;
+    font-feature-settings: "ss01", "kern";
+    transition: background-color 200ms ease, color 200ms ease;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  ::selection {
+    background: hsl(var(--primary) / 0.22);
+  }
+
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+
+  /* Elements that draw their own focus ring opt out of the global outline. */
+  .focus-ring:focus-visible,
+  [class*="focus-visible:ring"]:focus-visible {
+    outline: none;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--foreground) / 0.14);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--foreground) / 0.26);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }
 
 @layer components {
+  .field,
   .admin-input,
   .admin-textarea {
-    width: 100%;
-    border: 1px solid hsl(var(--border));
-    border-radius: 0.75rem;
-    background: hsl(var(--background));
-    color: hsl(var(--foreground));
-    font-size: 0.875rem;
-    outline: none;
-    transition: border-color 160ms ease, box-shadow 160ms ease;
-  }
-
-  .admin-input {
-    padding: 0.625rem 0.75rem;
+    @apply w-full rounded-xl border border-input bg-surface px-3.5 py-2.5 text-sm text-foreground shadow-xs outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-muted-foreground/80 disabled:cursor-not-allowed disabled:opacity-60;
   }
 
   .admin-textarea {
-    padding: 0.625rem 0.75rem;
-    line-height: 1.75rem;
+    @apply leading-7;
     resize: vertical;
   }
 
-  .admin-input::placeholder,
-  .admin-textarea::placeholder {
-    color: hsl(var(--muted-foreground));
+  .field:hover,
+  .admin-input:hover,
+  .admin-textarea:hover {
+    @apply border-primary-line;
   }
 
+  .field:focus,
   .admin-input:focus,
   .admin-textarea:focus {
-    border-color: var(--violet-border);
-    box-shadow: 0 0 0 3px var(--violet-glow);
+    @apply border-primary;
+    box-shadow: 0 0 0 4px hsl(var(--primary) / 0.16);
+  }
+
+  .field-label {
+    @apply mb-1.5 block text-xs font-bold text-secondary-foreground;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    background: linear-gradient(120deg, hsl(var(--brand)) 0%, hsl(var(--primary)) 45%, hsl(var(--accent)) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .glow-violet {
+    box-shadow: 0 0 60px hsl(var(--primary) / 0.18), 0 0 120px hsl(var(--primary) / 0.08);
+  }
+
+  /* Soft ambient wash behind app shells — the AI-native "aura". */
+  .bg-aura {
+    background-image:
+      radial-gradient(60rem 28rem at 50% -12rem, hsl(var(--primary) / 0.14), transparent 70%),
+      radial-gradient(36rem 20rem at 100% 0%, hsl(var(--accent) / 0.07), transparent 70%);
+    background-attachment: fixed;
+  }
+
+  .bg-grid {
+    background-image:
+      linear-gradient(hsl(var(--primary) / 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--primary) / 0.05) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+
+  .glass {
+    @apply bg-background/80 backdrop-blur-xl backdrop-saturate-150;
   }
 }

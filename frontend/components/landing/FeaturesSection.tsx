@@ -57,15 +57,15 @@ export default function FeaturesSection() {
   return (
     <section
       id="features"
-      className="border-t border-[hsl(var(--border))] bg-[--surface]/30"
+      className="border-t border-border bg-surface/30"
     >
       <div className="mx-auto max-w-7xl px-4 py-24">
         <div className="mb-14 text-center">
-          <p className="mb-3 text-sm font-semibold text-violet-400">ویژگی‌ها</p>
-          <h2 className="text-3xl font-black text-white md:text-4xl">
+          <p className="mb-3 text-sm font-semibold text-brand">ویژگی‌ها</p>
+          <h2 className="text-3xl font-black text-foreground md:text-4xl">
             همه‌چیزی که یه فریلنسر حرفه‌ای نیاز داره
           </h2>
-          <p className="mx-auto mt-4 max-w-xl text-[hsl(var(--muted-foreground))]">
+          <p className="mx-auto mt-4 max-w-xl text-muted-foreground">
             از اولین چت مشتری تا تحویل نهایی — یه ابزار، همه مراحل.
           </p>
         </div>
@@ -76,9 +76,9 @@ export default function FeaturesSection() {
             return (
               <Card
                 key={feature.title}
-                className={`p-6 transition-all duration-200 hover:-translate-y-1 hover:border-[--violet-border] ${
+                className={`p-6 transition-all duration-200 hover:-translate-y-1 hover:border-primary-line ${
                   feature.accent
-                    ? "border-[--violet-border] bg-[--violet-glow]"
+                    ? "border-primary-line bg-primary-soft"
                     : ""
                 }`}
               >
@@ -86,13 +86,13 @@ export default function FeaturesSection() {
                   <span
                     className={`mb-5 grid h-12 w-12 place-items-center rounded-2xl ${
                       feature.accent
-                        ? "bg-[--violet] text-white shadow-lg shadow-[--violet-glow]"
-                        : "bg-[--surface-2] text-violet-400 border border-[hsl(var(--border))]"
+                        ? "bg-primary text-primary-foreground shadow-md shadow-primary/25"
+                        : "bg-surface-2 text-brand border border-border"
                     }`}
                   >
                     <Icon size={22} stroke={1.8} />
                   </span>
-                  <CardTitle className="text-white">{feature.title}</CardTitle>
+                  <CardTitle className="text-foreground">{feature.title}</CardTitle>
                   <CardDescription>{feature.description}</CardDescription>
                 </CardHeader>
               </Card>

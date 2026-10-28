@@ -31,6 +31,7 @@ import {
   WorkspaceVersion,
   workspaceRequest,
 } from "@/lib/api";
+import ThemeToggle from "@/components/ThemeToggle";
 
 const PATHS = [
   {
@@ -80,9 +81,9 @@ const COMMENT_STATES = {
   approved: "تأییدشده",
 };
 const inputClass =
-  "w-full rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2.5 text-sm text-[hsl(var(--foreground))] outline-none focus:border-[--violet-light] focus:ring-1 focus:ring-[--violet-light]";
+  "field";
 const panelClass =
-  "rounded-2xl border border-[hsl(var(--border))] bg-[--surface] p-5 sm:p-6";
+  "rounded-2xl border border-border bg-surface p-5 sm:p-6 shadow-card";
 const date = (value: string | number) =>
   new Date(value).toLocaleString("fa-IR", {
     dateStyle: "medium",
@@ -267,27 +268,27 @@ export default function ProjectWorkspace({
     <section
       className={cn(
         panelClass,
-        "relative overflow-hidden border-[--violet-border]",
+        "relative overflow-hidden border-primary-line",
       )}
       aria-labelledby="deployment-heading"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-center gap-3">
-          <span className="grid h-11 w-11 place-items-center rounded-xl bg-[--violet-glow] text-violet-300">
+          <span className="grid h-11 w-11 place-items-center rounded-xl bg-primary-soft text-brand">
             <IconCloudUpload size={23} />
           </span>
           <div>
             <h2 id="deployment-heading" className="font-bold">
               پیشرفت دیپلوی
             </h2>
-            <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
+            <p className="mt-1 text-xs text-muted-foreground">
               وضعیت واقعی انتشار پروژه
             </p>
           </div>
         </div>
         <span
           role="status"
-          className="flex items-center gap-2 rounded-full border border-[--violet-border] bg-[--violet-glow] px-3 py-1.5 text-xs text-violet-300"
+          className="flex items-center gap-2 rounded-full border border-primary-line bg-primary-soft px-3 py-1.5 text-xs text-brand"
         >
           {deploying && <IconLoader2 size={14} className="animate-spin" />}
           {STATES[state] || state}
@@ -312,7 +313,7 @@ export default function ProjectWorkspace({
               <div
                 className={cn(
                   "h-1.5 rounded-full",
-                  complete || active ? "bg-[--violet]" : "bg-[--surface-2]",
+                  complete || active ? "bg-primary" : "bg-surface-2",
                   active && "animate-pulse",
                 )}
               />
@@ -320,8 +321,8 @@ export default function ProjectWorkspace({
                 className={cn(
                   "block text-xs",
                   complete || active
-                    ? "text-violet-300"
-                    : "text-[hsl(var(--muted-foreground))]",
+                    ? "text-brand"
+                    : "text-muted-foreground",
                 )}
               >
                 {label}
@@ -331,13 +332,13 @@ export default function ProjectWorkspace({
         })}
       </ol>
       {state === "NOT_STARTED" && (
-        <p className="mt-5 text-sm leading-7 text-[hsl(var(--muted-foreground))]">
+        <p className="mt-5 text-sm leading-7 text-muted-foreground">
           بعد از ثبت و تأیید نسخه توسعه، ایجنت می‌تواند انتشار را شروع کند.
           وضعیت اینجا خودکار به‌روز می‌شود.
         </p>
       )}
       {["FAILED", "UNHEALTHY", "EXPIRED"].includes(state) && (
-        <p className="mt-4 text-sm leading-7 text-[hsl(var(--muted-foreground))]">
+        <p className="mt-4 text-sm leading-7 text-muted-foreground">
           {state === "EXPIRED"
             ? "مدت میزبانی این نسخه تمام شده است."
             : "انتشار نیاز به بررسی دارد؛ جزئیات خطا در گزارش ساخت آمده است."}
@@ -348,7 +349,7 @@ export default function ProjectWorkspace({
           href={safeUrl(deployment?.url)}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-5 flex items-center justify-between gap-3 rounded-xl border border-[--violet-border] bg-[hsl(var(--background))] px-4 py-3 text-sm text-violet-300"
+          className="mt-5 flex items-center justify-between gap-3 rounded-xl border border-primary-line bg-background px-4 py-3 text-sm text-brand"
         >
           <span dir="ltr" className="truncate">
             {deployment?.url}
@@ -357,12 +358,12 @@ export default function ProjectWorkspace({
         </a>
       )}
       {deployment?.expires_at && (
-        <p className="mt-3 text-xs text-[hsl(var(--muted-foreground))]">
+        <p className="mt-3 text-xs text-muted-foreground">
           پایان اعتبار میزبانی: {date(deployment.expires_at * 1000)}
         </p>
       )}
       {deploymentError && (
-        <p role="alert" className="mt-4 text-sm text-violet-300">
+        <p role="alert" className="mt-4 text-sm text-brand">
           {deploymentError}
         </p>
       )}
@@ -390,35 +391,36 @@ export default function ProjectWorkspace({
   );
 
   return (
-    <div className="min-h-screen bg-[hsl(var(--background))] text-[hsl(var(--foreground))]">
-      <header className="sticky top-0 z-20 border-b border-[hsl(var(--border))] bg-[hsl(var(--background))]/95 backdrop-blur-xl">
+    <div className="min-h-screen bg-background bg-aura text-foreground">
+      <header className="glass sticky top-0 z-20 border-b border-border/70">
         <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 sm:px-6">
           <Link
             href="/panel"
-            className="flex items-center gap-1 text-sm text-[hsl(var(--muted-foreground))] hover:text-violet-300"
+            className="flex min-h-9 items-center gap-1 rounded-lg px-1 text-sm text-muted-foreground outline-none transition-colors hover:text-brand focus-visible:ring-2 focus-visible:ring-ring"
           >
             <IconChevronRight size={17} />
             پروژه‌ها
           </Link>
-          <span className="text-[hsl(var(--muted-foreground))]">/</span>
+          <span className="text-muted-foreground">/</span>
           <span className="truncate text-sm font-semibold">
             {order.project_name}
           </span>
-          <span className="mr-auto hidden text-xs text-violet-300 sm:block">
+          <span className="mr-auto hidden rounded-full border border-primary-line bg-primary-soft px-2.5 py-0.5 text-xs font-bold text-brand sm:block">
             فضای پروژه
           </span>
+          <ThemeToggle className="max-sm:mr-auto" />
         </div>
       </header>
       <main className="mx-auto max-w-7xl px-4 py-7 sm:px-6 sm:py-10">
         <div className="mb-7 flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="mb-2 text-xs font-semibold text-violet-300">
+            <p className="mb-2 text-xs font-semibold text-brand">
               WORKSPACE
             </p>
             <h1 className="text-2xl font-extrabold sm:text-3xl">
               {order.project_name}
             </h1>
-            <p className="mt-3 text-sm leading-7 text-[hsl(var(--muted-foreground))]">
+            <p className="mt-3 text-sm leading-7 text-muted-foreground">
               از اولین تصمیم تا انتشار؛ خروجی‌ها، بازخوردها و دسترسی‌های پروژه
               یک‌جا.
             </p>
@@ -433,7 +435,7 @@ export default function ProjectWorkspace({
           </Button>
         </div>
         <nav
-          className="mb-6 flex gap-1 overflow-x-auto border-b border-[hsl(var(--border))]"
+          className="mb-6 flex gap-1 overflow-x-auto border-b border-border"
           aria-label="بخش‌های فضای پروژه"
         >
           {TABS.map((item) => (
@@ -444,8 +446,8 @@ export default function ProjectWorkspace({
               className={cn(
                 "flex min-h-12 shrink-0 items-center gap-2 border-b-2 px-4 text-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-violet-400",
                 tab === item.id
-                  ? "border-[--violet] text-violet-300"
-                  : "border-transparent text-[hsl(var(--muted-foreground))] hover:text-violet-300",
+                  ? "border-primary text-brand"
+                  : "border-transparent text-muted-foreground hover:text-brand",
               )}
             >
               <item.icon size={17} />
@@ -456,7 +458,7 @@ export default function ProjectWorkspace({
         {error && (
           <div
             role="alert"
-            className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[--violet-border] bg-[--violet-glow] p-4 text-sm"
+            className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary-line bg-primary-soft p-4 text-sm"
           >
             <p>{error}</p>
             <Button
@@ -472,12 +474,12 @@ export default function ProjectWorkspace({
           </div>
         )}
         {notice && (
-          <p role="status" className="mb-5 text-sm text-violet-300">
+          <p role="status" className="mb-5 text-sm text-brand">
             {notice}
           </p>
         )}
         {!data ? (
-          <div className="flex min-h-64 items-center justify-center gap-3 text-sm text-[hsl(var(--muted-foreground))]">
+          <div className="flex min-h-64 items-center justify-center gap-3 text-sm text-muted-foreground">
             <IconLoader2 className="animate-spin" size={22} />
             در حال دریافت فضای پروژه…
           </div>
@@ -492,18 +494,18 @@ export default function ProjectWorkspace({
                       (path) => (
                         <div
                           key={path.id}
-                          className="flex items-start gap-3 rounded-xl border border-[--violet-border] bg-[--violet-glow] p-4"
+                          className="flex items-start gap-3 rounded-xl border border-primary-line bg-primary-soft p-4"
                         >
                           <path.icon
                             size={24}
-                            className="shrink-0 text-violet-300"
+                            className="shrink-0 text-brand"
                           />
                           <div>
                             <h3 className="text-sm font-bold">{path.title}</h3>
-                            <p className="mt-2 text-xs leading-6 text-[hsl(var(--muted-foreground))]">
+                            <p className="mt-2 text-xs leading-6 text-muted-foreground">
                               {path.text}
                             </p>
-                            <p className="mt-3 text-xs text-violet-300">
+                            <p className="mt-3 text-xs text-brand">
                               انتخاب‌شده پیش از شروع گفتگو
                             </p>
                           </div>
@@ -511,7 +513,7 @@ export default function ProjectWorkspace({
                       ),
                     )}
                     {!data.path && (
-                      <p className="text-sm leading-7 text-[hsl(var(--muted-foreground))]">
+                      <p className="text-sm leading-7 text-muted-foreground">
                         برای این پروژه قدیمی مسیری ثبت نشده است. مسیر پروژه‌های
                         جدید پیش از شروع گفتگو انتخاب می‌شود.
                       </p>
@@ -522,12 +524,12 @@ export default function ProjectWorkspace({
                         target="_blank"
                         rel="noopener noreferrer"
                         dir="ltr"
-                        className="mt-4 block break-all text-sm text-violet-300"
+                        className="mt-4 block break-all text-sm text-brand"
                       >
                         {data.source_url}
                       </a>
                     )}
-                    {data.source_file && <a href={`${process.env.NEXT_PUBLIC_API_URL || ""}${data.source_file.url}`} target="_blank" rel="noopener noreferrer" className="mt-4 flex items-center gap-2 break-all text-sm text-violet-300"><IconFileText size={17} />سورس ZIP: {data.source_file.name}<IconArrowUpRight size={15} /></a>}
+                    {data.source_file && <a href={`${process.env.NEXT_PUBLIC_API_URL || ""}${data.source_file.url}`} target="_blank" rel="noopener noreferrer" className="mt-4 flex items-center gap-2 break-all text-sm text-brand"><IconFileText size={17} />سورس ZIP: {data.source_file.name}<IconArrowUpRight size={15} /></a>}
 
                   </section>
                   <section className={panelClass}>
@@ -560,8 +562,8 @@ export default function ProjectWorkspace({
                             className={cn(
                               "grid h-8 w-8 shrink-0 place-items-center rounded-full text-xs",
                               step.done
-                                ? "bg-[--violet]"
-                                : "border border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))]",
+                                ? "bg-primary text-primary-foreground"
+                                : "border border-border text-muted-foreground",
                             )}
                           >
                             {step.done ? (
@@ -571,7 +573,7 @@ export default function ProjectWorkspace({
                             )}
                           </span>
                           <span className="text-sm">{step.title}</span>
-                          <span className="mr-auto text-xs text-[hsl(var(--muted-foreground))]">
+                          <span className="mr-auto text-xs text-muted-foreground">
                             {step.done ? "تکمیل شده" : "در انتظار"}
                           </span>
                         </li>
@@ -590,16 +592,16 @@ export default function ProjectWorkspace({
                 <div className="space-y-5">
                   {deploymentCard}
                   <section className={panelClass}>
-                    <IconMessage size={23} className="mb-3 text-violet-300" />
+                    <IconMessage size={23} className="mb-3 text-brand" />
                     <h2 className="font-bold">اقدام بعدی</h2>
-                    <p className="mt-2 text-sm leading-7 text-[hsl(var(--muted-foreground))]">
+                    <p className="mt-2 text-sm leading-7 text-muted-foreground">
                       {!data.path
                         ? "مسیر این پروژه قدیمی ثبت نشده؛ برای پروژه جدید، مسیر را پیش از گفتگو انتخاب کن."
                         : !data.versions.length
                           ? "کانفیگ را به ایجنت بده تا اولین خروجی را برای بازبینی ثبت کند."
                           : "آخرین نسخه و بازخوردها را در بخش طراحی و Preview بررسی کن."}
                     </p>
-                    <p className="mt-4 border-t border-[hsl(var(--border))] pt-4 text-xs leading-6 text-[hsl(var(--muted-foreground))]">
+                    <p className="mt-4 border-t border-border pt-4 text-xs leading-6 text-muted-foreground">
                       اجرای خودکار ایجنت هنوز متصل نیست. ایجنت بیرونی می‌تواند
                       با MCP خروجی و گزارش ثبت کند.
                     </p>
@@ -612,7 +614,7 @@ export default function ProjectWorkspace({
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h2 className="font-bold">خروجی‌های قابل بازبینی</h2>
-                    <p className="mt-1 text-xs leading-6 text-[hsl(var(--muted-foreground))]">
+                    <p className="mt-1 text-xs leading-6 text-muted-foreground">
                       هر بازخورد به نسخه، صفحه و المان همان خروجی متصل می‌شود.
                     </p>
                   </div>
@@ -754,10 +756,10 @@ export default function ProjectWorkspace({
                   <section className={cn(panelClass, "py-16 text-center")}>
                     <IconLayout
                       size={38}
-                      className="mx-auto mb-4 text-violet-300"
+                      className="mx-auto mb-4 text-brand"
                     />
                     <h3 className="font-semibold">اولین خروجی هنوز ثبت نشده</h3>
-                    <p className="mx-auto mt-3 max-w-lg text-sm leading-7 text-[hsl(var(--muted-foreground))]">
+                    <p className="mx-auto mt-3 max-w-lg text-sm leading-7 text-muted-foreground">
                       ایجنت می‌تواند خروجی را با MCP ثبت کند. اگر خروجی آماده
                       داری، از «ثبت نسخه» آدرس یا فایل HTML را اضافه کن.
                     </p>
@@ -787,7 +789,7 @@ export default function ProjectWorkspace({
                       </select>
                       {data.approvals[version.stage]?.version_id ===
                       version.id ? (
-                        <span className="flex items-center gap-1 text-xs text-violet-300">
+                        <span className="flex items-center gap-1 text-xs text-brand">
                           <IconLock size={15} />
                           تأیید شده در{" "}
                           {date(data.approvals[version.stage]!.approved_at)}
@@ -813,14 +815,14 @@ export default function ProjectWorkspace({
                       )}
                     </div>
                     {version.notes && (
-                      <p className="whitespace-pre-wrap text-sm leading-7 text-[hsl(var(--muted-foreground))]">
+                      <p className="whitespace-pre-wrap text-sm leading-7 text-muted-foreground">
                         {version.notes}
                       </p>
                     )}
                     <div className="grid items-start gap-5 xl:grid-cols-[1fr_340px]">
-                      <section className="overflow-hidden rounded-2xl border border-[hsl(var(--border))] bg-[--surface]">
-                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[hsl(var(--border))] px-4 py-3">
-                          <span className="text-xs text-[hsl(var(--muted-foreground))]">
+                      <section className="overflow-hidden rounded-2xl border border-border bg-surface shadow-card">
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
+                          <span className="text-xs text-muted-foreground">
                             {version.html
                               ? "برای ثبت بازخورد روی المان کلیک کن"
                               : "پیش‌نمایش سایت"}
@@ -830,7 +832,7 @@ export default function ProjectWorkspace({
                               href={safeUrl(version.url)}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="flex items-center gap-1 text-xs text-violet-300"
+                              className="flex items-center gap-1 text-xs text-brand"
                             >
                               باز کردن سایت
                               <IconArrowUpRight size={14} />
@@ -845,7 +847,7 @@ export default function ProjectWorkspace({
                             srcDoc={previewDocument(version)}
                             sandbox="allow-scripts"
                             referrerPolicy="no-referrer"
-                            className="h-[620px] w-full bg-[--surface-2]"
+                            className="h-[620px] w-full bg-surface-2"
                           />
                         ) : (
                           <div>
@@ -856,14 +858,14 @@ export default function ProjectWorkspace({
                               src={safeUrl(version.url)}
                               sandbox="allow-scripts allow-forms"
                               referrerPolicy="no-referrer"
-                              className="h-[620px] w-full bg-[--surface-2]"
+                              className="h-[620px] w-full bg-surface-2"
                             />
                             <div className="px-5 py-6 text-center">
                               <IconWorld
-                                className="mx-auto mb-3 text-violet-300"
+                                className="mx-auto mb-3 text-brand"
                                 size={32}
                               />
-                              <p className="text-sm leading-7 text-[hsl(var(--muted-foreground))]">
+                              <p className="text-sm leading-7 text-muted-foreground">
                                 Preview را در تب جدید باز کن و آدرس صفحه و
                                 selector المان را در فرم بازخورد وارد کن. برای
                                 انتخاب مستقیم، HTML این نسخه را هم ثبت کن. اگر
@@ -944,7 +946,7 @@ export default function ProjectWorkspace({
                                   {c.text}
                                 </p>
                                 <p
-                                  className="break-all text-xs text-[hsl(var(--muted-foreground))]"
+                                  className="break-all text-xs text-muted-foreground"
                                   dir="ltr"
                                 >
                                   {c.page} · {c.selector}
@@ -987,7 +989,7 @@ export default function ProjectWorkspace({
               <div className="grid items-start gap-5 lg:grid-cols-2">
                 <section className={panelClass}>
                   <h2 className="font-bold">اسناد پروژه</h2>
-                  <p className="mt-3 whitespace-pre-wrap text-sm leading-8 text-[hsl(var(--muted-foreground))]">
+                  <p className="mt-3 whitespace-pre-wrap text-sm leading-8 text-muted-foreground">
                     {order.summary}
                   </p>
                   <Button
@@ -1003,7 +1005,7 @@ export default function ProjectWorkspace({
                   </Button>
                   {data.source_url && (
                     <a
-                      className="mt-5 block break-all text-sm text-violet-300"
+                      className="mt-5 block break-all text-sm text-brand"
                       href={safeUrl(data.source_url)}
                       target="_blank"
                       rel="noopener noreferrer"
@@ -1013,10 +1015,10 @@ export default function ProjectWorkspace({
                     </a>
                   )}
                   <details className="mt-5">
-                    <summary className="cursor-pointer text-sm text-violet-300">
+                    <summary className="cursor-pointer text-sm text-brand">
                       نسخه‌های تأییدشده
                     </summary>
-                    <ul className="mt-3 space-y-2 text-xs text-[hsl(var(--muted-foreground))]">
+                    <ul className="mt-3 space-y-2 text-xs text-muted-foreground">
                       {Object.entries(data.approvals).map(
                         ([stage, approval]) => (
                           <li key={stage}>
@@ -1039,7 +1041,7 @@ export default function ProjectWorkspace({
                 <section className={panelClass}>
                   <div className="mb-4 flex items-center justify-between gap-3">
                     <h2 className="font-bold">فایل‌ها و سورس</h2>
-                    <label className="cursor-pointer rounded-lg border border-[--violet-border] px-3 py-2 text-xs text-violet-300">
+                    <label className="cursor-pointer rounded-lg border border-primary-line px-3 py-2 text-xs text-brand">
                       افزودن فایل
                       <input
                         className="sr-only"
@@ -1074,17 +1076,17 @@ export default function ProjectWorkspace({
                         href={`${process.env.NEXT_PUBLIC_API_URL || ""}${file.url}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center justify-between gap-3 rounded-xl border border-[hsl(var(--border))] p-3 text-sm hover:border-[--violet-border]"
+                        className="flex items-center justify-between gap-3 rounded-xl border border-border p-3 text-sm hover:border-primary-line"
                       >
                         <span className="truncate">{file.name}</span>
                         <IconArrowUpRight
                           size={17}
-                          className="shrink-0 text-violet-300"
+                          className="shrink-0 text-brand"
                         />
                       </a>
                     ))}
                     {!order.order_files.length && (
-                      <p className="py-8 text-sm text-[hsl(var(--muted-foreground))]">
+                      <p className="py-8 text-sm text-muted-foreground">
                         هنوز فایلی ثبت نشده است.
                       </p>
                     )}
@@ -1095,16 +1097,16 @@ export default function ProjectWorkspace({
             {tab === "activity" && (
               <section className={panelClass}>
                 <div className="mb-6 flex items-center gap-3">
-                  <IconHistory className="text-violet-300" size={24} />
+                  <IconHistory className="text-brand" size={24} />
                   <div>
                     <h2 className="font-bold">فعالیت پروژه</h2>
-                    <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
+                    <p className="mt-1 text-xs text-muted-foreground">
                       گزارش‌های کوتاه ایجنت و تصمیم‌های ثبت‌شده
                     </p>
                   </div>
                 </div>
                 {!data.activity.length ? (
-                  <p className="py-10 text-center text-sm text-[hsl(var(--muted-foreground))]">
+                  <p className="py-10 text-center text-sm text-muted-foreground">
                     هنوز گزارشی ثبت نشده. گزارش‌های MCP اینجا نمایش داده
                     می‌شوند.
                   </p>
@@ -1113,14 +1115,14 @@ export default function ProjectWorkspace({
                     {[...data.activity].reverse().map((item) => (
                       <li
                         key={item.id}
-                        className="flex gap-4 border-b border-[hsl(var(--border))] py-4 last:border-0"
+                        className="flex gap-4 border-b border-border py-4 last:border-0"
                       >
-                        <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-[--violet]" />
+                        <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-primary" />
                         <div className="min-w-0">
                           <p className="whitespace-pre-wrap break-words text-sm leading-7">
                             {item.text}
                           </p>
-                          <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">
+                          <p className="mt-2 text-xs text-muted-foreground">
                             {item.actor === "agent"
                               ? "ایجنت"
                               : item.actor === "system"
@@ -1144,7 +1146,7 @@ export default function ProjectWorkspace({
                     {deployment?.fail_reason && (
                       <p
                         role="status"
-                        className="mb-4 break-words text-sm text-violet-300"
+                        className="mb-4 break-words text-sm text-brand"
                       >
                         {deployment.fail_reason}
                       </p>
@@ -1152,12 +1154,12 @@ export default function ProjectWorkspace({
                     {deployment?.build_log_tail?.length ? (
                       <pre
                         dir="ltr"
-                        className="max-h-96 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-[hsl(var(--background))] p-4 text-left text-xs leading-6 text-[hsl(var(--muted-foreground))]"
+                        className="max-h-96 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-background p-4 text-left text-xs leading-6 text-muted-foreground"
                       >
                         {deployment.build_log_tail.join("\n")}
                       </pre>
                     ) : (
-                      <p className="text-sm leading-7 text-[hsl(var(--muted-foreground))]">
+                      <p className="text-sm leading-7 text-muted-foreground">
                         هنوز گزارشی از ساخت دریافت نشده است.
                       </p>
                     )}
@@ -1165,7 +1167,7 @@ export default function ProjectWorkspace({
                       <p
                         key={i}
                         dir="ltr"
-                        className="mt-3 break-words text-xs text-violet-300"
+                        className="mt-3 break-words text-xs text-brand"
                       >
                         {line}
                       </p>
@@ -1174,7 +1176,7 @@ export default function ProjectWorkspace({
                   <section className={panelClass}>
                     <h2 className="mb-4 font-bold">تاریخچه انتشار</h2>
                     {!(deployment?.history || data.deployments).length ? (
-                      <p className="text-sm text-[hsl(var(--muted-foreground))]">
+                      <p className="text-sm text-muted-foreground">
                         انتشاری ثبت نشده است.
                       </p>
                     ) : (
@@ -1184,13 +1186,13 @@ export default function ProjectWorkspace({
                           .map((item) => (
                             <li
                               key={item.id}
-                              className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[hsl(var(--border))] p-3"
+                              className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border p-3"
                             >
                               <div>
                                 <p className="text-sm">
                                   {STATES[item.state] || item.state}
                                 </p>
-                                <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
+                                <p className="mt-1 text-xs text-muted-foreground">
                                   {date(item.created_at)}
                                 </p>
                               </div>
@@ -1199,7 +1201,7 @@ export default function ProjectWorkspace({
                                   href={safeUrl(item.url)}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="text-xs text-violet-300"
+                                  className="text-xs text-brand"
                                 >
                                   مشاهده سایت
                                   <IconArrowUpRight
@@ -1216,17 +1218,17 @@ export default function ProjectWorkspace({
                 </div>
                 <section className={panelClass}>
                   <div className="mb-3 flex items-center gap-2">
-                    <IconLock className="text-violet-300" size={21} />
+                    <IconLock className="text-brand" size={21} />
                     <h2 className="font-bold">دسترسی ادمین پروژه</h2>
                   </div>
-                  <p className="mb-5 text-xs leading-7 text-[hsl(var(--muted-foreground))]">
+                  <p className="mb-5 text-xs leading-7 text-muted-foreground">
                     آدرس مدیریت و اطلاعات ورود همین پروژه. رمزها به‌صورت
                     رمزگذاری‌شده ذخیره می‌شوند و فقط برای حساب مالک قابل
                     مشاهده‌اند.
                   </p>
                   {!credentials ? (
                     <>
-                      <p className="mb-4 text-sm text-[hsl(var(--muted-foreground))]">
+                      <p className="mb-4 text-sm text-muted-foreground">
                         {data.has_credentials
                           ? "اطلاعات ورود ثبت شده است."
                           : "هنوز اطلاعات ورود ثبت نشده است. ایجنت یا خودت می‌توانید اطلاعات واقعی پروژه را اضافه کنید."}
@@ -1286,7 +1288,7 @@ export default function ProjectWorkspace({
                       </label>
                       {safeUrl(credentials.admin_url) && (
                         <a
-                          className="flex items-center gap-1 text-xs text-violet-300"
+                          className="flex items-center gap-1 text-xs text-brand"
                           href={safeUrl(credentials.admin_url)}
                           target="_blank"
                           rel="noopener noreferrer"
@@ -1330,7 +1332,7 @@ export default function ProjectWorkspace({
                       </label>
                       <button
                         type="button"
-                        className="text-xs text-violet-300"
+                        className="text-xs text-brand"
                         onClick={() => setShowPassword(!showPassword)}
                       >
                         {showPassword ? "پنهان کردن رمز" : "نمایش رمز"}

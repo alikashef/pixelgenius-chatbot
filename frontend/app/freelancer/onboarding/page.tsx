@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { IconSparkles } from "@tabler/icons-react";
 import { freelancerOnboarding } from "@/lib/api";
+import ThemeToggle from "@/components/ThemeToggle";
 
 const STEPS = [
   { title: "اسم و موقعیت", desc: "مشتری‌ها با چه عنوانی تو رو می‌شناسن؟" },
@@ -65,38 +66,40 @@ export default function FreelancerOnboardingPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-[hsl(var(--background))] px-4 py-10">
-      <div className="w-full max-w-lg">
+    <div className="relative flex min-h-[100dvh] flex-col items-center justify-center overflow-hidden bg-background bg-aura px-4 py-10">
+      <div className="pointer-events-none absolute inset-0 bg-grid [mask-image:radial-gradient(ellipse_at_top,black,transparent_70%)]" />
+      <ThemeToggle className="absolute left-4 top-4 z-10" />
+      <div className="relative w-full max-w-lg">
         <div className="mb-8 flex flex-col items-center gap-3">
-          <span className="grid h-12 w-12 place-items-center rounded-2xl bg-[--violet] shadow-lg shadow-[--violet-glow]">
-            <IconSparkles size={22} stroke={2} className="text-white" />
+          <span className="grid h-12 w-12 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-md shadow-primary/25">
+            <IconSparkles size={22} stroke={2} aria-hidden="true" />
           </span>
-          <h1 className="text-xl font-black text-white">راه‌اندازی FreelioAI</h1>
-          <p className="text-sm text-[hsl(var(--muted-foreground))]">یه‌بار این اطلاعات رو بده تا AI شخصی‌سازی بشه</p>
+          <h1 className="text-xl font-black text-foreground">راه‌اندازی FreelioAI</h1>
+          <p className="text-sm text-muted-foreground">یه‌بار این اطلاعات رو بده تا AI شخصی‌سازی بشه</p>
         </div>
 
         <div className="mb-6 flex gap-1.5">
           {STEPS.map((_, i) => (
             <div
               key={i}
-              className={`h-1.5 flex-1 rounded-full transition-colors ${i <= step ? "bg-[--violet]" : "bg-[hsl(var(--border))]"}`}
+              className={`h-1.5 flex-1 rounded-full transition-colors ${i <= step ? "bg-primary" : "bg-border"}`}
             />
           ))}
         </div>
 
-        <div className="rounded-2xl border border-[hsl(var(--border))] bg-[--surface] p-6">
-          <p className="mb-1 font-bold text-white">{STEPS[step].title}</p>
-          <p className="mb-5 text-sm text-[hsl(var(--muted-foreground))]">{STEPS[step].desc}</p>
+        <div className="rounded-2xl border border-border bg-surface p-6 shadow-card">
+          <p className="mb-1 font-bold text-foreground">{STEPS[step].title}</p>
+          <p className="mb-5 text-sm text-muted-foreground">{STEPS[step].desc}</p>
 
           <form onSubmit={handleNext} className="space-y-4">
             {step === 0 && (
               <>
                 <div>
-                  <label className="mb-1.5 block text-xs text-[hsl(var(--muted-foreground))]">اسم کامل</label>
+                  <label className="field-label">اسم کامل</label>
                   <input value={name} onChange={(e) => setName(e.target.value)} placeholder="مثلاً علی رضایی" className="admin-input" required />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs text-[hsl(var(--muted-foreground))]">موقعیت / تخصص</label>
+                  <label className="field-label">موقعیت / تخصص</label>
                   <input value={position} onChange={(e) => setPosition(e.target.value)} placeholder="مثلاً فریلنسر طراحی و توسعه وب" className="admin-input" required />
                 </div>
               </>
@@ -104,7 +107,7 @@ export default function FreelancerOnboardingPage() {
 
             {step === 1 && (
               <div>
-                <label className="mb-1.5 block text-xs text-[hsl(var(--muted-foreground))]">خدماتی که ارائه می‌دی</label>
+                <label className="field-label">خدماتی که ارائه می‌دی</label>
                 <textarea
                   value={services}
                   onChange={(e) => setServices(e.target.value)}
@@ -118,7 +121,7 @@ export default function FreelancerOnboardingPage() {
 
             {step === 2 && (
               <div>
-                <label className="mb-1.5 block text-xs text-[hsl(var(--muted-foreground))]">بازه قیمتی پروژه‌هات</label>
+                <label className="field-label">بازه قیمتی پروژه‌هات</label>
                 <input
                   value={priceRange}
                   onChange={(e) => setPriceRange(e.target.value)}
@@ -126,13 +129,13 @@ export default function FreelancerOnboardingPage() {
                   className="admin-input"
                   required
                 />
-                <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">این عدد به AI کمک می‌کنه بودجه مشتری رو بهتر ارزیابی کنه.</p>
+                <p className="mt-2 text-xs text-muted-foreground">این عدد به AI کمک می‌کنه بودجه مشتری رو بهتر ارزیابی کنه.</p>
               </div>
             )}
 
             {step === 3 && (
               <div>
-                <label className="mb-1.5 block text-xs text-[hsl(var(--muted-foreground))]">زمان تحویل معمول</label>
+                <label className="field-label">زمان تحویل معمول</label>
                 <input
                   value={timeline}
                   onChange={(e) => setTimeline(e.target.value)}
@@ -145,7 +148,7 @@ export default function FreelancerOnboardingPage() {
 
             {step === 4 && (
               <div>
-                <label className="mb-1.5 block text-xs text-[hsl(var(--muted-foreground))]">نکته مهم (اختیاری)</label>
+                <label className="field-label">نکته مهم (اختیاری)</label>
                 <textarea
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
@@ -156,14 +159,14 @@ export default function FreelancerOnboardingPage() {
               </div>
             )}
 
-            {error && <p className="text-sm text-red-400">{error}</p>}
+            {error && <p className="text-sm text-danger">{error}</p>}
 
             <div className="flex gap-3">
               {step > 0 && (
                 <button
                   type="button"
                   onClick={() => setStep((s) => s - 1)}
-                  className="flex-1 rounded-xl border border-[hsl(var(--border))] py-3 text-sm text-[hsl(var(--muted-foreground))] transition-colors hover:border-[--violet-border] hover:text-white"
+                  className="flex-1 rounded-xl border border-border py-3 text-sm text-muted-foreground transition-colors hover:border-primary-line hover:text-foreground"
                 >
                   قبلی
                 </button>
@@ -171,7 +174,7 @@ export default function FreelancerOnboardingPage() {
               <button
                 type="submit"
                 disabled={loading || !canAdvance()}
-                className="flex-1 rounded-xl bg-[--violet] py-3 text-sm font-bold text-white shadow-md shadow-[--violet-glow] transition-colors hover:bg-violet-700 disabled:opacity-50"
+                className="flex-1 rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground shadow-md shadow-primary/25 transition-colors hover:bg-primary-hover disabled:opacity-50"
               >
                 {loading ? "در حال ذخیره..." : isLastStep ? "شروع کار" : "بعدی"}
               </button>
@@ -179,7 +182,7 @@ export default function FreelancerOnboardingPage() {
           </form>
         </div>
 
-        <p className="mt-4 text-center text-xs text-[hsl(var(--muted-foreground))]">
+        <p className="mt-4 text-center text-xs text-muted-foreground">
           مرحله {step + 1} از {STEPS.length}
         </p>
       </div>

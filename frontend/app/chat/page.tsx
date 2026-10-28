@@ -6,6 +6,7 @@ import Link from "next/link";
 import { IconArrowUp, IconCode, IconCloudUpload, IconLayout, IconCheck, IconCoin, IconCopy, IconDownload, IconPaperclip, IconPlus, IconRefresh, IconSparkles, IconUser, IconWand, IconX } from "@tabler/icons-react";
 import ChatBubble from "@/components/ChatBubble";
 import ChatRobot, { ROBOT_INTRODUCTIONS } from "@/components/ChatRobot";
+import ThemeToggle from "@/components/ThemeToggle";
 import { fetchOrderBrief, fetchChatProgress, ChatProgressStage, sendChat, sendOtp, submitOrder, uploadChatFile, createChatSession, updateChatSession, ChatMode, ProjectPath, Message, Proposal, LeadAnalysis, OrderFile } from "@/lib/api";
 
 const WELCOME: Message = {
@@ -275,10 +276,10 @@ function CopyBlock({ text, label, rtl = false }: { text: string; label: string; 
     }
   }
   return (
-    <div className="mt-2 flex items-start gap-2 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] p-2.5">
+    <div className="mt-2 flex items-start gap-2 rounded-xl border border-border bg-background p-2.5">
       <pre
         dir={rtl ? "rtl" : "ltr"}
-        className={`min-w-0 flex-1 overflow-x-auto whitespace-pre-wrap text-xs leading-6 text-violet-200 ${
+        className={`min-w-0 flex-1 overflow-x-auto whitespace-pre-wrap text-xs leading-6 text-brand ${
           rtl ? "text-right font-[inherit]" : "break-all text-left"
         }`}
       >
@@ -288,7 +289,7 @@ function CopyBlock({ text, label, rtl = false }: { text: string; label: string; 
         type="button"
         onClick={copy}
         aria-label={label}
-        className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-[hsl(var(--border))] px-2.5 text-xs text-[hsl(var(--secondary-foreground))] outline-none transition-colors hover:border-[--violet-border] hover:text-white focus-visible:ring-2 focus-visible:ring-[--violet-light]"
+        className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-border px-2.5 text-xs text-secondary-foreground outline-none transition-colors hover:border-primary-line hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
       >
         {copied ? <IconCheck size={14} stroke={2.5} /> : <IconCopy size={14} stroke={2} />}
         {copied ? "کپی شد" : "کپی"}
@@ -313,29 +314,29 @@ function BriefGuide({ mcpUrl }: { mcpUrl: string }) {
   ];
   return (
     <div className="mt-5">
-      <h3 className="text-sm font-extrabold text-white">آموزش گام‌به‌گام</h3>
+      <h3 className="text-sm font-extrabold text-foreground">آموزش گام‌به‌گام</h3>
       <ol className="mt-3 space-y-4">
         {steps.map((step, i) => (
           <li key={step.title} className="flex gap-3">
-            <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border border-[--violet-border] bg-[--violet-glow] text-xs font-bold text-violet-300">
+            <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border border-primary-line bg-primary-soft text-xs font-bold text-brand">
               {i + 1}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-white">{step.title}</p>
-              <p className="mt-1 text-[13px] leading-7 text-[hsl(var(--muted-foreground))]">{step.body}</p>
+              <p className="text-sm font-semibold text-foreground">{step.title}</p>
+              <p className="mt-1 text-[13px] leading-7 text-muted-foreground">{step.body}</p>
             </div>
           </li>
         ))}
 
         <li className="flex gap-3">
-          <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border border-[--violet-border] bg-[--violet-glow] text-xs font-bold text-violet-300">
+          <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border border-primary-line bg-primary-soft text-xs font-bold text-brand">
             3
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-white">
-              اتصال سرور انتشار <span className="text-xs font-normal text-[hsl(var(--muted-foreground))]">(اختیاری)</span>
+            <p className="text-sm font-semibold text-foreground">
+              اتصال سرور انتشار <span className="text-xs font-normal text-muted-foreground">(اختیاری)</span>
             </p>
-            <p className="mt-1 text-[13px] leading-7 text-[hsl(var(--muted-foreground))]">
+            <p className="mt-1 text-[13px] leading-7 text-muted-foreground">
               با این اتصال، هوش مصنوعی پروژه رو خودش روی سرور <b>بیلد و منتشر</b> می‌کنه و یک آدرس موقت بهت می‌ده تا همون لحظه ببینیش. پروژه‌های Next.js، Node، Python و Django با دیتابیس PostgreSQL پشتیبانی می‌شن. اگه بیلد خطا بده، هوش مصنوعی لاگ رو می‌خونه و خودش اصلاح می‌کنه.
             </p>
 
@@ -347,10 +348,10 @@ function BriefGuide({ mcpUrl }: { mcpUrl: string }) {
                   role="tab"
                   aria-selected={tool === t.id}
                   onClick={() => setTool(t.id)}
-                  className={`min-h-8 rounded-lg px-3 text-xs font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[--violet-light] ${
+                  className={`min-h-8 rounded-lg px-3 text-xs font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${
                     tool === t.id
-                      ? "bg-[--violet] text-white"
-                      : "border border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:text-white"
+                      ? "bg-primary text-primary-foreground"
+                      : "border border-border text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   {t.label}
@@ -358,10 +359,10 @@ function BriefGuide({ mcpUrl }: { mcpUrl: string }) {
               ))}
             </div>
 
-            <div role="tabpanel" className="mt-2 text-[13px] leading-7 text-[hsl(var(--secondary-foreground))]">
+            <div role="tabpanel" className="mt-2 text-[13px] leading-7 text-secondary-foreground">
               {tool === "claude" && (
                 <>
-                  <ol className="list-decimal space-y-1 pr-5 marker:text-violet-400">
+                  <ol className="list-decimal space-y-1 pr-5 marker:text-brand">
                     <li>
                       توی Claude برو به <b>Customize ← Connectors</b>.
                     </li>
@@ -373,15 +374,15 @@ function BriefGuide({ mcpUrl }: { mcpUrl: string }) {
                       <b>Add</b> رو بزن تا ساخته بشه.
                     </li>
                   </ol>
-                  <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">اسم:</p>
+                  <p className="mt-2 text-xs text-muted-foreground">اسم:</p>
                   <CopyBlock text="FreelioAI" label="کپی اسم کانکتور" />
-                  <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">آدرس سرور:</p>
+                  <p className="mt-2 text-xs text-muted-foreground">آدرس سرور:</p>
                   <CopyBlock text={mcpUrl} label="کپی آدرس سرور" />
                 </>
               )}
               {tool === "chatgpt" && (
                 <>
-                  <ol className="list-decimal space-y-1 pr-5 marker:text-violet-400">
+                  <ol className="list-decimal space-y-1 pr-5 marker:text-brand">
                     <li>
                       توی ChatGPT برو به <b>Settings ← Apps &amp; Connectors ← Advanced</b> و <b>Developer Mode</b> رو روشن کن.
                     </li>
@@ -395,26 +396,26 @@ function BriefGuide({ mcpUrl }: { mcpUrl: string }) {
                       توی چت جدید، از منوی ابزارها <b>FreelioAI</b> رو فعال کن.
                     </li>
                   </ol>
-                  <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">اسم:</p>
+                  <p className="mt-2 text-xs text-muted-foreground">اسم:</p>
                   <CopyBlock text="FreelioAI" label="کپی اسم کانکتور" />
-                  <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">آدرس سرور:</p>
+                  <p className="mt-2 text-xs text-muted-foreground">آدرس سرور:</p>
                   <CopyBlock text={mcpUrl} label="کپی آدرس سرور" />
-                  <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">
+                  <p className="mt-2 text-xs text-muted-foreground">
                     Developer Mode بسته به پلن ممکنه در دسترس نباشه؛ اگه گزینه رو ندیدی، از Claude یا Cursor استفاده کن.
                   </p>
                 </>
               )}
               {tool === "cursor" && (
                 <>
-                  <ol className="list-decimal space-y-1 pr-5 marker:text-violet-400">
+                  <ol className="list-decimal space-y-1 pr-5 marker:text-brand">
                     <li>
                       توی Cursor برو به <b>Settings ← MCP</b> و <b>Add new MCP server</b> رو بزن.
                     </li>
                     <li>نوع سرور رو آدرس (URL / HTTP) بذار و آدرس زیر رو وارد کن.</li>
                   </ol>
-                  <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">آدرس سرور:</p>
+                  <p className="mt-2 text-xs text-muted-foreground">آدرس سرور:</p>
                   <CopyBlock text={mcpUrl} label="کپی آدرس سرور" />
-                  <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">
+                  <p className="mt-2 text-xs text-muted-foreground">
                     Codex و ابزارهای مشابه هم توی بخش تنظیمات MCP خودشون همین آدرس رو می‌پذیرن.
                   </p>
                 </>
@@ -424,22 +425,22 @@ function BriefGuide({ mcpUrl }: { mcpUrl: string }) {
         </li>
 
         <li className="flex gap-3">
-          <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border border-[--violet-border] bg-[--violet-glow] text-xs font-bold text-violet-300">
+          <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border border-primary-line bg-primary-soft text-xs font-bold text-brand">
             4
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-white">این پیام رو به هوش مصنوعی بده</p>
+            <p className="text-sm font-semibold text-foreground">این پیام رو به هوش مصنوعی بده</p>
             <CopyBlock text={BUILD_PROMPT} label="کپی پیام ساخت پروژه" rtl />
           </div>
         </li>
 
         <li className="flex gap-3">
-          <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border border-[--violet-border] bg-[--violet-glow] text-xs font-bold text-violet-300">
+          <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border border-primary-line bg-primary-soft text-xs font-bold text-brand">
             5
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-white">نتیجه رو بگیر</p>
-            <p className="mt-1 text-[13px] leading-7 text-[hsl(var(--muted-foreground))]">
+            <p className="text-sm font-semibold text-foreground">نتیجه رو بگیر</p>
+            <p className="mt-1 text-[13px] leading-7 text-muted-foreground">
               هوش مصنوعی فایل‌ها رو می‌سازه، با سرور انتشار منتشرشون می‌کنه و آدرس زنده‌ی پروژه رو بهت می‌ده. این آدرس موقته و بعد از چند ساعت به‌صورت خودکار پاک می‌شه. بدون اتصال سرور انتشار، دستور اجرای محلی رو می‌نویسه.
             </p>
           </div>
@@ -840,18 +841,18 @@ function ChatPageInner() {
   }
 
   const pathPicker = !botToken && mode === "designer" && !briefOrderId && (isFresh || needsProjectPath) ? (
-    <fieldset className="mt-7 rounded-2xl border border-[--violet-border] bg-[--surface] p-4 sm:p-5">
-      <legend className="px-2 text-sm font-bold text-violet-300">مسیر پروژه را قبل از گفتگو مشخص کن</legend>
-      <p className="mb-4 text-xs leading-6 text-[hsl(var(--muted-foreground))]">سؤال‌ها و مراحل پروژه براساس این انتخاب تنظیم می‌شوند. مسیر بعد از شروع گفتگو ثابت می‌ماند.</p>
+    <fieldset className="mt-7 rounded-2xl border border-border bg-surface p-4 shadow-card sm:p-5">
+      <legend className="px-2 text-sm font-bold text-brand">مسیر پروژه را قبل از گفتگو مشخص کن</legend>
+      <p className="mb-4 text-xs leading-6 text-muted-foreground">سؤال‌ها و مراحل پروژه براساس این انتخاب تنظیم می‌شوند. مسیر بعد از شروع گفتگو ثابت می‌ماند.</p>
       <div className="grid gap-3 sm:grid-cols-3">{PROJECT_PATHS.map(path => <label key={path.id} className="relative cursor-pointer">
         <input type="radio" name="project-path" className="peer sr-only" value={path.id} checked={projectPath === path.id} onChange={() => chooseProjectPath(path.id)} />
-        <span className="block h-full rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] p-4 transition-colors hover:border-[--violet-border] peer-checked:border-[--violet] peer-checked:bg-[--violet-glow] peer-focus-visible:ring-2 peer-focus-visible:ring-[--violet-light]"><path.icon size={23} className="mb-3 text-violet-300" /><span className="block text-sm font-bold">{path.title}</span><span className="mt-2 block text-xs leading-6 text-[hsl(var(--muted-foreground))]">{path.description}</span></span>
+        <span className="block h-full rounded-xl border border-border bg-background p-4 transition-colors hover:border-primary-line peer-checked:border-primary peer-checked:bg-primary-soft peer-checked:shadow-glow peer-focus-visible:ring-2 peer-focus-visible:ring-ring"><path.icon size={23} className="mb-3 text-brand" /><span className="block text-sm font-bold">{path.title}</span><span className="mt-2 block text-xs leading-6 text-muted-foreground">{path.description}</span></span>
       </label>)}</div>
-      {projectPath === "source" && <fieldset className="mt-5 border-t border-[hsl(var(--border))] pt-4">
+      {projectPath === "source" && <fieldset className="mt-5 border-t border-border pt-4">
         <legend className="px-2 text-sm font-semibold">سورس پروژه کجاست؟</legend>
-        <div className="mb-4 mt-2 grid grid-cols-2 gap-3">{[{ id: "github", title: "مخزن GitHub", description: "لینک مخزن پروژه را وارد کن" }, { id: "zip", title: "فایل ZIP", description: "سورس پروژه را بارگذاری کن" }].map(item => <label key={item.id} className="cursor-pointer"><input className="peer sr-only" type="radio" name="source-type" value={item.id} checked={sourceType === item.id} onChange={() => { setSourceType(item.id as "github" | "zip"); setError(""); }} /><span className="block rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-4 py-3 peer-checked:border-[--violet] peer-checked:bg-[--violet-glow] peer-focus-visible:ring-2 peer-focus-visible:ring-[--violet-light]"><span className="block text-sm font-bold">{item.title}</span><span className="mt-1 block text-xs leading-6 text-[hsl(var(--muted-foreground))]">{item.description}</span></span></label>)}</div>
-        {sourceType === "github" && <label className="block text-xs text-[hsl(var(--muted-foreground))]">لینک مخزن GitHub<input type="url" dir="ltr" value={sourceUrl} onChange={e => setSourceUrl(e.target.value)} maxLength={2000} className="mt-2 w-full rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-3 text-sm text-[hsl(var(--foreground))] outline-none focus:border-[--violet-light]" placeholder="https://github.com/owner/repo" /></label>}
-        {sourceType === "zip" && <div className="rounded-xl border border-dashed border-[--violet-border] bg-[hsl(var(--background))] p-4"><input ref={sourceFileRef} type="file" accept=".zip,application/zip" className="hidden" aria-label="فایل ZIP سورس پروژه" onChange={e => void handleSourceZip(e.target.files?.[0])} />{sourceArchive ? <div className="flex items-center justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-semibold" dir="auto">{sourceArchive.name}</p><p className="mt-1 text-xs text-violet-300">سورس بارگذاری شد · {(sourceArchive.size / 1024).toLocaleString("fa-IR", { maximumFractionDigits: 1 })} کیلوبایت</p></div><button type="button" onClick={() => setSourceArchive(undefined)} disabled={uploadingFile} className="rounded-lg px-3 py-2 text-xs text-violet-300">حذف فایل</button></div> : <><button type="button" onClick={() => sourceFileRef.current?.click()} disabled={uploadingFile} className="flex min-h-11 items-center gap-2 rounded-xl bg-[--violet] px-4 text-sm font-bold text-white disabled:opacity-50"><IconCloudUpload size={18} />{uploadingFile ? "در حال بارگذاری…" : "انتخاب فایل ZIP"}</button><p className="mt-3 text-xs leading-6 text-[hsl(var(--muted-foreground))]">حداکثر ۱۲ مگابایت؛ فایل‌های سورس بدون node_modules و پوشه‌های build.</p></>}</div>}
+        <div className="mb-4 mt-2 grid grid-cols-2 gap-3">{[{ id: "github", title: "مخزن GitHub", description: "لینک مخزن پروژه را وارد کن" }, { id: "zip", title: "فایل ZIP", description: "سورس پروژه را بارگذاری کن" }].map(item => <label key={item.id} className="cursor-pointer"><input className="peer sr-only" type="radio" name="source-type" value={item.id} checked={sourceType === item.id} onChange={() => { setSourceType(item.id as "github" | "zip"); setError(""); }} /><span className="block rounded-xl border border-border bg-background px-4 py-3 peer-checked:border-primary peer-checked:bg-primary-soft peer-focus-visible:ring-2 peer-focus-visible:ring-ring"><span className="block text-sm font-bold">{item.title}</span><span className="mt-1 block text-xs leading-6 text-muted-foreground">{item.description}</span></span></label>)}</div>
+        {sourceType === "github" && <label className="block text-xs text-muted-foreground">لینک مخزن GitHub<input type="url" dir="ltr" value={sourceUrl} onChange={e => setSourceUrl(e.target.value)} maxLength={2000} className="field mt-2 py-3" placeholder="https://github.com/owner/repo" /></label>}
+        {sourceType === "zip" && <div className="rounded-xl border border-dashed border-primary-line bg-background p-4"><input ref={sourceFileRef} type="file" accept=".zip,application/zip" className="hidden" aria-label="فایل ZIP سورس پروژه" onChange={e => void handleSourceZip(e.target.files?.[0])} />{sourceArchive ? <div className="flex items-center justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-semibold" dir="auto">{sourceArchive.name}</p><p className="mt-1 text-xs text-brand">سورس بارگذاری شد · {(sourceArchive.size / 1024).toLocaleString("fa-IR", { maximumFractionDigits: 1 })} کیلوبایت</p></div><button type="button" onClick={() => setSourceArchive(undefined)} disabled={uploadingFile} className="rounded-lg px-3 py-2 text-xs text-brand">حذف فایل</button></div> : <><button type="button" onClick={() => sourceFileRef.current?.click()} disabled={uploadingFile} className="flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground disabled:opacity-50"><IconCloudUpload size={18} />{uploadingFile ? "در حال بارگذاری…" : "انتخاب فایل ZIP"}</button><p className="mt-3 text-xs leading-6 text-muted-foreground">حداکثر ۱۲ مگابایت؛ فایل‌های سورس بدون node_modules و پوشه‌های build.</p></>}</div>}
       </fieldset>}
     </fieldset>
   ) : null;
@@ -862,22 +863,22 @@ function ChatPageInner() {
   }
 
   return (
-    <div className="flex h-[100dvh] min-h-[100dvh] flex-col overflow-hidden bg-[hsl(var(--background))]">
-      <header className="z-10 flex h-14 shrink-0 items-center gap-2 border-b border-[hsl(var(--border))] bg-[hsl(var(--background))]/90 px-3 backdrop-blur-xl sm:gap-3 sm:px-5">
+    <div className="flex h-[100dvh] min-h-[100dvh] flex-col overflow-hidden bg-background bg-aura">
+      <header className="glass z-10 flex h-16 shrink-0 items-center gap-2 border-b border-border/70 px-3 sm:gap-3 sm:px-6">
         <Link
           href="/"
-          className="flex items-center gap-2 rounded-lg font-black text-white outline-none focus-visible:ring-2 focus-visible:ring-[--violet-light]"
+          className="flex items-center gap-2 rounded-lg font-black text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
           aria-label="FreelioAI، بازگشت به صفحه اصلی"
         >
-          <span className="grid h-8 w-8 place-items-center rounded-xl bg-[--violet] shadow-md shadow-[--violet-glow]">
-            <IconSparkles size={16} stroke={2.2} />
+          <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-primary to-primary-hover text-primary-foreground shadow-md shadow-primary/30">
+            <IconSparkles size={18} stroke={2.2} aria-hidden="true" />
           </span>
-          <span className="hidden text-sm sm:inline">FreelioAI</span>
+          <span className="hidden text-base tracking-tight sm:inline">Freelio<span className="text-gradient">AI</span></span>
         </Link>
 
         {!isFresh && !briefOrderId && (
           <span
-            className="rounded-lg border border-[--violet-border] bg-[--violet-glow] px-2.5 py-1 text-xs font-semibold text-violet-300"
+            className="rounded-lg border border-primary-line bg-primary-soft px-2.5 py-1 text-xs font-semibold text-brand"
             title="برای تغییر حالت، یک چت جدید شروع کن"
           >
             {MODE_CARDS[activeMode].label}{activeMode === "designer" && projectPath ? ` · ${PROJECT_PATHS.find(p => p.id === projectPath)?.title}` : ""}
@@ -885,12 +886,13 @@ function ChatPageInner() {
         )}
 
         <div className="mr-auto flex items-center gap-1.5 sm:gap-2">
+          <ThemeToggle />
           {messages.length > 1 && (
             <button
               onClick={resetChat}
               disabled={isLoading}
               aria-label="چت جدید"
-              className="flex h-9 items-center gap-1.5 rounded-xl border border-[hsl(var(--border))] bg-[--surface] px-3 text-xs text-[hsl(var(--muted-foreground))] outline-none transition-colors hover:text-white focus-visible:ring-2 focus-visible:ring-[--violet-light]"
+              className="flex h-9 items-center gap-1.5 rounded-xl border border-border bg-surface px-3 text-xs font-bold text-muted-foreground outline-none transition-colors hover:border-primary-line hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
             >
               <IconPlus size={14} stroke={2.5} />
               <span className="hidden sm:inline">چت جدید</span>
@@ -899,7 +901,7 @@ function ChatPageInner() {
           <Link
             href={customerToken ? "/panel" : "/login?redirect=/panel"}
             aria-label="حساب کاربری"
-            className="flex h-9 items-center gap-1.5 rounded-xl border border-[--violet-border] bg-[--violet-glow] px-3 text-xs font-semibold text-violet-300 outline-none transition-colors hover:text-white focus-visible:ring-2 focus-visible:ring-[--violet-light]"
+            className="flex h-9 items-center gap-1.5 rounded-xl bg-primary px-3 text-xs font-bold text-primary-foreground shadow-sm shadow-primary/25 outline-none transition-colors hover:bg-primary-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             <IconUser size={14} stroke={2} />
             <span className="hidden sm:inline">حساب کاربری</span>
@@ -914,10 +916,14 @@ function ChatPageInner() {
           {isFresh ? (
             <section className="pb-4 pt-2 sm:pt-8" aria-labelledby="chat-hero-title">
               <div className="text-center">
-                <h1 id="chat-hero-title" className="text-xl font-extrabold text-white sm:text-2xl">
+                <span className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-primary-line bg-primary-soft px-3 py-1 text-xs font-bold text-brand">
+                  <IconSparkles size={14} stroke={2.2} aria-hidden="true" />
+                  دستیار هوشمند پروژه
+                </span>
+                <h1 id="chat-hero-title" className="text-2xl font-black tracking-tight text-foreground sm:text-[2rem] sm:leading-[1.35]">
                   {customerName ? `${customerName} جان، ` : ""}چطور می‌خوای شروع کنیم؟
                 </h1>
-                <p className="mt-2 text-sm leading-7 text-[hsl(var(--muted-foreground))]">
+                <p className="mx-auto mt-3 max-w-md text-sm leading-7 text-muted-foreground">
                   یکی از دو حالت رو انتخاب کن. بعد از شروع گفتگو، برای تغییر حالت باید چت جدید بزنی.
                 </p>
               </div>
@@ -937,20 +943,20 @@ function ChatPageInner() {
                         onChange={() => selectMode(id)}
                         className="peer sr-only"
                       />
-                      <div className="h-full rounded-2xl border border-[hsl(var(--border))] bg-[--surface] p-4 text-right transition-all group-hover:-translate-y-0.5 group-hover:border-[--violet-border] peer-checked:border-[--violet] peer-checked:bg-[--surface-2] peer-checked:shadow-[0_0_32px_var(--violet-glow)] peer-focus-visible:ring-2 peer-focus-visible:ring-[--violet-light]">
+                      <div className="h-full rounded-2xl border border-border bg-surface p-5 text-right shadow-card transition-[border-color,box-shadow,transform] duration-200 ease-out group-hover:-translate-y-0.5 group-hover:border-primary-line peer-checked:border-primary peer-checked:shadow-glow peer-focus-visible:ring-2 peer-focus-visible:ring-ring">
                         <div className="flex items-center gap-3">
                           <span
-                            className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl text-white ${
-                              mode === id ? "bg-[--violet] shadow-md shadow-[--violet-glow]" : "bg-[--violet-glow] text-violet-300"
+                            className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${
+                              mode === id ? "bg-primary text-primary-foreground shadow-md shadow-primary/25" : "bg-primary-soft text-brand"
                             }`}
                           >
                             <Icon size={20} stroke={2} />
                           </span>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
-                              <span className="text-base font-extrabold text-white">{card.label}</span>
+                              <span className="text-base font-extrabold text-foreground">{card.label}</span>
                               {card.badge && (
-                                <span className="rounded-full bg-[--violet-glow] px-2 py-0.5 text-[11px] font-semibold text-violet-300">
+                                <span className="rounded-full bg-primary-soft px-2 py-0.5 text-[11px] font-semibold text-brand">
                                   {card.badge}
                                 </span>
                               )}
@@ -960,30 +966,30 @@ function ChatPageInner() {
                             aria-hidden="true"
                             className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border transition-colors ${
                               mode === id
-                                ? "border-[--violet] bg-[--violet] text-white"
-                                : "border-[hsl(var(--border))] text-transparent"
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : "border-border text-transparent"
                             }`}
                           >
                             <IconCheck size={14} stroke={3} />
                           </span>
                         </div>
 
-                        <p className="mt-3 text-sm leading-7 text-[hsl(var(--secondary-foreground))]">{card.summary}</p>
+                        <p className="mt-3 text-sm leading-7 text-secondary-foreground">{card.summary}</p>
 
-                        <ul className="mt-3 space-y-1.5 text-[13px] leading-6 text-[hsl(var(--muted-foreground))]">
+                        <ul className="mt-3 space-y-1.5 text-[13px] leading-6 text-muted-foreground">
                           {card.points.map((point) => (
                             <li key={point} className="flex items-start gap-2">
-                              <span className="mt-2.5 h-1 w-1 shrink-0 rounded-full bg-violet-400" aria-hidden="true" />
+                              <span className="mt-2.5 h-1 w-1 shrink-0 rounded-full bg-primary" aria-hidden="true" />
                               <span>{point}</span>
                             </li>
                           ))}
                         </ul>
 
-                        <div className="mt-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2.5 text-xs leading-6">
-                          <p className="font-semibold text-violet-300">خروجی نهایی</p>
-                          <p className="text-[hsl(var(--secondary-foreground))]">{card.output}</p>
+                        <div className="mt-3 rounded-xl border border-border bg-background px-3 py-2.5 text-xs leading-6">
+                          <p className="font-semibold text-brand">خروجی نهایی</p>
+                          <p className="text-secondary-foreground">{card.output}</p>
                         </div>
-                        <p className="mt-2.5 text-xs text-[hsl(var(--muted-foreground))]">{card.fit}</p>
+                        <p className="mt-2.5 text-xs text-muted-foreground">{card.fit}</p>
                       </div>
                     </label>
                   );
@@ -993,7 +999,7 @@ function ChatPageInner() {
 
               {pathPicker}
               {!needsProjectPath && (
-                <div className="mt-6 rounded-2xl border border-[--violet-border] p-3 sm:p-5">
+                <div className="mt-6 rounded-2xl border border-border bg-surface/60 p-3 shadow-card sm:p-5">
                   <ChatRobot
                     busy={false}
                     stage={null}
@@ -1009,7 +1015,7 @@ function ChatPageInner() {
                 </div>
               )}
               <div className="mt-8 text-center">
-                <p className="mb-3 text-xs text-[hsl(var(--muted-foreground))]">
+                <p className="mb-3 text-xs text-muted-foreground">
                   {needsProjectPath ? "با انتخاب مسیر، گفتگو فعال می‌شود." : projectPath === "source" && mode === "designer" ? sourceReady ? "سورس ثبت شد؛ حالا درباره پروژه و هدفت از انتشار بنویس." : "ابتدا لینک GitHub یا فایل ZIP سورس را اضافه کن." : "حالا ایده‌ات رو پایین بنویس، یا از یک نمونه شروع کن:"}
                 </p>
                 <div className="flex flex-wrap justify-center gap-2">
@@ -1019,14 +1025,14 @@ function ChatPageInner() {
                       type="button"
                       onClick={() => submit(label)}
                       disabled={isLoading || chatBlocked}
-                      className="min-h-10 rounded-full border border-[hsl(var(--border))] bg-[--surface] px-4 text-sm text-[hsl(var(--secondary-foreground))] outline-none transition-all hover:-translate-y-0.5 hover:border-[--violet-border] hover:text-white focus-visible:ring-2 focus-visible:ring-[--violet-light] disabled:opacity-50"
+                      className="min-h-10 rounded-full border border-border bg-surface px-4 text-sm font-bold text-secondary-foreground shadow-xs outline-none transition-[border-color,color,transform] duration-150 hover:-translate-y-0.5 hover:border-primary-line hover:text-brand focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
                     >
                       {label}
                     </button>
                   ))}
                 </div>
                 {!customerToken && (
-                  <p className="mt-6 text-[11px] leading-6 text-[hsl(var(--muted-foreground))]">
+                  <p className="mt-6 text-[11px] leading-6 text-muted-foreground">
                     چت روی همین مرورگر ذخیره می‌شه. برای ثبت نهایی با شماره موبایل وارد می‌شی.
                   </p>
                 )}
@@ -1044,28 +1050,28 @@ function ChatPageInner() {
           {briefOrderId && (
             <section
               aria-labelledby="brief-title"
-              className="mb-5 rounded-2xl border border-[--violet-border] bg-[--surface] p-5 shadow-[0_0_40px_var(--violet-glow)]"
+              className="mb-5 animate-fade-up rounded-2xl border border-primary-line bg-surface p-5 shadow-glow sm:p-6"
             >
-              <h2 id="brief-title" className="text-base font-extrabold text-white">
+              <h2 id="brief-title" className="text-base font-extrabold text-foreground">
                 کانفیگ پروژه‌ات آماده‌ست
               </h2>
-              <p className="mt-2 text-sm leading-7 text-[hsl(var(--muted-foreground))]">
+              <p className="mt-2 text-sm leading-7 text-muted-foreground">
                 این فایل همه‌ی تصمیم‌های طراحی، صفحه‌ها، مدل داده و استک پروژه‌ات رو داره. بده به هوش مصنوعی تا بسازتش.
               </p>
 
               {briefState === "loading" && (
-                <p role="status" className="mt-4 flex items-center gap-2 text-sm text-violet-300">
-                  <span className="h-4 w-4 rounded-full border-2 border-violet-400 border-t-transparent motion-safe:animate-spin" />
+                <p role="status" className="mt-4 flex items-center gap-2 text-sm text-brand">
+                  <span className="h-4 w-4 rounded-full border-2 border-primary border-t-transparent motion-safe:animate-spin" />
                   در حال ساخت کانفیگ پروژه... (ممکنه یکی دو دقیقه طول بکشه)
                 </p>
               )}
               {briefState === "error" && (
-                <div role="alert" className="mt-4 flex flex-wrap items-center gap-3 text-sm text-red-300">
+                <div role="alert" className="mt-4 flex flex-wrap items-center gap-3 text-sm text-danger">
                   <span>ساخت کانفیگ ناموفق بود.</span>
                   <button
                     type="button"
                     onClick={() => loadBrief(briefOrderId, customerToken || localStorage.getItem("customer_token") || "")}
-                    className="flex items-center gap-1.5 rounded-lg border border-red-400/30 px-3 py-1.5 text-xs font-semibold text-red-200 outline-none transition-colors hover:bg-red-500/15 focus-visible:ring-2 focus-visible:ring-red-300"
+                    className="flex items-center gap-1.5 rounded-lg border border-danger/30 px-3 py-1.5 text-xs font-semibold text-danger outline-none transition-colors hover:bg-danger/15 focus-visible:ring-2 focus-visible:ring-danger"
                   >
                     <IconRefresh size={14} stroke={2.2} />
                     تلاش دوباره
@@ -1076,19 +1082,19 @@ function ChatPageInner() {
                 <button
                   type="button"
                   onClick={downloadBrief}
-                  className="mt-4 flex min-h-11 items-center gap-2 rounded-xl bg-[--violet] px-5 text-sm font-bold text-white shadow-md shadow-[--violet-glow] outline-none transition-all hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-[--violet-light]"
+                  className="mt-4 flex min-h-11 items-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground shadow-md shadow-primary/25 outline-none transition-all hover:bg-primary-hover focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <IconDownload size={18} stroke={2.2} />
                   دانلود کانفیگ پروژه (JSON)
                 </button>
               )}
 
-              <div className="mt-5 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] p-4 text-sm leading-7 text-[hsl(var(--secondary-foreground))]">
-                <p className="font-semibold text-white">برای بهترین نتیجه</p>
+              <div className="mt-5 rounded-xl border border-border bg-background p-4 text-sm leading-7 text-secondary-foreground">
+                <p className="font-semibold text-foreground">برای بهترین نتیجه</p>
                 <p className="mt-1">
                   فایل رو توی یک ابزار کدنویسی مثل <b>Claude Code</b>، <b>Codex</b> یا <b>Cursor</b> باز کن؛ این ابزارها فایل‌ها رو کامل می‌سازن و اجرا می‌کنن، برای همین بک‌اند و دیتابیس هم واقعی ساخته می‌شه.
                 </p>
-                <p className="mt-2 text-amber-300">
+                <p className="mt-2 text-warning">
                   حتماً نسخه‌ی <b>Pro</b> (اشتراک پولی) رو بگیر؛ نسخه‌ی رایگان برای ساخت یک پروژه کامل محدودیت داره و وسط کار متوقف می‌شه.
                 </p>
               </div>
@@ -1101,7 +1107,7 @@ function ChatPageInner() {
 
               <Link
                 href={`/panel/${briefOrderId}`}
-                className="mt-4 inline-block text-xs text-[hsl(var(--muted-foreground))] underline-offset-4 outline-none hover:text-white hover:underline focus-visible:ring-2 focus-visible:ring-[--violet-light]"
+                className="mt-4 inline-block text-xs text-muted-foreground underline-offset-4 outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring"
               >
                 مشاهده سفارش در پنل کاربری
               </Link>
@@ -1110,20 +1116,20 @@ function ChatPageInner() {
 
           {isLoading && !isFresh && (
             <div className="mb-5 flex items-end justify-end gap-2.5" role="status" aria-label="در حال نوشتن">
-              <span className="mb-1 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[--violet] text-white shadow-lg shadow-[--violet-glow]">
+              <span className="mb-1 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground shadow-md shadow-primary/25">
                 <IconSparkles size={15} stroke={2.2} />
               </span>
-              <div className="flex items-center gap-2 rounded-2xl rounded-bl-md border border-[hsl(var(--border))] bg-[--surface-2] px-4 py-3">
+              <div className="flex items-center gap-2 rounded-2xl rounded-bl-md border border-border bg-surface-2 px-4 py-3">
                 <span className="flex gap-1" aria-hidden="true">
                   {[0, 1, 2].map((i) => (
                     <span
                       key={i}
-                      className="h-1.5 w-1.5 rounded-full bg-violet-400 motion-safe:animate-bounce"
+                      className="h-1.5 w-1.5 rounded-full bg-primary motion-safe:animate-bounce"
                       style={{ animationDelay: `${i * 150}ms` }}
                     />
                   ))}
                 </span>
-                <span className="text-xs text-[hsl(var(--muted-foreground))]">
+                <span className="text-xs text-muted-foreground">
                   {uploadingFile ? "در حال آپلود فایل..." : "در حال نوشتن..."}
                 </span>
               </div>
@@ -1133,7 +1139,7 @@ function ChatPageInner() {
           {error && (
             <div
               role="alert"
-              className="mb-5 flex items-center justify-between gap-3 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300"
+              className="mb-5 flex items-center justify-between gap-3 rounded-xl border border-danger/20 bg-danger/10 px-4 py-3 text-sm text-danger"
             >
               <span>{error}</span>
               {lastAttemptRef.current && !phoneStep && (
@@ -1141,7 +1147,7 @@ function ChatPageInner() {
                   type="button"
                   onClick={retry}
                   disabled={loading}
-                  className="flex shrink-0 items-center gap-1.5 rounded-lg border border-red-400/30 px-3 py-1.5 text-xs font-semibold text-red-200 outline-none transition-colors hover:bg-red-500/15 focus-visible:ring-2 focus-visible:ring-red-300 disabled:opacity-50"
+                  className="flex shrink-0 items-center gap-1.5 rounded-lg border border-danger/30 px-3 py-1.5 text-xs font-semibold text-danger outline-none transition-colors hover:bg-danger/15 focus-visible:ring-2 focus-visible:ring-danger disabled:opacity-50"
                 >
                   <IconRefresh size={14} stroke={2.2} />
                   تلاش دوباره
@@ -1153,21 +1159,21 @@ function ChatPageInner() {
         </div>
       </main>
 
-      <footer className="shrink-0 border-t border-[hsl(var(--border))] bg-[hsl(var(--background))]/90 px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 backdrop-blur md:px-8">
+      <footer className="glass shrink-0 border-t border-border/70 px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 backdrop-blur md:px-8">
         <form onSubmit={handleSubmit} className="mx-auto max-w-2xl">
-          <div className="rounded-2xl border border-[hsl(var(--border))] bg-[--surface] p-2 transition-colors focus-within:border-[--violet-border] focus-within:shadow-[0_0_0_3px_var(--violet-glow)]">
+          <div className="rounded-2xl border border-input bg-surface p-2 shadow-card transition-[border-color,box-shadow] duration-150 focus-within:border-primary focus-within:shadow-[0_0_0_4px_hsl(var(--primary)/0.14)]">
             {attachments.length > 0 && (
               <div className="mb-2 flex flex-wrap gap-2 px-1 pt-1">
                 {attachments.map((file) => (
                   <span
                     key={file.id}
-                    className="relative block h-16 w-16 overflow-hidden rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))]"
+                    className="relative block h-16 w-16 overflow-hidden rounded-xl border border-border bg-background"
                   >
                     {file.content_type?.startsWith("image/") ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={file.url} alt={file.name} className="h-full w-full object-cover" />
                     ) : (
-                      <span className="flex h-full w-full flex-col items-center justify-center gap-1 px-1 text-[10px] text-[hsl(var(--muted-foreground))]">
+                      <span className="flex h-full w-full flex-col items-center justify-center gap-1 px-1 text-[10px] text-muted-foreground">
                         <IconPaperclip size={15} />
                         <span className="w-full truncate text-center">{file.name}</span>
                       </span>
@@ -1175,7 +1181,7 @@ function ChatPageInner() {
                     <button
                       type="button"
                       onClick={() => removeAttachment(file.id)}
-                      className="absolute -right-1 -top-1 grid h-6 w-6 place-items-center rounded-full bg-white text-black shadow-md outline-none transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-[--violet-light]"
+                      className="absolute -right-1 -top-1 grid h-6 w-6 place-items-center rounded-full bg-foreground text-background shadow-md outline-none transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-ring"
                       aria-label={`حذف فایل ${file.name}`}
                     >
                       <IconX size={15} stroke={2.5} />
@@ -1191,7 +1197,7 @@ function ChatPageInner() {
                     type="button"
                     onClick={() => fileRef.current?.click()}
                     disabled={isLoading || chatBlocked}
-                    className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-[hsl(var(--muted-foreground))] outline-none transition-colors hover:bg-white/5 hover:text-white focus-visible:ring-2 focus-visible:ring-[--violet-light] disabled:opacity-40"
+                    className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-muted-foreground outline-none transition-colors hover:bg-foreground/5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
                     aria-label="پیوست فایل یا تصویر"
                     title="پیوست فایل یا تصویر نمونه"
                   >
@@ -1221,19 +1227,19 @@ function ChatPageInner() {
                 rows={1}
                 inputMode={phoneStep ? "tel" : "text"}
                 autoComplete={phoneStep ? "tel" : "off"}
-                className="max-h-32 min-h-10 min-w-0 flex-1 resize-none bg-transparent px-1 py-2 text-[16px] leading-6 text-[hsl(var(--foreground))] placeholder-[hsl(var(--muted-foreground))] outline-none disabled:opacity-50 sm:text-sm"
+                className="max-h-32 min-h-10 min-w-0 flex-1 resize-none bg-transparent px-1 py-2 text-[16px] leading-6 text-foreground placeholder:text-muted-foreground outline-none disabled:opacity-50 sm:text-sm"
               />
               <button
                 type="submit"
                 disabled={isLoading || !canSubmit}
                 aria-label="ارسال پیام"
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[--violet] text-white shadow-md shadow-[--violet-glow] outline-none transition-all hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-[--violet-light] disabled:cursor-not-allowed disabled:bg-[--surface-2] disabled:text-[hsl(var(--muted-foreground))] disabled:shadow-none"
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground shadow-md shadow-primary/25 outline-none transition-all hover:bg-primary-hover focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-muted-foreground disabled:shadow-none"
               >
                 <IconArrowUp size={18} stroke={2.5} />
               </button>
             </div>
           </div>
-          <p className="mt-2 text-center text-[11px] text-[hsl(var(--muted-foreground))]">
+          <p className="mt-2 text-center text-[11px] text-muted-foreground">
             <span className="hidden sm:inline">Enter برای ارسال · Shift+Enter برای خط جدید · </span>
             هوش مصنوعی ممکنه اشتباه کنه؛ نتیجه نهایی رو بررسی کن
           </p>

@@ -4,10 +4,10 @@ import { Button } from "@/components/ui/button";
 
 export default function Navbar() {
   return (
-    <header className="sticky top-0 z-50 border-b border-[hsl(var(--border))] bg-[hsl(var(--background))]/80 backdrop-blur-xl">
+    <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
-        <Link href="/" className="flex items-center gap-2.5 font-black text-white">
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-[--violet] shadow-lg shadow-[--violet-glow]">
+        <Link href="/" className="flex items-center gap-2.5 font-black text-foreground">
+          <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary text-primary-foreground shadow-md shadow-primary/25">
             <IconSparkles size={19} stroke={2.2} />
           </span>
           <span>
@@ -16,10 +16,10 @@ export default function Navbar() {
           </span>
         </Link>
 
-        <nav className="hidden items-center gap-6 text-sm text-[hsl(var(--muted-foreground))] md:flex">
-          <Link href="#features" className="transition-colors hover:text-white">ویژگی‌ها</Link>
-          <Link href="#how" className="transition-colors hover:text-white">نحوه کار</Link>
-          <Link href="#pricing" className="transition-colors hover:text-white">قیمت‌گذاری</Link>
+        <nav className="hidden items-center gap-6 text-sm text-muted-foreground md:flex">
+          <Link href="#features" className="transition-colors hover:text-foreground">ویژگی‌ها</Link>
+          <Link href="#how" className="transition-colors hover:text-foreground">نحوه کار</Link>
+          <Link href="#pricing" className="transition-colors hover:text-foreground">قیمت‌گذاری</Link>
         </nav>
 
         <div className="flex items-center gap-3">

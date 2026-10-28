@@ -18,6 +18,7 @@ import {
   IconCalendar,
 } from "@tabler/icons-react";
 import { fetchCustomerProfile, fetchMyOrders, updateCustomerProfile, CustomerProfile, Order } from "@/lib/api";
+import ThemeToggle from "@/components/ThemeToggle";
 
 const STATUS_LABEL: Record<Order["status"], string> = {
   pending_review: "در انتظار بررسی",
@@ -28,11 +29,11 @@ const STATUS_LABEL: Record<Order["status"], string> = {
 };
 
 const STATUS_CLASS: Record<Order["status"], string> = {
-  pending_review: "border border-yellow-500/25 bg-yellow-500/12 text-yellow-400",
-  approved: "border border-blue-500/25 bg-blue-500/12 text-blue-400",
-  awaiting_payment: "border border-orange-500/25 bg-orange-500/12 text-orange-400",
-  paid: "border border-violet-500/25 bg-violet-500/12 text-violet-400",
-  cancelled: "border border-red-500/25 bg-red-500/12 text-red-400",
+  pending_review: "border border-warning/25 bg-warning/10 text-warning",
+  approved: "border border-info/25 bg-info/10 text-info",
+  awaiting_payment: "border border-pending/25 bg-pending/10 text-pending",
+  paid: "border border-primary/25 bg-primary/10 text-brand",
+  cancelled: "border border-danger/25 bg-danger/10 text-danger",
 };
 
 function formatDate(iso: string) {
@@ -81,14 +82,14 @@ function ProjectCard({ order }: { order: Order }) {
   const isDesigner = order.mode === "designer";
   const Icon = isDesigner ? IconWand : IconCoin;
   return (
-    <article className="group flex flex-col rounded-2xl border border-[hsl(var(--border))] bg-[--surface] p-5 transition-all hover:-translate-y-0.5 hover:border-[--violet-border]">
+    <article className="group flex flex-col rounded-2xl border border-border bg-surface p-5 transition-all hover:-translate-y-0.5 hover:border-primary-line shadow-card">
       <div className="flex items-center justify-between gap-3">
-        <span className="inline-flex items-center gap-1.5 rounded-lg bg-[--violet-glow] px-2.5 py-1 text-xs font-semibold text-violet-300">
+        <span className="inline-flex items-center gap-1.5 rounded-lg bg-primary-soft px-2.5 py-1 text-xs font-semibold text-brand">
           <Icon size={13} stroke={2.2} />
           {isDesigner ? "طراحی محصول" : "مشاوره فروش"}
         </span>
         {isDesigner ? (
-          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-400">
+          <span className="inline-flex items-center gap-1 rounded-full border border-success/25 bg-success/10 px-2.5 py-1 text-xs font-medium text-success">
             <IconCheck size={12} stroke={3} />
             کانفیگ آماده
           </span>
@@ -99,17 +100,17 @@ function ProjectCard({ order }: { order: Order }) {
         )}
       </div>
 
-      <h3 className="mt-4 text-base font-bold leading-7 text-white">
+      <h3 className="mt-4 text-base font-bold leading-7 text-foreground">
         <Link
           href={`/panel/${order.id}`}
-          className="rounded outline-none after:absolute after:inset-0 focus-visible:ring-2 focus-visible:ring-[--violet-light]"
+          className="rounded outline-none after:absolute after:inset-0 focus-visible:ring-2 focus-visible:ring-ring"
         >
           {order.project_name}
         </Link>
       </h3>
-      <p className="mt-1.5 line-clamp-2 text-sm leading-7 text-[hsl(var(--muted-foreground))]">{order.summary}</p>
+      <p className="mt-1.5 line-clamp-2 text-sm leading-7 text-muted-foreground">{order.summary}</p>
 
-      <dl className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-[hsl(var(--muted-foreground))]">
+      <dl className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
         <div className="flex items-center gap-1.5">
           <IconCalendar size={13} stroke={2} />
           <dt className="sr-only">تاریخ ثبت</dt>
@@ -124,16 +125,16 @@ function ProjectCard({ order }: { order: Order }) {
         {!isDesigner && hasPrice(order) && (
           <div>
             <dt className="sr-only">مبلغ</dt>
-            <dd className="font-semibold text-[hsl(var(--foreground))]">{formatMoney(order.final_price) || order.price_label}</dd>
+            <dd className="font-semibold text-foreground">{formatMoney(order.final_price) || order.price_label}</dd>
           </div>
         )}
       </dl>
 
-      <div className="relative z-10 mt-5 flex items-center justify-between gap-3 border-t border-[hsl(var(--border))] pt-4">
+      <div className="relative z-10 mt-5 flex items-center justify-between gap-3 border-t border-border pt-4">
         {isDesigner ? (
           <Link
             href={`/chat?brief=${order.id}`}
-            className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[--violet] px-4 text-sm font-bold text-white shadow-md shadow-[--violet-glow] outline-none transition-colors hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-[--violet-light]"
+            className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground shadow-md shadow-primary/25 outline-none transition-colors hover:bg-primary-hover focus-visible:ring-2 focus-visible:ring-ring"
           >
             <IconDownload size={16} stroke={2.2} />
             دریافت کانفیگ
@@ -141,18 +142,18 @@ function ProjectCard({ order }: { order: Order }) {
         ) : order.status === "awaiting_payment" ? (
           <Link
             href={`/panel/${order.id}`}
-            className="inline-flex min-h-10 items-center rounded-xl bg-[--violet] px-4 text-sm font-bold text-white shadow-md shadow-[--violet-glow] outline-none transition-colors hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-[--violet-light]"
+            className="inline-flex min-h-10 items-center rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground shadow-md shadow-primary/25 outline-none transition-colors hover:bg-primary-hover focus-visible:ring-2 focus-visible:ring-ring"
           >
             پرداخت
           </Link>
         ) : (
-          <span className="text-xs text-[hsl(var(--muted-foreground))]">
+          <span className="text-xs text-muted-foreground">
             {order.status === "pending_review" ? "تیم ما در حال بررسی است" : ""}
           </span>
         )}
         <Link
           href={`/panel/${order.id}`}
-          className="inline-flex items-center gap-0.5 rounded text-xs font-semibold text-violet-300 outline-none transition-colors hover:text-white focus-visible:ring-2 focus-visible:ring-[--violet-light]"
+          className="inline-flex items-center gap-0.5 rounded text-xs font-semibold text-brand outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
         >
           {isDesigner ? "فضای پروژه" : "جزئیات"}
           <IconChevronLeft size={14} stroke={2.5} />
@@ -239,8 +240,8 @@ export default function PanelPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[hsl(var(--background))]">
-        <span className="h-10 w-10 animate-spin rounded-full border-4 border-[--violet] border-t-transparent" />
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <span className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
       </div>
     );
   }
@@ -248,23 +249,24 @@ export default function PanelPage() {
   const greeting = profile?.first_name ? `سلام ${profile.first_name} جان` : "سلام";
 
   return (
-    <div className="min-h-screen bg-[hsl(var(--background))]">
-      <header className="sticky top-0 z-10 flex h-14 items-center gap-3 border-b border-[hsl(var(--border))] bg-[hsl(var(--background))]/85 px-4 backdrop-blur-xl sm:px-5">
+    <div className="min-h-screen bg-background bg-aura">
+      <header className="glass sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-border/70 px-4 sm:px-6">
         <Link
           href="/"
           aria-label="FreelioAI، صفحه اصلی"
-          className="flex items-center gap-2 rounded-lg font-black text-white outline-none focus-visible:ring-2 focus-visible:ring-[--violet-light]"
+          className="flex items-center gap-2 rounded-lg font-black text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <span className="grid h-8 w-8 place-items-center rounded-xl bg-[--violet] shadow-md shadow-[--violet-glow]">
-            <IconSparkles size={16} stroke={2.2} />
+          <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-primary to-primary-hover text-primary-foreground shadow-md shadow-primary/30">
+            <IconSparkles size={18} stroke={2.2} aria-hidden="true" />
           </span>
-          <span className="hidden text-sm sm:inline">FreelioAI</span>
+          <span className="hidden text-base tracking-tight sm:inline">Freelio<span className="text-gradient">AI</span></span>
         </Link>
 
         <div className="mr-auto flex items-center gap-2">
+          <ThemeToggle />
           <Link
             href="/chat?new=1"
-            className="flex h-9 items-center gap-1.5 rounded-xl border border-[--violet-border] bg-[--violet-glow] px-3 text-xs font-semibold text-violet-300 outline-none transition-colors hover:text-white focus-visible:ring-2 focus-visible:ring-[--violet-light]"
+            className="flex h-9 items-center gap-1.5 rounded-xl bg-primary px-3 text-xs font-bold text-primary-foreground shadow-sm shadow-primary/25 outline-none transition-colors hover:bg-primary-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             <IconPlus size={14} stroke={2.5} />
             <span className="hidden sm:inline">پروژه جدید</span>
@@ -273,7 +275,7 @@ export default function PanelPage() {
           <button
             onClick={logout}
             aria-label="خروج از حساب"
-            className="flex h-9 items-center gap-1.5 rounded-xl border border-[hsl(var(--border))] bg-[--surface] px-3 text-xs text-[hsl(var(--muted-foreground))] outline-none transition-colors hover:text-white focus-visible:ring-2 focus-visible:ring-[--violet-light]"
+            className="flex h-9 items-center gap-1.5 rounded-xl border border-border bg-surface px-3 text-xs font-bold text-muted-foreground outline-none transition-colors hover:border-danger/40 hover:text-danger focus-visible:ring-2 focus-visible:ring-ring"
           >
             <IconLogout size={14} stroke={2} />
             <span className="hidden sm:inline">خروج</span>
@@ -281,10 +283,10 @@ export default function PanelPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl px-4 py-8">
+      <main className="mx-auto max-w-4xl px-4 py-8 sm:py-10">
         <section className="mb-6">
-          <h1 className="text-xl font-extrabold text-white sm:text-2xl">{greeting} 👋</h1>
-          <p className="mt-1.5 text-sm leading-7 text-[hsl(var(--muted-foreground))]">
+          <h1 className="text-2xl font-black tracking-tight text-foreground sm:text-3xl">{greeting}</h1>
+          <p className="mt-1.5 text-sm leading-7 text-muted-foreground">
             {orders.length > 0
               ? "پروژه‌هات اینجاست. کانفیگ هر پروژه رو بگیر یا ادامه‌ی چت‌های ناتمام رو باز کن."
               : "هنوز پروژه‌ای نداری. یه گفتگو با طراح محصول شروع کن تا پروژه‌ات ساخته بشه."}
@@ -292,12 +294,12 @@ export default function PanelPage() {
         </section>
 
         {error && (
-          <p role="alert" className="mb-6 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2.5 text-center text-sm text-red-400">
+          <p role="alert" className="mb-6 rounded-xl border border-danger/20 bg-danger/10 px-4 py-2.5 text-center text-sm text-danger">
             {error}
           </p>
         )}
 
-        <div role="tablist" aria-label="بخش‌های پنل" className="mb-6 flex gap-1 rounded-2xl border border-[hsl(var(--border))] bg-[--surface] p-1.5">
+        <div role="tablist" aria-label="بخش‌های پنل" className="mb-6 flex gap-1 rounded-2xl border border-border bg-surface p-1.5 shadow-card">
           {TABS.map(({ key, label, icon: Icon }) => {
             const count = key === "orders" ? orders.length : key === "chats" ? chatSessions.length : 0;
             const active = activeTab === key;
@@ -307,16 +309,16 @@ export default function PanelPage() {
                 role="tab"
                 aria-selected={active}
                 onClick={() => setActiveTab(key)}
-                className={`flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl px-2 text-[13px] font-semibold outline-none transition-all focus-visible:ring-2 focus-visible:ring-[--violet-light] sm:gap-2 sm:px-3 sm:text-sm ${
+                className={`flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl px-2 text-[13px] font-bold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring sm:gap-2 sm:px-3 sm:text-sm ${
                   active
-                    ? "bg-[--violet] text-white shadow-md shadow-[--violet-glow]"
-                    : "text-[hsl(var(--muted-foreground))] hover:text-white"
+                    ? "bg-primary-soft text-brand"
+                    : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
                 }`}
               >
-                <Icon size={16} stroke={2} />
+                <Icon size={16} stroke={2} aria-hidden="true" />
                 <span>{label}</span>
                 {count > 0 && (
-                  <span className={`rounded-full px-1.5 text-[11px] ${active ? "bg-white/20" : "bg-white/10"}`}>
+                  <span className={`rounded-full px-1.5 text-[11px] ${active ? "bg-primary text-primary-foreground" : "bg-foreground/5"}`}>
                     {count.toLocaleString("fa-IR")}
                   </span>
                 )}
@@ -326,17 +328,17 @@ export default function PanelPage() {
         </div>
 
         {activeTab === "orders" && orders.length === 0 && (
-          <div className="flex flex-col items-center rounded-3xl border border-dashed border-[hsl(var(--border))] bg-[--surface] px-6 py-16 text-center">
-            <span className="mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-[--violet-glow] text-violet-300">
+          <div className="flex flex-col items-center rounded-3xl border border-dashed border-border bg-surface px-6 py-16 text-center">
+            <span className="mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-primary-soft text-brand">
               <IconWand size={26} stroke={1.8} />
             </span>
-            <h2 className="mb-1 text-base font-bold text-white">اولین پروژه‌ات رو بساز</h2>
-            <p className="mb-6 max-w-sm text-sm leading-7 text-[hsl(var(--muted-foreground))]">
+            <h2 className="mb-1 text-base font-bold text-foreground">اولین پروژه‌ات رو بساز</h2>
+            <p className="mb-6 max-w-sm text-sm leading-7 text-muted-foreground">
               ایده‌ات رو به طراح محصول بگو، با چند سوال کوتاه ساختار پروژه مشخص می‌شه و یک کانفیگ آماده می‌گیری.
             </p>
             <Link
               href="/chat?new=1"
-              className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[--violet] px-5 text-sm font-bold text-white shadow-md shadow-[--violet-glow] outline-none transition-colors hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-[--violet-light]"
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground shadow-md shadow-primary/25 outline-none transition-colors hover:bg-primary-hover focus-visible:ring-2 focus-visible:ring-ring"
             >
               <IconPlus size={16} stroke={2.5} />
               شروع گفتگو
@@ -353,9 +355,9 @@ export default function PanelPage() {
             ))}
             <Link
               href="/chat?new=1"
-              className="flex min-h-40 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-[hsl(var(--border))] text-sm font-semibold text-[hsl(var(--muted-foreground))] outline-none transition-colors hover:border-[--violet-border] hover:text-white focus-visible:ring-2 focus-visible:ring-[--violet-light]"
+              className="flex min-h-40 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border text-sm font-semibold text-muted-foreground outline-none transition-colors hover:border-primary-line hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <span className="grid h-10 w-10 place-items-center rounded-xl bg-[--violet-glow] text-violet-300">
+              <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary-soft text-brand">
                 <IconPlus size={18} stroke={2.5} />
               </span>
               پروژه جدید
@@ -364,15 +366,15 @@ export default function PanelPage() {
         )}
 
         {activeTab === "chats" && (
-          <div className="overflow-hidden rounded-2xl border border-[hsl(var(--border))] bg-[--surface]">
-            <div className="flex items-center justify-between border-b border-[hsl(var(--border))] px-5 py-4">
+          <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-card">
+            <div className="flex items-center justify-between border-b border-border px-5 py-4">
               <div>
-                <h2 className="font-semibold text-white">چت‌های ناتمام</h2>
-                <p className="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">گفتگوهایی که به نتیجه نرسیده‌اند را ادامه بده.</p>
+                <h2 className="font-semibold text-foreground">چت‌های ناتمام</h2>
+                <p className="mt-0.5 text-xs text-muted-foreground">گفتگوهایی که به نتیجه نرسیده‌اند را ادامه بده.</p>
               </div>
               <Link
                 href="/chat?new=1"
-                className="flex min-h-9 items-center gap-1.5 rounded-xl bg-[--violet] px-4 text-xs font-bold text-white shadow-md shadow-[--violet-glow] outline-none transition-colors hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-[--violet-light]"
+                className="flex min-h-9 items-center gap-1.5 rounded-xl bg-primary px-4 text-xs font-bold text-primary-foreground shadow-md shadow-primary/25 outline-none transition-colors hover:bg-primary-hover focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <IconPlus size={13} stroke={2.5} />
                 چت جدید
@@ -380,22 +382,22 @@ export default function PanelPage() {
             </div>
             {chatSessions.length === 0 ? (
               <div className="px-5 py-14 text-center">
-                <IconMessage size={36} stroke={1.2} className="mx-auto mb-3 text-[hsl(var(--muted-foreground))]" />
-                <p className="text-sm text-[hsl(var(--muted-foreground))]">چت ناتمامی نداری.</p>
+                <IconMessage size={36} stroke={1.2} className="mx-auto mb-3 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">چت ناتمامی نداری.</p>
               </div>
             ) : (
-              <ul className="divide-y divide-[hsl(var(--border))]">
+              <ul className="divide-y divide-border">
                 {chatSessions.map((session) => (
                   <li key={session.id}>
                     <Link
                       href={`/chat?session=${session.id}`}
-                      className="flex items-center justify-between gap-4 px-5 py-4 outline-none transition-colors hover:bg-white/[0.03] focus-visible:bg-white/[0.05]"
+                      className="flex items-center justify-between gap-4 px-5 py-4 outline-none transition-colors hover:bg-foreground/[0.03] focus-visible:bg-foreground/5"
                     >
                       <div className="min-w-0">
-                        <p className="truncate font-medium text-white">{session.title}</p>
-                        <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">آخرین بروزرسانی: {formatDate(session.updated_at)}</p>
+                        <p className="truncate font-medium text-foreground">{session.title}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">آخرین بروزرسانی: {formatDate(session.updated_at)}</p>
                       </div>
-                      <span className="inline-flex shrink-0 items-center gap-0.5 text-xs font-semibold text-violet-300">
+                      <span className="inline-flex shrink-0 items-center gap-0.5 text-xs font-semibold text-brand">
                         ادامه
                         <IconChevronLeft size={14} stroke={2.5} />
                       </span>
@@ -413,14 +415,14 @@ export default function PanelPage() {
               e.preventDefault();
               handleSaveProfile();
             }}
-            className="space-y-5 rounded-2xl border border-[hsl(var(--border))] bg-[--surface] p-6"
+            className="space-y-5 rounded-2xl border border-border bg-surface p-6 shadow-card"
           >
             <div>
-              <h2 className="font-semibold text-white">تنظیمات حساب</h2>
-              <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">این اطلاعات برای شخصی‌سازی چت استفاده می‌شه.</p>
+              <h2 className="font-semibold text-foreground">تنظیمات حساب</h2>
+              <p className="mt-1 text-sm text-muted-foreground">این اطلاعات برای شخصی‌سازی چت استفاده می‌شه.</p>
               {profile?.phone && (
-                <p className="mt-3 text-xs text-[hsl(var(--muted-foreground))]">
-                  شماره‌ی موبایل: <span dir="ltr" className="text-[hsl(var(--foreground))]">{profile.phone}</span>
+                <p className="mt-3 text-xs text-muted-foreground">
+                  شماره‌ی موبایل: <span dir="ltr" className="text-foreground">{profile.phone}</span>
                 </p>
               )}
             </div>
@@ -431,7 +433,7 @@ export default function PanelPage() {
                 { id: "last-name", label: "نام خانوادگی", value: lastName, setter: setLastName, placeholder: "مثلاً رضایی", autoComplete: "family-name" },
               ].map(({ id, label, value, setter, placeholder, autoComplete }) => (
                 <div key={id}>
-                  <label htmlFor={id} className="mb-2 block text-xs text-[hsl(var(--muted-foreground))]">{label}</label>
+                  <label htmlFor={id} className="mb-2 block text-xs text-muted-foreground">{label}</label>
                   <input
                     id={id}
                     value={value}
@@ -441,13 +443,13 @@ export default function PanelPage() {
                     }}
                     placeholder={placeholder}
                     autoComplete={autoComplete}
-                    className="min-h-11 w-full rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-4 text-sm text-white outline-none placeholder-[hsl(var(--muted-foreground))] transition-colors focus:border-[--violet-border] focus-visible:ring-2 focus-visible:ring-[--violet-light]"
+                    className="field min-h-11 px-4"
                   />
                 </div>
               ))}
 
               <div className="md:col-span-2">
-                <label htmlFor="business-type" className="mb-2 block text-xs text-[hsl(var(--muted-foreground))]">نوع فعالیت</label>
+                <label htmlFor="business-type" className="mb-2 block text-xs text-muted-foreground">نوع فعالیت</label>
                 <select
                   id="business-type"
                   value={businessType}
@@ -455,7 +457,7 @@ export default function PanelPage() {
                     setBusinessType(e.target.value);
                     setSaved(false);
                   }}
-                  className="min-h-11 w-full rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-4 text-sm text-white outline-none transition-colors focus:border-[--violet-border] focus-visible:ring-2 focus-visible:ring-[--violet-light]"
+                  className="field min-h-11 px-4"
                 >
                   <option value="">انتخاب کنید</option>
                   <option value="فروشگاه آنلاین">فروشگاه آنلاین</option>
@@ -473,12 +475,12 @@ export default function PanelPage() {
               <button
                 type="submit"
                 disabled={savingProfile}
-                className="flex min-h-11 items-center gap-2 rounded-xl bg-[--violet] px-6 text-sm font-bold text-white shadow-md shadow-[--violet-glow] outline-none transition-colors hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-[--violet-light] disabled:opacity-50"
+                className="flex min-h-11 items-center gap-2 rounded-xl bg-primary px-6 text-sm font-bold text-primary-foreground shadow-md shadow-primary/25 outline-none transition-colors hover:bg-primary-hover focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
               >
                 {savingProfile ? "در حال ذخیره..." : "ذخیره تنظیمات"}
               </button>
               {saved && (
-                <span role="status" className="inline-flex items-center gap-1 text-sm text-emerald-400">
+                <span role="status" className="inline-flex items-center gap-1 text-sm text-success">
                   <IconCheck size={16} stroke={2.5} />
                   ذخیره شد
                 </span>

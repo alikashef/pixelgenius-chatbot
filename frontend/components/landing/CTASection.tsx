@@ -4,24 +4,24 @@ import { Button } from "@/components/ui/button";
 
 export default function CTASection() {
   return (
-    <section className="border-t border-[hsl(var(--border))] bg-[--surface]/30">
+    <section className="border-t border-border bg-surface/30">
       <div className="mx-auto max-w-7xl px-4 py-24">
-        <div className="relative overflow-hidden rounded-3xl border border-[--violet-border] bg-[--surface] p-10 text-center md:p-16">
+        <div className="relative overflow-hidden rounded-3xl border border-primary-line bg-surface p-10 text-center md:p-16">
           {/* background glow */}
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_50%_100%,rgba(124,58,237,0.15),transparent)]" />
+          <div className="pointer-events-none absolute inset-0 bg-aura" />
 
           <div className="relative">
-            <span className="mb-6 inline-grid h-16 w-16 place-items-center rounded-3xl bg-[--violet] shadow-2xl shadow-[--violet-glow]">
-              <IconSparkles size={30} className="text-white" stroke={1.8} />
+            <span className="mb-6 inline-grid h-16 w-16 place-items-center rounded-3xl bg-primary shadow-2xl shadow-primary/25">
+              <IconSparkles size={30} className="text-foreground" stroke={1.8} />
             </span>
 
-            <h2 className="text-3xl font-black text-white md:text-4xl lg:text-5xl">
+            <h2 className="text-3xl font-black text-foreground md:text-4xl lg:text-5xl">
               همین الان شروع کن
               <br />
               <span className="text-gradient">رایگانه</span>
             </h2>
 
-            <p className="mx-auto mt-5 max-w-lg text-[hsl(var(--muted-foreground))]">
+            <p className="mx-auto mt-5 max-w-lg text-muted-foreground">
               کمتر از ۳ دقیقه طول می‌کشه تا ویجت رو روی سایتت راه بندازی.
               کارت بانکی لازم نیست.
             </p>

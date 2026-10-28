@@ -17,7 +17,7 @@ function isImage(file: OrderFile) {
 function renderInline(text: string): ReactNode[] {
   return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
     part.startsWith("**") && part.endsWith("**") && part.length > 4 ? (
-      <strong key={i} className="font-bold text-white">
+      <strong key={i} className="font-bold text-foreground">
         {part.slice(2, -2)}
       </strong>
     ) : (
@@ -37,7 +37,7 @@ function renderRichText(content: string): ReactNode[] {
       const numbered = /^\s*[0-9۰-۹]+[.)]/.test(lines[0]);
       const Tag = numbered ? "ol" : "ul";
       return (
-        <Tag key={blockIndex} className={`space-y-1.5 pr-5 ${numbered ? "list-decimal" : "list-disc"} marker:text-violet-400`}>
+        <Tag key={blockIndex} className={`space-y-1.5 pr-5 ${numbered ? "list-decimal" : "list-disc"} marker:text-brand`}>
           {items.map((m, i) => (
             <li key={i}>{renderInline(m![1])}</li>
           ))}
@@ -63,7 +63,7 @@ export default function ChatBubble({ role, content, attachments = [] }: Props) {
       {!isUser && (
         <span
           aria-hidden="true"
-          className="mb-1 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[--violet] text-white shadow-lg shadow-[--violet-glow]"
+          className="mb-1 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-primary to-accent text-primary-foreground shadow-md shadow-primary/25"
         >
           <IconSparkles size={15} stroke={2.2} />
         </span>
@@ -71,8 +71,8 @@ export default function ChatBubble({ role, content, attachments = [] }: Props) {
       <div
         className={`max-w-[85%] overflow-hidden rounded-2xl text-[15px] leading-7 sm:max-w-[78%] ${
           isUser
-            ? "rounded-br-md bg-[--violet] text-white shadow-md shadow-[--violet-glow]"
-            : "rounded-bl-md border border-[hsl(var(--border))] bg-[--surface-2] text-[hsl(var(--foreground))]"
+            ? "rounded-br-md bg-primary text-primary-foreground shadow-md shadow-primary/25"
+            : "rounded-bl-md border border-border bg-surface text-foreground shadow-card"
         }`}
       >
         {attachments.length > 0 && (
@@ -83,8 +83,8 @@ export default function ChatBubble({ role, content, attachments = [] }: Props) {
                 href={file.url}
                 target="_blank"
                 rel="noreferrer"
-                className={`block overflow-hidden rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-white ${
-                  isImage(file) ? "border border-white/15 bg-black/10" : "border border-white/15 bg-black/10 px-3 py-2"
+                className={`block overflow-hidden rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${
+                  isImage(file) ? "border border-border bg-foreground/5" : "border border-border bg-foreground/5 px-3 py-2"
                 }`}
               >
                 {isImage(file) ? (

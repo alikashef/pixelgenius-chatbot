@@ -128,32 +128,32 @@ export default function DesignerSettings({ getToken: getTokenProp, settings, onS
 
   return (
     <div className="space-y-5">
-      <section className="bg-[--surface] border border-[hsl(var(--border))] rounded-2xl p-5 space-y-4">
+      <section className="bg-surface border border-border rounded-2xl p-5 space-y-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="font-semibold text-[hsl(var(--foreground))]">استک بر اساس اندازه پروژه</h2>
-            <p className="text-[hsl(var(--muted-foreground))] text-xs mt-1 leading-6">
+            <h2 className="font-semibold text-foreground">استک بر اساس اندازه پروژه</h2>
+            <p className="text-muted-foreground text-xs mt-1 leading-6">
               برای هر اندازه، زبان‌ها و ابزارهای هر لایه را انتخاب کنید. چت طراح اندازهٔ پروژه را از نیاز مشتری تشخیص می‌دهد و استک را از همین جدول برمی‌دارد.
             </p>
           </div>
           <button
             onClick={save}
             disabled={saving || !dirty}
-            className="bg-[--violet] hover:bg-violet-700 disabled:opacity-50 text-white font-bold rounded-xl px-5 py-3 text-sm transition-colors"
+            className="bg-primary hover:bg-primary-hover disabled:opacity-50 text-primary-foreground font-bold rounded-xl px-5 py-3 text-sm transition-colors"
           >
             {saving ? "در حال ذخیره..." : dirty ? "ذخیره تغییرات" : "ذخیره شد"}
           </button>
         </div>
 
         {message && (
-          <p className={cn("rounded-xl border px-4 py-3 text-sm", message.type === "ok" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400" : "border-red-500/30 bg-red-500/10 text-red-400")}>
+          <p className={cn("rounded-xl border px-4 py-3 text-sm", message.type === "ok" ? "border-success/30 bg-success/10 text-success" : "border-danger/30 bg-danger/10 text-danger")}>
             {message.text}
           </p>
         )}
 
         <div className="grid gap-4 lg:grid-cols-3">
           {tiers.map((tier, index) => (
-            <div key={tier.key} className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--background))]/40 p-4 space-y-4">
+            <div key={tier.key} className="rounded-2xl border border-border bg-background/40 p-4 space-y-4">
               <div className="space-y-2">
                 <input className="admin-input font-semibold" value={tier.label} onChange={(e) => patchTier(index, { label: e.target.value })} />
                 <textarea
@@ -177,15 +177,15 @@ export default function DesignerSettings({ getToken: getTokenProp, settings, onS
         </div>
       </section>
 
-      <section className="bg-[--surface] border border-[hsl(var(--border))] rounded-2xl p-5 space-y-4">
+      <section className="bg-surface border border-border rounded-2xl p-5 space-y-4">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 className="font-semibold text-[hsl(var(--foreground))]">تولید تصویر با هوش مصنوعی</h2>
-            <p className="text-[hsl(var(--muted-foreground))] text-xs mt-1 leading-6">
+            <h2 className="font-semibold text-foreground">تولید تصویر با هوش مصنوعی</h2>
+            <p className="text-muted-foreground text-xs mt-1 leading-6">
               وقتی کانفیگ پروژه به عکس نیاز دارد (Hero، بنر، تصویر محصول)، طراح برای هر تصویر یک prompt می‌نویسد و با این مدل ساخته می‌شود؛ آدرس تصویر داخل کانفیگ قرار می‌گیرد.
             </p>
           </div>
-          <label className="flex shrink-0 items-center gap-2 text-xs text-[hsl(var(--foreground))] cursor-pointer">
+          <label className="flex shrink-0 items-center gap-2 text-xs text-foreground cursor-pointer">
             <Switch checked={image.enabled} onChange={() => patchImage({ enabled: !image.enabled })} />
             فعال
           </label>
@@ -193,11 +193,11 @@ export default function DesignerSettings({ getToken: getTokenProp, settings, onS
 
         <div className="grid gap-3 md:grid-cols-3">
           <label className="block md:col-span-1">
-            <span className="block text-[hsl(var(--muted-foreground))] text-xs mb-2">شناسهٔ مدل</span>
+            <span className="block text-muted-foreground text-xs mb-2">شناسهٔ مدل</span>
             <input dir="ltr" className="admin-input" value={image.model} onChange={(e) => patchImage({ model: e.target.value })} />
           </label>
           <label className="block">
-            <span className="block text-[hsl(var(--muted-foreground))] text-xs mb-2">اندازهٔ تصویر</span>
+            <span className="block text-muted-foreground text-xs mb-2">اندازهٔ تصویر</span>
             <select className="admin-input" value={image.size} onChange={(e) => patchImage({ size: e.target.value })}>
               {IMAGE_SIZES.map((s) => (
                 <option key={s} value={s}>{s}</option>
@@ -205,7 +205,7 @@ export default function DesignerSettings({ getToken: getTokenProp, settings, onS
             </select>
           </label>
           <label className="block">
-            <span className="block text-[hsl(var(--muted-foreground))] text-xs mb-2">حداکثر تصویر در هر پروژه</span>
+            <span className="block text-muted-foreground text-xs mb-2">حداکثر تصویر در هر پروژه</span>
             <input
               type="number"
               min={0}
@@ -217,19 +217,19 @@ export default function DesignerSettings({ getToken: getTokenProp, settings, onS
           </label>
         </div>
 
-        <div className="rounded-2xl border border-dashed border-[hsl(var(--border))] p-4 space-y-3">
-          <p className="text-xs text-[hsl(var(--muted-foreground))]">تست مدل (هر تست یک تصویر واقعی می‌سازد و هزینه دارد)</p>
+        <div className="rounded-2xl border border-dashed border-border p-4 space-y-3">
+          <p className="text-xs text-muted-foreground">تست مدل (هر تست یک تصویر واقعی می‌سازد و هزینه دارد)</p>
           <textarea dir="ltr" className="admin-textarea min-h-[72px]" value={testPrompt} onChange={(e) => setTestPrompt(e.target.value)} />
           <button
             onClick={runTest}
             disabled={testing || !testPrompt.trim()}
-            className="border border-[hsl(var(--border))] hover:border-[--violet-border] disabled:opacity-50 rounded-xl px-4 py-2 text-xs text-[hsl(var(--foreground))] transition-colors"
+            className="border border-border hover:border-primary-line disabled:opacity-50 rounded-xl px-4 py-2 text-xs text-foreground transition-colors"
           >
             {testing ? "در حال ساخت تصویر..." : "ساخت تصویر آزمایشی"}
           </button>
           {testUrl && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={testUrl} alt="تصویر آزمایشی" className="max-h-72 rounded-xl border border-[hsl(var(--border))]" />
+            <img src={testUrl} alt="تصویر آزمایشی" className="max-h-72 rounded-xl border border-border" />
           )}
         </div>
       </section>
@@ -253,8 +253,8 @@ function MultiSelect({ label, options, value, onChange }: { label: string; optio
 
   return (
     <div>
-      <span className="block text-[hsl(var(--muted-foreground))] text-xs mb-2">
-        {label} <span className="text-violet-300">({value.length.toLocaleString("fa-IR")})</span>
+      <span className="block text-muted-foreground text-xs mb-2">
+        {label} <span className="text-brand">({value.length.toLocaleString("fa-IR")})</span>
       </span>
       <div className="flex flex-wrap gap-1.5">
         {all.map((option) => {
@@ -269,8 +269,8 @@ function MultiSelect({ label, options, value, onChange }: { label: string; optio
               className={cn(
                 "rounded-full border px-2.5 py-1 text-[11px] transition-colors",
                 on
-                  ? "border-[--violet] bg-[--violet-glow] text-violet-200"
-                  : "border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:border-[--violet-border]",
+                  ? "border-primary bg-primary-soft text-brand"
+                  : "border-border text-muted-foreground hover:border-primary-line",
               )}
             >
               {option}
