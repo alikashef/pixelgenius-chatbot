@@ -20,6 +20,7 @@ import {
 import { fetchCustomerProfile, fetchMyOrders, updateCustomerProfile, CustomerProfile, Order } from "@/lib/api";
 import AppShell, { ShellLoading } from "@/components/AppShell";
 import McpTour, { isMcpTourDone } from "@/components/McpTour";
+import GuidedTour, { startTour } from "@/components/GuidedTour";
 import { Button } from "@/components/ui/button";
 
 const STATUS_LABEL: Record<Order["status"], string> = {
@@ -332,9 +333,11 @@ export default function PanelPage() {
       primaryAction={newProjectLink}
       user={{ name: [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || "کاربر", detail: profile?.phone }}
       onLogout={logout}
+      onHelp={() => startTour("panel")}
       title={SECTION_COPY[activeTab].title}
       description={SECTION_COPY[activeTab].description}
     >
+      <GuidedTour tour="panel" />
       {error && (
         <p role="alert" className="mb-6 rounded-lg border border-danger/25 bg-danger/10 px-4 py-2.5 text-sm text-danger">
           {error}

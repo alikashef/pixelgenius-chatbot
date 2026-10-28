@@ -138,6 +138,9 @@ frontend/
     AuthLayout.tsx                ← لِی‌اوت دوبخشی صفحات ورود
     ThemeToggle.tsx               ← سوییچ تم (client)
     McpTour.tsx                   ← تور آموزشی اتصال MCP در پنل مشتری + CopyBlock و BUILD_PROMPT مشترک
+    GuidedTour.tsx                ← تور خوش‌آمد (اسپات‌لایت + روبات راهنما + صدا)
+  lib/tours.json                  ← متن مراحل تورها (منبع مشترک UI و تولید صدا)
+  public/audio/tour/              ← صداهای تور + manifest.json (خروجی اسکریپت)
   lib/
     utils.ts                      ← cn() با clsx + tailwind-merge
     api.ts                        ← همه fetch calls به backend
@@ -259,6 +262,7 @@ Utilityها: `glass` (هدر)، `bg-dots` (بافت پنل برند). فیلد �
 | `components/AppShell.tsx` | سایدبار (دسکتاپ) / دراور (موبایل) + عنوان صفحه؛ پنل مشتری، ادمین و فریلنسر |
 | `components/AuthLayout.tsx` | صفحه‌ی دوبخشی ورود: فرم + پنل برند معکوس (variant: customer / freelancer / admin) |
 | `components/ThemeToggle.tsx` | روشن / تیره / سیستم |
+| `components/GuidedTour.tsx` | تور اولین ورود: اسپات‌لایت روی المان‌های `data-tour`، روبات دایره‌ای زعفرانی که حین پخش صدا «حرف می‌زند»؛ با `startTour(id)` دوباره باز می‌شود |
 | `components/McpTour.tsx` | تور ۵ مرحله‌ای اتصال ابزار AI به سرور MCP (`/panel?tab=connect`)، پیشرفت در `localStorage.mcp_tour` |
 
 ### قوانین طراحی
@@ -307,6 +311,17 @@ import { cn } from "@/lib/utils"
 - صفحات با state → **client component**
 - layout مشترک → در `layout.tsx`، نه در `page.tsx`
 - shadcn components → از `components/ui/` import کن، دوباره نساز
+
+### صدای تور (ElevenLabs)
+
+متن تورها فقط در `frontend/lib/tours.json` تغییر می‌کند. بعد از هر تغییر:
+
+```bash
+ELEVENLABS_API_KEY=... python3 scripts/generate_tour_audio.py
+```
+
+کلید فقط از env خوانده می‌شود و **هرگز** commit نمی‌شود. اختیاری: `ELEVENLABS_VOICE_ID`، `ELEVENLABS_MODEL_ID` (پیش‌فرض `eleven_v3`).
+اگر فایل صدا نباشد، تور بدون صدا (فقط متن) کار می‌کند.
 
 ### قبل از هر commit
 

@@ -3,13 +3,14 @@
 import { useState, useRef, useEffect, FormEvent, KeyboardEvent, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { IconArrowUp, IconBrandGithub, IconChevronLeft, IconCode, IconCloudUpload, IconLayout, IconCheck, IconCoin, IconCopy, IconDownload, IconFileText, IconFileZip, IconMenu2, IconMessage, IconPaperclip, IconPlus, IconRefresh, IconUser, IconWand, IconX } from "@tabler/icons-react";
+import { IconArrowUp, IconBrandGithub, IconChevronLeft, IconCode, IconCloudUpload, IconLayout, IconCheck, IconCoin, IconCopy, IconDownload, IconFileText, IconHelp, IconFileZip, IconMenu2, IconMessage, IconPaperclip, IconPlus, IconRefresh, IconUser, IconWand, IconX } from "@tabler/icons-react";
 import { BrandLogo, BrandMark } from "@/components/Brand";
 import { Button } from "@/components/ui/button";
 import { BUILD_PROMPT, CopyBlock } from "@/components/McpTour";
 import ChatBubble from "@/components/ChatBubble";
 import ChatRobot, { ROBOT_INTRODUCTIONS } from "@/components/ChatRobot";
 import ThemeToggle from "@/components/ThemeToggle";
+import GuidedTour, { startTour } from "@/components/GuidedTour";
 import { fetchOrderBrief, fetchChatProgress, ChatProgressStage, sendChat, sendOtp, submitOrder, uploadChatFile, createChatSession, updateChatSession, ChatMode, ProjectPath, Message, Proposal, LeadAnalysis, OrderFile } from "@/lib/api";
 
 const WELCOME: Message = {
@@ -820,7 +821,7 @@ function ChatPageInner() {
   ];
 
   const pathPicker = !botToken && mode === "designer" && !briefOrderId && (isFresh || needsProjectPath) ? (
-    <fieldset className="mt-8 text-right">
+    <fieldset className="mt-8 text-right" data-tour="path">
       <legend className="eyebrow mb-3">مسیر پروژه</legend>
       <div className="grid gap-2.5 sm:grid-cols-3">
         {PROJECT_PATHS.map((path) => {
@@ -910,7 +911,7 @@ function ChatPageInner() {
   ) : null;
 
   const composer = (
-    <form onSubmit={handleSubmit} className="w-full">
+    <form onSubmit={handleSubmit} className="w-full" data-tour="composer">
       <div className="rounded-2xl border border-input bg-surface p-2 shadow-elevated transition-[border-color,box-shadow] duration-150 focus-within:border-ring focus-within:shadow-[0_0_0_3px_hsl(var(--ring)/0.16)]">
             {attachments.length > 0 && (
               <div className="mb-2 flex flex-wrap gap-2 px-1 pt-1">
@@ -1012,7 +1013,7 @@ function ChatPageInner() {
           گفتگوی جدید
         </button>
       </div>
-      <nav aria-label="گفتگوهای اخیر" className="mt-6 min-h-0 flex-1 overflow-y-auto px-3 pb-4">
+      <nav aria-label="گفتگوهای اخیر" data-tour="history" className="mt-6 min-h-0 flex-1 overflow-y-auto px-3 pb-4">
         <p className="eyebrow mb-2 px-2.5">گفتگوهای اخیر</p>
         {customerToken ? (
           visibleSessions.length ? (
@@ -1042,12 +1043,24 @@ function ChatPageInner() {
         )}
       </nav>
       <div className="flex items-center gap-2 border-t border-border p-3">
-        <Link href={customerToken ? "/panel" : "/login?redirect=/panel"} className="flex h-10 min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2 text-sm font-bold text-foreground outline-none transition-colors hover:bg-foreground/5 focus-visible:ring-2 focus-visible:ring-ring">
+        <Link href={customerToken ? "/panel" : "/login?redirect=/panel"} data-tour="account" className="flex h-10 min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2 text-sm font-bold text-foreground outline-none transition-colors hover:bg-foreground/5 focus-visible:ring-2 focus-visible:ring-ring">
           <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-surface-2 text-muted-foreground">
             <IconUser size={15} aria-hidden="true" />
           </span>
           <span className="truncate">{customerToken ? customerName || "پنل کاربری" : "ورود / ثبت‌نام"}</span>
         </Link>
+        <button
+          type="button"
+          onClick={() => {
+            setSidebarOpen(false);
+            startTour("chat");
+          }}
+          aria-label="راهنمای سایت"
+          title="راهنما"
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-border bg-surface text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <IconHelp size={17} aria-hidden="true" />
+        </button>
         <ThemeToggle />
       </div>
     </div>
@@ -1055,6 +1068,7 @@ function ChatPageInner() {
 
   return (
     <div className="flex h-[100dvh] min-h-[100dvh] overflow-hidden bg-background">
+      {showSidebar && hydrated && <GuidedTour tour="chat" autoStart={isFresh} />}
       {showSidebar && (
         <aside className="hidden w-72 shrink-0 border-l border-border bg-surface-2/60 lg:block">{sidebar}</aside>
       )}
@@ -1096,7 +1110,7 @@ function ChatPageInner() {
                 </div>
 
                 {!botToken && (
-                  <fieldset className="mt-8">
+                  <fieldset className="mt-8" data-tour="mode">
                     <legend className="sr-only">حالت گفتگو</legend>
                     <div className="mx-auto grid max-w-md grid-cols-2 gap-1 rounded-xl bg-surface-2 p-1">
                       {(Object.keys(MODE_CARDS) as ChatMode[]).map((id) => {
@@ -1140,7 +1154,7 @@ function ChatPageInner() {
                     {needsProjectPath ? "با انتخاب مسیر پروژه، گفتگو فعال می‌شود." : projectPath === "source" && mode === "designer" ? sourceReady ? "سورس ثبت شد؛ حالا درباره پروژه و هدفت از انتشار بنویس." : "ابتدا لینک GitHub یا فایل ZIP سورس را اضافه کن." : "یا با یکی از نمونه‌ها شروع کن:"}
                   </p>
                   {!(activeMode === "designer" && projectPath === "source") && (
-                    <div className="mt-3 flex flex-wrap justify-center gap-2">
+                    <div className="mt-3 flex flex-wrap justify-center gap-2" data-tour="chips">
                       {QUICK_STARTS[activeMode].map((label) => (
                         <button
                           key={label}

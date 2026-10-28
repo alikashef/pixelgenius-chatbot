@@ -2,7 +2,7 @@
 
 import { ReactNode, useEffect, useState } from "react";
 import Link from "next/link";
-import { IconLogout, IconMenu2, IconX, type Icon } from "@tabler/icons-react";
+import { IconHelp, IconLogout, IconMenu2, IconX, type Icon } from "@tabler/icons-react";
 import { BrandLogo } from "@/components/Brand";
 import ThemeToggle from "@/components/ThemeToggle";
 import { cn } from "@/lib/utils";
@@ -29,6 +29,8 @@ interface AppShellProps {
   primaryAction?: ReactNode;
   user?: { name: string; detail?: string };
   onLogout?: () => void;
+  /** Shows a help button that replays the onboarding tour. */
+  onHelp?: () => void;
   title: ReactNode;
   description?: ReactNode;
   /** Controls placed beside the page title. */
@@ -66,7 +68,7 @@ function NavLink({ item, onNavigate }: { item: ShellNavItem; onNavigate: () => v
   );
   if (item.href) {
     return (
-      <Link href={item.href} onClick={onNavigate} aria-current={item.active ? "page" : undefined} className={className}>
+      <Link href={item.href} onClick={onNavigate} aria-current={item.active ? "page" : undefined} data-tour={`nav-${item.key}`} className={className}>
         {content}
       </Link>
     );
@@ -79,6 +81,7 @@ function NavLink({ item, onNavigate }: { item: ShellNavItem; onNavigate: () => v
         onNavigate();
       }}
       aria-current={item.active ? "page" : undefined}
+      data-tour={`nav-${item.key}`}
       className={className}
     >
       {content}
@@ -92,6 +95,7 @@ export default function AppShell({
   primaryAction,
   user,
   onLogout,
+  onHelp,
   title,
   description,
   actions,
@@ -123,7 +127,7 @@ export default function AppShell({
           <IconX size={18} aria-hidden="true" />
         </button>
       </div>
-      {primaryAction && <div className="px-3 pb-2">{primaryAction}</div>}
+      {primaryAction && <div className="px-3 pb-2" data-tour="new-project">{primaryAction}</div>}
       <nav aria-label="منوی اصلی" className="mt-3 min-h-0 flex-1 space-y-0.5 overflow-y-auto px-3">
         {nav.map((item, i) => (
           <div key={item.key}>
@@ -134,7 +138,7 @@ export default function AppShell({
           </div>
         ))}
       </nav>
-      <div className="border-t border-border p-3">
+      <div className="border-t border-border p-3" data-tour="shell-footer">
         <div className="flex items-center gap-2">
           {user && (
             <div className="flex min-w-0 flex-1 items-center gap-2.5 px-1">
@@ -147,7 +151,24 @@ export default function AppShell({
               </span>
             </div>
           )}
-          <ThemeToggle className={user ? "" : "ml-auto"} />
+          {onHelp && (
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                onHelp();
+              }}
+              aria-label="راهنمای پنل"
+              title="راهنما"
+              className={cn(
+                "grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-border bg-surface text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
+                !user && "ml-auto"
+              )}
+            >
+              <IconHelp size={17} aria-hidden="true" />
+            </button>
+          )}
+          <ThemeToggle className={user || onHelp ? "" : "ml-auto"} />
           {onLogout && (
             <button
               type="button"
