@@ -11,7 +11,7 @@ import { BUILD_PROMPT, CopyBlock } from "@/components/McpTour";
 import ChatBubble from "@/components/ChatBubble";
 import ChatRobot from "@/components/ChatRobot";
 import ThemeToggle from "@/components/ThemeToggle";
-import { NavGroups, useAccountNav } from "@/components/AppShell";
+import { NavGroups, useSectionLinks } from "@/components/AppShell";
 import GuidedTour, { startTour } from "@/components/GuidedTour";
 import FreelancerPromo from "@/components/FreelancerPromo";
 import GithubRepoPicker from "@/components/GithubRepoPicker";
@@ -942,7 +942,7 @@ function ChatPageInner() {
   }, [customerToken]);
 
   const visibleSessions = sessions.filter((s) => s.draft.messages.some((m) => m.role === "user"));
-  const accountNav = useAccountNav({ active: "", counts: { orders: salesOrders.length || undefined } });
+  const accountNav = useSectionLinks({ "فروش": salesOrders.length || undefined });
   const showSidebar = !botToken && !embedded;
   const brandName = botProfile?.widget.brand_name || botProfile?.name || "دستیار پروژه";
   const robotProps = {

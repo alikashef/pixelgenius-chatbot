@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   IconBrush, IconClipboardList, IconHelp, IconLayoutDashboard, IconLayoutGrid, IconLogout, IconMenu2, IconMessage, IconPlugConnected, IconReceipt, IconWorld,
   IconSchool, IconSettings, IconWand, IconX, type Icon,
+  IconBriefcase, IconUser,
 } from "@tabler/icons-react";
 import { BrandLogo } from "@/components/Brand";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -46,9 +47,25 @@ const ACCOUNT_NAV: (Omit<ShellNavItem, "key"> & { key: CustomerTab })[] = [
 ];
 const PRICING_NAV: ShellNavItem = { key: "pricing", group: "حساب کاربری", label: "تعرفه‌ها", icon: IconReceipt, href: "/pricing" };
 
+type Section = { id: string; label: string; icon: Icon; href: string; role: Role };
+
+// The main page lists only these sections; each section's page lists its own links.
+const SECTIONS: Section[] = [
+  { id: "طراحی محصول", label: "طراحی محصول", icon: IconWand, href: "/account?tab=design", role: "customer" },
+  { id: "فروش", label: "فروش", icon: IconClipboardList, href: "/account?tab=orders", role: "customer" },
+  { id: "فریلنسر", label: "فریلنسر", icon: IconBriefcase, href: "/freelancer/dashboard", role: "freelancer" },
+  { id: "حساب کاربری", label: "حساب کاربری", icon: IconUser, href: "/account?tab=account", role: "customer" },
+];
+
+function useRoles() {
+  const [roles, setRoles] = useState<Role[]>([]);
+  useEffect(() => setRoles(signedInRoles()), []);
+  return roles;
+}
+
 /**
- * The shared sidebar items. Customer sections link to /account tabs (or switch tabs in place when
- * onCustomerTab is given); the freelancer section only appears for accounts with that permission.
+ * Sidebar links of the section the current page belongs to. Customer links switch /account tabs
+ * (in place when onCustomerTab is given); the freelancer section exists only with that permission.
  */
 export function useAccountNav({
   active,
@@ -59,8 +76,7 @@ export function useAccountNav({
   counts?: Partial<Record<string, number>>;
   onCustomerTab?: (tab: CustomerTab) => void;
 }): ShellNavItem[] {
-  const [roles, setRoles] = useState<Role[]>([]);
-  useEffect(() => setRoles(signedInRoles()), []);
+  const roles = useRoles();
   const customerItem = ({ key, ...item }: Omit<ShellNavItem, "key"> & { key: CustomerTab | "templates" }): ShellNavItem => ({
     ...item,
     key,
@@ -73,12 +89,26 @@ export function useAccountNav({
         : { href: `/account?tab=${key}` }),
   });
   const customer = roles.includes("customer");
-  return [
+  const all = [
     ...(customer ? CUSTOMER_NAV.map(customerItem) : []),
     ...(roles.includes("freelancer") ? FREELANCER_NAV.map((item) => ({ ...item, active: active === item.key, count: counts[item.key] })) : []),
     ...(customer ? ACCOUNT_NAV.map(customerItem) : []),
-    ...(roles.length ? [{ ...PRICING_NAV, group: customer ? PRICING_NAV.group : "حساب", active: active === "pricing" }] : []),
+    ...(roles.length ? [{ ...PRICING_NAV, active: active === "pricing" }] : []),
   ];
+  const section = all.find((item) => item.key === active)?.group;
+  return section ? all.filter((item) => item.group === section) : [];
+}
+
+/** The main page's sidebar: one link per section the account may open. */
+export function useSectionLinks(counts: Partial<Record<string, number>> = {}): ShellNavItem[] {
+  const roles = useRoles();
+  return SECTIONS.filter((section) => roles.includes(section.role)).map((section) => ({
+    key: `section-${section.id}`,
+    label: section.label,
+    icon: section.icon,
+    href: section.href,
+    count: counts[section.id],
+  }));
 }
 
 /** The primary button at the top of the panel sidebar: back to the chat. */
