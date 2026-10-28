@@ -429,6 +429,7 @@ function BriefGuide({ mcpUrl }: { mcpUrl: string }) {
 }
 
 function ChatPageInner() {
+  const [tourOpen, setTourOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([WELCOME]);
   const [customerToken, setCustomerToken] = useState("");
   const [customerId, setCustomerId] = useState("");
@@ -791,6 +792,10 @@ function ChatPageInner() {
   }
 
   async function handlePhoneSubmit(phone: string) {
+    if (!/^09[0-9]{9}$/.test(phone)) {
+      setError("شماره موبایل را ۱۱ رقمی، با اعداد انگلیسی و شروع با 09 وارد کن.");
+      return;
+    }
     setSendingOtp(true);
     setError("");
     setMessages((prev) => [...prev, { role: "user", content: phone }]);
@@ -930,9 +935,10 @@ function ChatPageInner() {
   const visibleSessions = sessions.filter((s) => s.draft.messages.some((m) => m.role === "user"));
   const showSidebar = !botToken && !embedded;
   const brandName = botProfile?.widget.brand_name || botProfile?.name || "دستیار پروژه";
-  const robotProps = botProfile
-    ? { shape: botProfile.widget.robot_shape, robotColors: robotColors(botProfile.widget.robot_color), voiceAvailable: botProfile.widget.voice }
-    : {};
+  const robotProps = {
+    ...(botProfile ? { shape: botProfile.widget.robot_shape, robotColors: robotColors(botProfile.widget.robot_color) } : {}),
+    voiceAvailable: !tourOpen && (botProfile?.widget.voice ?? true),
+  };
   const modeChip = !isFresh && !briefOrderId ? (
     <span className="inline-flex min-w-0 items-center gap-1.5 truncate rounded-full bg-surface-2 px-3 py-1 text-xs font-bold text-secondary-foreground" title="برای تغییر حالت، یک گفتگوی جدید شروع کن">
       {activeMode === "designer" ? <IconWand size={14} aria-hidden="true" /> : <IconCoin size={14} aria-hidden="true" />}
@@ -1018,13 +1024,23 @@ function ChatPageInner() {
                 id="chat-input"
                 ref={inputRef}
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (phoneStep && /[^0-9]/.test(value)) {
+                    setError("شماره موبایل را فقط با اعداد انگلیسی وارد کن؛ زبان کیبورد را به انگلیسی تغییر بده.");
+                    return;
+                  }
+                  setInput(value);
+                  if (phoneStep) setError("");
+                }}
                 onKeyDown={handleTextareaKeyDown}
                 placeholder={placeholder}
                 disabled={isLoading || chatBlocked}
                 dir={phoneStep ? "ltr" : "rtl"}
                 rows={1}
-                inputMode={phoneStep ? "tel" : "text"}
+                inputMode={phoneStep ? "numeric" : "text"}
+                maxLength={phoneStep ? 11 : undefined}
+                lang={phoneStep ? "en" : "fa"}
                 autoComplete={phoneStep ? "tel" : "off"}
                 className="max-h-32 min-h-10 min-w-0 flex-1 resize-none bg-transparent px-1 py-2 text-[16px] leading-6 text-foreground placeholder:text-muted-foreground outline-none disabled:opacity-50 sm:text-[15px]"
               />
@@ -1123,7 +1139,7 @@ function ChatPageInner() {
 
   return (
     <div className="flex h-[100dvh] min-h-[100dvh] overflow-hidden bg-background" style={botProfile ? accentStyle(botProfile.widget) : undefined}>
-      {showSidebar && hydrated && <GuidedTour tour="chat" autoStart={isFresh} />}
+      {showSidebar && hydrated && <GuidedTour tour="chat" autoStart={isFresh} onOpenChange={setTourOpen} />}
       {showSidebar && (
         <aside className="hidden w-72 shrink-0 border-l border-border bg-surface-2/60 lg:block">{sidebar}</aside>
       )}

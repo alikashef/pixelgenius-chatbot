@@ -52,7 +52,7 @@ function loadManifest() {
   return manifestPromise;
 }
 
-export default function GuidedTour({ tour, autoStart = true }: { tour: TourId; autoStart?: boolean }) {
+export default function GuidedTour({ tour, autoStart = true, onOpenChange }: { tour: TourId; autoStart?: boolean; onOpenChange?: (open: boolean) => void }) {
   const [open, setOpen] = useState(false);
   const [steps, setSteps] = useState<TourStep[]>([]);
   const [index, setIndex] = useState(0);
@@ -63,25 +63,42 @@ export default function GuidedTour({ tour, autoStart = true }: { tour: TourId; a
   const audio = useRef<HTMLAudioElement | null>(null);
   const card = useRef<HTMLDivElement>(null);
 
+  const stopAudio = useCallback(() => {
+    const voice = audio.current;
+    audio.current = null;
+    if (voice) {
+      voice.onplaying = voice.onended = voice.onpause = voice.onwaiting = voice.onerror = null;
+      voice.pause();
+      voice.removeAttribute("src");
+      voice.load();
+    }
+    setSpeaking(false);
+  }, []);
+
   const begin = useCallback(() => {
     // Steps whose section is not on screen (e.g. the sidebar on mobile) are left out.
     const visible = (TOURS[tour] as TourStep[]).filter((step) => !step.target || findTarget(step.target));
     setSteps(visible);
     setIndex(0);
     setOpen(true);
-  }, [tour]);
+    onOpenChange?.(true);
+  }, [tour, onOpenChange]);
 
   const close = useCallback(() => {
-    audio.current?.pause();
-    audio.current = null;
-    setSpeaking(false);
+    stopAudio();
     setOpen(false);
+    onOpenChange?.(false);
     try {
       localStorage.setItem(DONE_KEY(tour), "1");
     } catch {
       // storage blocked: the tour may show again next visit
     }
-  }, [tour]);
+  }, [tour, stopAudio, onOpenChange]);
+
+  useEffect(() => () => {
+    stopAudio();
+    onOpenChange?.(false);
+  }, [stopAudio, onOpenChange]);
 
   useEffect(() => {
     try {
@@ -137,26 +154,24 @@ export default function GuidedTour({ tour, autoStart = true }: { tour: TourId; a
   }, [step]);
 
   const play = useCallback(() => {
-    audio.current?.pause();
-    audio.current = null;
-    setSpeaking(false);
+    stopAudio();
     if (!step) return;
     const file = audioFiles[`${tour}/${step.id}`];
     if (!file) return;
     const voice = new Audio(`/audio/tour/${file}`);
     audio.current = voice;
-    voice.onplay = () => audio.current === voice && setSpeaking(true);
-    voice.onended = voice.onpause = () => audio.current === voice && setSpeaking(false);
-    voice.play().catch(() => setSpeaking(false));
-  }, [step, audioFiles, tour]);
+    voice.onplaying = () => audio.current === voice && setSpeaking(true);
+    voice.onended = voice.onpause = voice.onwaiting = voice.onerror = () => audio.current === voice && setSpeaking(false);
+    voice.play().catch(() => {
+      if (audio.current === voice) setSpeaking(false);
+    });
+  }, [step, audioFiles, tour, stopAudio]);
 
   useEffect(() => {
     if (!step || muted) return;
     play();
-    return () => {
-      audio.current?.pause();
-    };
-  }, [step, muted, play]);
+    return stopAudio;
+  }, [step, muted, play, stopAudio]);
 
   useEffect(() => {
     if (open) card.current?.focus();
@@ -165,10 +180,13 @@ export default function GuidedTour({ tour, autoStart = true }: { tour: TourId; a
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
+      if (e.repeat || e.altKey || e.ctrlKey || e.metaKey || !card.current?.contains(e.target as Node)) return;
       if (e.key === "Escape") close();
       // RTL: the left arrow moves forward.
-      if (e.key === "ArrowLeft") setIndex((i) => Math.min(i + 1, steps.length - 1));
-      if (e.key === "ArrowRight") setIndex((i) => Math.max(i - 1, 0));
+      if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        e.preventDefault();
+        setIndex((i) => Math.min(Math.max(i + (e.key === "ArrowLeft" ? 1 : -1), 0), steps.length - 1));
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -177,10 +195,7 @@ export default function GuidedTour({ tour, autoStart = true }: { tour: TourId; a
   function toggleMute() {
     const next = !muted;
     setMuted(next);
-    if (next) {
-      audio.current?.pause();
-      setSpeaking(false);
-    }
+    if (next) stopAudio();
     try {
       if (next) localStorage.setItem(MUTE_KEY, "1");
       else localStorage.removeItem(MUTE_KEY);
@@ -241,6 +256,7 @@ export default function GuidedTour({ tour, autoStart = true }: { tour: TourId; a
           aria-modal="true"
           aria-labelledby="tour-title"
           aria-describedby="tour-text"
+          data-robot-state={robotState}
           tabIndex={-1}
           style={style}
           className={cn(

@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { RobotHeadShape, RobotHeadState } from "robot-heads";
 import type { ChatProgressStage } from "@/lib/api";
 import { IconVolume, IconVolumeOff } from "@tabler/icons-react";
@@ -133,7 +133,7 @@ export default function ChatRobot({
   plain?: boolean;
 }) {
   const [clock, setClock] = useState(() => Date.now());
-  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [voiceEnabled, setVoiceEnabled] = useState(!introduction);
   const [voiceError, setVoiceError] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const voice = useRef<HTMLAudioElement | null>(null);
@@ -225,89 +225,88 @@ export default function ChatRobot({
     } catch {}
   }, [introduction]);
 
+  const stopVoice = useCallback(() => {
+    const audio = voice.current;
+    voice.current = null;
+    if (audio) {
+      audio.onplaying = audio.onpause = audio.onended = audio.onwaiting = audio.onerror = null;
+      audio.pause();
+      audio.removeAttribute("src");
+      audio.load();
+    }
+    setSpeaking(false);
+  }, []);
+
+  const playVoice = useCallback(() => {
+    stopVoice();
+    if (!voiceAvailable) return;
+    const audio = new Audio(robotSpeechUrl(mood.label));
+    voice.current = audio;
+    audio.volume = 0.75;
+    audio.onplaying = () => voice.current === audio && setSpeaking(true);
+    audio.onpause = audio.onwaiting = () => voice.current === audio && setSpeaking(false);
+    audio.onended = () => {
+      if (voice.current !== audio) return;
+      setSpeaking(false);
+      if (introduction) setVoiceEnabled(false);
+    };
+    const failed = () => {
+      if (voice.current !== audio) return;
+      setSpeaking(false);
+      setVoiceError(true);
+      setVoiceEnabled(false);
+    };
+    audio.onerror = failed;
+    // A blocked autoplay must never be retried by an unrelated page click.
+    audio.play().catch(failed);
+  }, [mood.label, voiceAvailable, introduction, stopVoice]);
+
   useEffect(() => {
-    if (!voiceEnabled || !voiceAvailable) return;
+    if (!voiceEnabled || !voiceAvailable) {
+      stopVoice();
+      if (!voiceAvailable) setVoiceEnabled(false);
+      return;
+    }
     const url = robotSpeechUrl(mood.label);
     const timer = window.setTimeout(() => {
-      if (document.hidden) {
-        if (introduction) setVoiceEnabled(false);
-        return;
-      }
+      if (document.hidden) return;
       if (voice.current?.src.endsWith(url)) return;
-      const audio = new Audio(url);
-      voice.current = audio;
-      audio.volume = 0.75;
-      audio.onplaying = () => setSpeaking(true);
-      audio.onpause = () => setSpeaking(false);
-      audio.onended = () => {
-        setSpeaking(false);
-        if (introduction) setVoiceEnabled(false);
-      };
-      audio.play().catch(() => {
-        if (voice.current !== audio) return;
-        const retry = () => {
-          cleanup();
-          if (voice.current === audio) audio.play().catch(() => {});
-        };
-        const cleanup = () => {
-          window.removeEventListener("pointerdown", retry);
-          window.removeEventListener("keydown", retry);
-        };
-        unlock = cleanup;
-        window.addEventListener("pointerdown", retry, { once: true });
-        window.addEventListener("keydown", retry, { once: true });
-      });
+      playVoice();
     }, 500);
-    let unlock = () => {};
     return () => {
       window.clearTimeout(timer);
-      unlock();
-      voice.current?.pause();
-      voice.current = null;
+      stopVoice();
     };
-  }, [mood.label, voiceEnabled, introduction, voiceAvailable]);
+  }, [mood.label, voiceEnabled, voiceAvailable, playVoice, stopVoice]);
 
   useEffect(() => {
     const pauseWhenHidden = () => {
-      if (document.hidden) voice.current?.pause();
+      if (document.hidden) stopVoice();
     };
     document.addEventListener("visibilitychange", pauseWhenHidden);
     return () => {
       document.removeEventListener("visibilitychange", pauseWhenHidden);
-      voice.current?.pause();
+      stopVoice();
     };
-  }, []);
+  }, [stopVoice]);
 
   const toggleVoice = () => {
     if (voiceEnabled) {
-      voice.current?.pause();
+      stopVoice();
       setVoiceEnabled(false);
       if (!introduction) try { localStorage.setItem("robot-voice-muted", "1"); } catch {}
       return;
     }
     if (!introduction) try { localStorage.removeItem("robot-voice-muted"); } catch {}
     setVoiceError(false);
-    const audio = new Audio(robotSpeechUrl(mood.label));
-    voice.current = audio;
-    audio.volume = 0.75;
-    audio.onplaying = () => setSpeaking(true);
-    audio.onpause = () => setSpeaking(false);
-    audio.onended = () => {
-      setSpeaking(false);
-      if (introduction) setVoiceEnabled(false);
-    };
     setVoiceEnabled(true);
-    audio.play().catch(() => {
-      if (voice.current !== audio) return;
-      setVoiceError(true);
-      setVoiceEnabled(false);
-    });
+    playVoice();
   };
 
   return (
     <section
       aria-label="همراه گفتگو"
-      data-robot-state={mood.state}
+      data-robot-state={speaking ? "speaking" : mood.state}
       className={`relative z-10 flex shrink-0 flex-col items-center px-4 pb-3 pt-2 sm:pt-3 ${introduction || plain ? "" : "glass"}`}
     >
       <div
@@ -317,7 +316,7 @@ export default function ChatRobot({
         <span className="pointer-events-none absolute inset-x-6 bottom-4 h-10 rounded-full bg-brand-soft blur-2xl" />
         <RobotHead
           shape={shape}
-          state={speaking && introduction ? "speaking" : mood.state}
+          state={speaking ? "speaking" : mood.state}
           size={176}
           {...(robotColors || colors)}
           interactive

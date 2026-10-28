@@ -13,7 +13,8 @@ import { Button } from "@/components/ui/button";
 function LoginContent() {
   const router = useRouter();
   const params = useSearchParams();
-  const phoneParam = params.get("phone") || "";
+  const rawPhoneParam = params.get("phone") || "";
+  const phoneParam = /^09[0-9]{9}$/.test(rawPhoneParam) ? rawPhoneParam : "";
   const redirectParam = params.get("redirect") || "";
   // Only same-site paths, so a crafted link cannot bounce a fresh session to another site.
   const redirect = redirectParam.startsWith("/") && !redirectParam.startsWith("//") ? redirectParam : "";
@@ -253,14 +254,28 @@ function LoginContent() {
       <input
         id={id}
         type="tel"
+        inputMode="numeric"
+        lang="en"
+        pattern="09[0-9]{9}"
+        maxLength={11}
         autoComplete="tel"
         value={phone}
-        onChange={(e) => setPhone(e.target.value)}
+        onChange={(e) => {
+          const value = e.target.value;
+          if (/[^0-9]/.test(value)) {
+            setError("شماره موبایل را فقط با اعداد انگلیسی وارد کن؛ زبان کیبورد را به انگلیسی تغییر بده.");
+            return;
+          }
+          setPhone(value);
+          setError("");
+        }}
+        aria-describedby={`${id}-hint`}
         placeholder="09xxxxxxxxx"
         required
         dir="ltr"
         className="field min-h-12 text-left text-base tracking-wider"
       />
+      <p id={`${id}-hint`} className="mt-1.5 text-xs text-muted-foreground">شماره را با اعداد انگلیسی وارد کن؛ مثل 09123456789.</p>
     </div>
   );
 
