@@ -338,7 +338,7 @@ def make_deploy_info(order_id: str, workspace_enabled: bool = True) -> dict:
         "token": token,
         "site_url": public_site_url(slug),
         "site_ttl_days": SITE_TTL_SECONDS // 86400,
-        "supports": "static previews and full project deployment via Liara",
+        "supports": "static previews and full-stack project deployment",
         "workspace_url": f"/panel/{order_id}" if workspace_enabled else None,
         "workflow": "Call get_workspace first. The owner selects a path. Use report_output for design/development previews (include html for element selection), report_activity for updates, update_feedback for comment progress. Wait for owner approval of design before development, and development before deploy_project. Use save_admin_credentials to deliver real admin access. An external agent must run these tools; no automatic runner is connected." if workspace_enabled else "Deploy the project using deploy_project and poll get_deploy_status.",
     }

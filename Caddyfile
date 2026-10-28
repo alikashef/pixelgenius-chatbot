@@ -60,6 +60,9 @@
 				header_up -X-Preview-Kind
 				header_down Location `(?i)^https?://(?:[a-z0-9-]+\.)+liara\.(?:run|space)(?::[0-9]+)?(.*)$` "https://{hostport}$1"
 				header_down Set-Cookie `(?i);\s*Domain=\.?(?:[a-z0-9-]+\.)*liara\.(?:run|space)(;|$)` "$1"
+				# Keep the hosting provider invisible to visitors.
+				header_down -Server
+				header_down -X-Liara*
 				flush_interval -1
 				transport http {
 					tls

@@ -3,6 +3,7 @@ import io
 import json
 import logging
 import os
+import re
 import tarfile
 import tempfile
 import time
@@ -39,6 +40,18 @@ class LiaraError(Exception):
     pass
 
 
+# The hosting provider stays internal: anything shown to customers or their AI tools
+# (errors, build and runtime logs) has the provider's name and hostnames replaced.
+_PROVIDER_HOST = re.compile(r"(?i)\b[a-z0-9.-]*\.liara\.(?:run|space|ir|cloud)\b")
+_PROVIDER_NAME = re.compile(r"(?i)liara|لیارا")
+
+
+def scrub(text) -> str:
+    if text is None:
+        return ""
+    return _PROVIDER_NAME.sub("hosting", _PROVIDER_HOST.sub("[host]", str(text)))
+
+
 def _token() -> str:
     token = os.getenv("LIARA_API_TOKEN", "")
     if not token:
@@ -60,9 +73,10 @@ def _fail(response: httpx.Response, action: str) -> LiaraError:
         detail = body.get("message") or body.get("error") or ""
     except Exception:
         detail = response.text[:200]
+    logger.warning("hosting API: %s failed (%s) %s", action, response.status_code, detail)
     if response.status_code == 402:
-        return LiaraError("Hosting account balance is too low.")
-    return LiaraError(f"{action} failed ({response.status_code}) {detail}".strip())
+        return LiaraError("Deployment is temporarily unavailable. Try again later.")
+    return LiaraError(scrub(f"{action} failed ({response.status_code}) {detail}".strip()))
 
 
 def app_name_for_slug(slug: str) -> str:
@@ -257,11 +271,11 @@ async def release_status(release_id: str) -> dict:
     lines = []
     for item in body.get("buildOutput") or []:
         prefix = "" if item.get("stream") == "STDOUT" else "[error] "
-        lines.append(prefix + str(item.get("line", "")).rstrip())
+        lines.append(scrub(prefix + str(item.get("line", "")).rstrip()))
     return {
         "state": release.get("state"),
         "queue": release.get("queue"),
-        "fail_reason": release.get("failReason"),
+        "fail_reason": scrub(release.get("failReason")) or None,
         "build_log_tail": lines[-60:],
     }
 
@@ -387,7 +401,7 @@ async def app_logs(name: str) -> list[str]:
     items = body.get("logs") if isinstance(body, dict) else body
     lines = []
     for item in (items or [])[-60:]:
-        lines.append(item.get("message", json.dumps(item, ensure_ascii=False)) if isinstance(item, dict) else str(item))
+        lines.append(scrub(item.get("message", json.dumps(item, ensure_ascii=False)) if isinstance(item, dict) else item))
     return lines
 
 
