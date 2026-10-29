@@ -365,7 +365,8 @@ export async function verifyOtp(phone: string, code: string, socialToken?: strin
 export type SocialProvider = "google" | "github";
 
 export async function fetchSocialProviders(): Promise<Record<SocialProvider, boolean>> {
-  const res = await fetch(`${API_URL}/api/auth/social/providers`);
+  // `v` skips an answer an edge cache stored before the keys were set; the server now sends no-store.
+  const res = await fetch(`${API_URL}/api/auth/social/providers?v=2`, { cache: "no-store" });
   if (!res.ok) return { google: false, github: false };
   return res.json();
 }
