@@ -11,6 +11,7 @@ import HostingSites from "@/components/HostingSites";
 import SalesOrders, { toman } from "@/components/SalesOrders";
 import GuidedTour, { startTour } from "@/components/GuidedTour";
 import { Button } from "@/components/ui/button";
+import Select from "@/components/ui/select";
 
 const STATUS_LABEL: Record<Order["status"], string> = {
   pending_review: "در انتظار بررسی",
@@ -445,7 +446,7 @@ export default function PanelPage() {
 
             <div className="sm:col-span-2">
               <label htmlFor="business-type" className="field-label">نوع فعالیت</label>
-              <select
+              <Select
                 id="business-type"
                 value={businessType}
                 onChange={(e) => {
@@ -462,7 +463,7 @@ export default function PanelPage() {
                 <option value="تولید محتوا/رسانه">تولید محتوا/رسانه</option>
                 <option value="استارتاپ/SaaS">استارتاپ/SaaS</option>
                 <option value="سایر">سایر</option>
-              </select>
+              </Select>
             </div>
           </div>
 

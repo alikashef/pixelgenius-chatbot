@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import SkillsManager from "@/components/admin/SkillsManager";
 import DesignerSettings from "@/components/admin/DesignerSettings";
@@ -15,7 +16,7 @@ import {
   updateAISettings,
   Order, clearSession } from "@/lib/api";
 import AppShell, { ShellLoading } from "@/components/AppShell";
-import { IconAdjustments, IconCheck, IconClipboardList, IconPalette, IconUsers, IconWand, IconWorld, IconX } from "@tabler/icons-react";
+import { IconAdjustments, IconCheck, IconClipboardList, IconExternalLink, IconPalette, IconUsers, IconWand, IconWorld, IconX } from "@tabler/icons-react";
 
 const STATUS_LABEL: Record<Order["status"], string> = {
   pending_review: "در انتظار بررسی",
@@ -236,6 +237,15 @@ export default function AdminDashboard() {
           onSelect: () => selectTab(key),
           count: key === "orders" ? salesOrders.length || undefined : key === "design" ? designOrders.length || undefined : undefined,
         }))}
+        primaryAction={
+          <Link
+            href="/chat"
+            className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-surface-2 px-4 text-sm font-bold text-foreground outline-none transition-colors hover:bg-foreground/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          >
+            <IconExternalLink size={17} stroke={2.2} aria-hidden="true" />
+            مشاهده سایت
+          </Link>
+        }
         user={{ name: "مدیر سیستم" }}
         onLogout={() => { clearSession(); router.push("/login"); }}
         title={ADMIN_TABS.find((t) => t.key === activeTab)?.title}

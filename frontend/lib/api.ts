@@ -349,15 +349,41 @@ export async function sendOtp(phone: string) {
   return res.json();
 }
 
-export async function verifyOtp(phone: string, code: string): Promise<Session & { access_token: string; customer_id: string; first_name: string | null }> {
+export async function verifyOtp(phone: string, code: string, socialToken?: string): Promise<Session & { access_token: string; customer_id: string; first_name: string | null }> {
   const res = await fetch(`${API_URL}/api/customer/otp/verify`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ phone, code }),
+    body: JSON.stringify({ phone, code, ...(socialToken ? { social_token: socialToken } : {}) }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.detail || "کد اشتباه است");
+  }
+  return res.json();
+}
+
+export type SocialProvider = "google" | "github";
+
+export async function fetchSocialProviders(): Promise<Record<SocialProvider, boolean>> {
+  const res = await fetch(`${API_URL}/api/auth/social/providers`);
+  if (!res.ok) return { google: false, github: false };
+  return res.json();
+}
+
+/** Where the browser goes to start a Google/GitHub sign-in; the server sends it back to this site. */
+export function socialStartUrl(provider: SocialProvider): string {
+  return `${API_URL}/api/auth/${provider}/start?origin=${encodeURIComponent(window.location.origin)}`;
+}
+
+export async function exchangeSocialCode(code: string): Promise<Session & { access_token: string; customer_id: string; first_name: string | null }> {
+  const res = await fetch(`${API_URL}/api/auth/social/exchange`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "ورود انجام نشد");
   }
   return res.json();
 }

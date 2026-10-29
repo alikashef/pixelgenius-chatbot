@@ -12,10 +12,11 @@ import ChatBubble from "@/components/ChatBubble";
 import ChatRobot from "@/components/ChatRobot";
 import ThemeToggle from "@/components/ThemeToggle";
 import { NavGroups, useSectionLinks } from "@/components/AppShell";
+import { PricingPlans } from "@/components/landing/PricingSection";
 import GuidedTour, { startTour } from "@/components/GuidedTour";
 import FreelancerPromo from "@/components/FreelancerPromo";
 import GithubRepoPicker from "@/components/GithubRepoPicker";
-import { fetchChatModels, ChatModels, fetchBotProfile, BotProfile, fetchOrderBrief, fetchChatProgress, ChatProgressStage, sendChat, sendOtp, submitOrder, uploadChatFile, createChatSession, updateChatSession, ChatMode, ProjectPath, Message, Proposal, LeadAnalysis, OrderFile, Order, fetchMyOrders } from "@/lib/api";
+import { fetchChatModels, ChatModels, fetchBotProfile, BotProfile, fetchOrderBrief, fetchChatProgress, ChatProgressStage, sendChat, sendOtp, submitOrder, uploadChatFile, createChatSession, updateChatSession, ChatMode, ProjectPath, Message, Proposal, LeadAnalysis, OrderFile, Order, fetchMyOrders, fetchCustomerProfile } from "@/lib/api";
 
 const WELCOME: Message = {
   role: "assistant",
@@ -435,6 +436,8 @@ function ChatPageInner() {
   const [customerToken, setCustomerToken] = useState("");
   const [customerId, setCustomerId] = useState("");
   const [customerName, setCustomerName] = useState("");
+  const [pricingOpen, setPricingOpen] = useState(false);
+  const [accountLabel, setAccountLabel] = useState<{ name: string; phone: string } | null>(null);
   const [chatKey, setChatKey] = useState(ANON_CHAT_KEY);
   const [sessionId, setSessionId] = useState("");
   const [dbSessionId, setDbSessionId] = useState<string | null>(null);
@@ -496,6 +499,14 @@ function ChatPageInner() {
   const [stoppable, setStoppable] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const token = localStorage.getItem("customer_token") || "";
+    if (!token) return;
+    fetchCustomerProfile(token)
+      .then((p) => setAccountLabel({ name: [p.first_name, p.last_name].filter(Boolean).join(" "), phone: p.phone || "" }))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const token = localStorage.getItem("customer_token") || "";
@@ -615,9 +626,13 @@ function ChatPageInner() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [customerToken, messages.length]);
 
+  // Opening a saved conversation (or any new chat link) leaves the pricing view.
+  useEffect(() => setPricingOpen(false), [searchParams]);
+
   // Starts a fresh conversation; signed-in users keep the previous one in their history.
   function startNewChat() {
     setSidebarOpen(false);
+    setPricingOpen(false);
     if (!customerToken) localStorage.removeItem(chatKey);
     setSessionId(createSessionId());
     router.push("/chat?new=1");
@@ -1010,7 +1025,10 @@ function ChatPageInner() {
   }, [customerToken]);
 
   const visibleSessions = sessions.filter((s) => s.draft.messages.some((m) => m.role === "user"));
-  const accountNav = useSectionLinks({ "فروش": salesOrders.length || undefined });
+  const accountNav = useSectionLinks({ "فروش": salesOrders.length || undefined }, {
+    active: pricingOpen,
+    onSelect: () => { setPricingOpen(true); setSidebarOpen(false); },
+  });
   const showSidebar = !botToken && !embedded;
   const brandName = botProfile?.widget.brand_name || botProfile?.name || "دستیار پروژه";
   const robotProps = {
@@ -1164,7 +1182,7 @@ function ChatPageInner() {
           <IconX size={18} aria-hidden="true" />
         </button>
       </div>
-      <div className="px-3">
+      <div className="px-3 pt-3">
         <button type="button" onClick={startNewChat} disabled={isLoading} className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground outline-none transition-colors hover:bg-primary-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50">
           <IconPlus size={17} aria-hidden="true" />
           گفتگوی جدید
@@ -1176,7 +1194,7 @@ function ChatPageInner() {
             <NavGroups nav={accountNav} onNavigate={() => setSidebarOpen(false)} dense />
           </nav>
         )}
-        <nav aria-label="گفتگوهای اخیر" data-tour="history" className={accountNav.length > 0 ? "mt-4" : undefined}>
+        <nav aria-label="گفتگوهای اخیر" data-tour="history" className={accountNav.length > 0 ? "mt-4 border-t border-border pt-4" : undefined}>
           <p className="eyebrow mb-1.5 px-3">گفتگوهای اخیر</p>
           {customerToken ? (
             visibleSessions.length ? (
@@ -1219,7 +1237,14 @@ function ChatPageInner() {
           <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-surface-2 text-muted-foreground">
             <IconUser size={15} aria-hidden="true" />
           </span>
-          <span className="truncate">{customerToken ? customerName || "پنل کاربری" : "ورود / ثبت‌نام"}</span>
+          {customerToken ? (
+            <span className="min-w-0">
+              <span className="block truncate">{accountLabel?.name || customerName || "کاربر"}</span>
+              {accountLabel?.phone && <span className="block truncate text-xs font-normal text-muted-foreground" dir="auto">{accountLabel.phone}</span>}
+            </span>
+          ) : (
+            <span className="truncate">ورود / ثبت‌نام</span>
+          )}
         </Link>
         <button
           type="button"
@@ -1251,7 +1276,24 @@ function ChatPageInner() {
         </div>
       )}
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="relative flex min-w-0 flex-1 flex-col">
+        {pricingOpen && showSidebar && (
+          <div className="absolute inset-0 z-20 flex flex-col bg-background">
+            <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-3 sm:px-5">
+              <button type="button" onClick={() => setSidebarOpen(true)} aria-label="باز کردن منو" className="grid h-9 w-9 place-items-center rounded-lg text-muted-foreground outline-none hover:bg-foreground/5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring lg:hidden">
+                <IconMenu2 size={20} aria-hidden="true" />
+              </button>
+              <h1 className="text-sm font-black text-foreground">تعرفه‌ها</h1>
+              <div className="mr-auto"><ThemeToggle className="lg:hidden" /></div>
+            </header>
+            <main className="min-h-0 flex-1 overflow-y-auto px-4 py-8 md:px-8">
+              <div className="mx-auto max-w-5xl">
+                <p className="mb-6 text-sm leading-7 text-muted-foreground">میزبانی سایت‌هایی که با طراح محصول می‌سازی و اشتراک دستیار فریلنسر.</p>
+                <PricingPlans />
+              </div>
+            </main>
+          </div>
+        )}
         <header className={`z-10 flex h-14 shrink-0 items-center gap-2 px-3 sm:px-5 ${isFresh && showSidebar ? "lg:hidden" : "border-b border-border"}`}>
           {showSidebar ? (
             <button type="button" onClick={() => setSidebarOpen(true)} aria-label="باز کردن منو" className="grid h-9 w-9 place-items-center rounded-lg text-muted-foreground outline-none hover:bg-foreground/5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring lg:hidden">

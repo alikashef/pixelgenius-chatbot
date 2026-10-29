@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   IconBrush, IconClipboardList, IconHelp, IconLayoutDashboard, IconLayoutGrid, IconLogout, IconMenu2, IconMessage, IconPlugConnected, IconReceipt, IconWorld,
   IconSchool, IconSettings, IconWand, IconX, type Icon,
-  IconBriefcase, IconArrowRight, IconMovie,
+  IconBriefcase, IconArrowRight, IconMovie, IconShield,
 } from "@tabler/icons-react";
 import { BrandLogo } from "@/components/Brand";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -55,6 +55,7 @@ const SECTIONS: Section[] = [
   { id: "طراحی محصول", label: "طراحی محصول", icon: IconWand, href: "/account?tab=design", role: "customer" },
   { id: "فروش", label: "فروش", icon: IconClipboardList, href: "/account?tab=orders", role: "customer" },
   { id: "فریلنسر", label: "فریلنسر", icon: IconBriefcase, href: "/freelancer/dashboard", role: "freelancer" },
+  { id: "ادمین", label: "ادمین", icon: IconShield, href: "/admin/dashboard", role: "admin" },
 ];
 
 function useRoles() {
@@ -93,22 +94,33 @@ export function useAccountNav({
     ...(customer ? CUSTOMER_NAV.map(customerItem) : []),
     ...(roles.includes("freelancer") ? FREELANCER_NAV.map((item) => ({ ...item, active: active === item.key, count: counts[item.key] })) : []),
     ...(customer ? ACCOUNT_NAV.map(customerItem) : []),
-    ...(roles.length ? [{ ...PRICING_NAV, active: active === "pricing" }] : []),
+    ...(roles.length && active === "pricing" ? [{ ...PRICING_NAV, active: true }] : []),
   ];
   const section = all.find((item) => item.key === active)?.group;
   return section ? all.filter((item) => item.group === section) : [];
 }
 
-/** The main page's sidebar: one link per section the account may open. */
-export function useSectionLinks(counts: Partial<Record<string, number>> = {}): ShellNavItem[] {
+/** The main page's sidebar: one link per section the account may open; a guest sees the customer sections and signs in on click. */
+export function useSectionLinks(counts: Partial<Record<string, number>> = {}, pricing?: { active: boolean; onSelect: () => void }): ShellNavItem[] {
   const roles = useRoles();
-  return SECTIONS.filter((section) => roles.includes(section.role)).map((section) => ({
+  const [ready, setReady] = useState(false);
+  useEffect(() => setReady(true), []);
+  if (!ready) return [];
+  const guest = roles.length === 0;
+  const sections: ShellNavItem[] = SECTIONS.filter((section) => roles.includes(section.role) || (guest && section.role === "customer")).map((section) => ({
     key: `section-${section.id}`,
     label: section.label,
     icon: section.icon,
-    href: section.href,
-    count: counts[section.id],
+    href: guest ? `/login?redirect=${encodeURIComponent(section.href)}` : section.href,
+    count: guest ? undefined : counts[section.id],
   }));
+  const upcoming: ShellNavItem[] = roles.includes("customer") || guest
+    ? CUSTOMER_NAV.filter((item) => item.comingSoon).map(({ key, label, icon, comingSoon }) => ({ key, label, icon, comingSoon }))
+    : [];
+  const pricingItem: ShellNavItem = pricing
+    ? { key: "pricing", label: PRICING_NAV.label, icon: PRICING_NAV.icon, active: pricing.active, onSelect: pricing.onSelect }
+    : { key: "pricing", label: PRICING_NAV.label, icon: PRICING_NAV.icon, href: PRICING_NAV.href };
+  return [...sections, ...upcoming, pricingItem];
 }
 
 /** The primary button at the top of the panel sidebar: back to the chat. */
@@ -116,7 +128,7 @@ export function NewProjectLink() {
   return (
     <Link
       href="/chat"
-      className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground outline-none transition-colors hover:bg-primary-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-surface-2 px-4 text-sm font-bold text-foreground outline-none transition-colors hover:bg-foreground/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
     >
       <IconMessage size={17} stroke={2.2} aria-hidden="true" />
       گفتگو
@@ -246,19 +258,33 @@ export default function AppShell({
           <IconX size={18} aria-hidden="true" />
         </button>
       </div>
-      {backHref && (
-        <div className="px-3 pb-2">
-          <Link
-            href={backHref}
-            onClick={() => setOpen(false)}
-            className="flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-bold text-secondary-foreground outline-none transition-colors hover:bg-foreground/5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <IconArrowRight size={17} aria-hidden="true" />
-            بازگشت
-          </Link>
+      {(backHref || primaryAction) && (
+        <div className="flex gap-2 px-3 pb-2">
+          {backHref && (
+            <Link
+              href={backHref}
+              onClick={(e) => {
+                setOpen(false);
+                // Go back to the page the user came from; fall back to backHref when there is none inside the app.
+                const external = document.referrer && new URL(document.referrer).origin !== window.location.origin;
+                if (window.history.length > 1 && !external) {
+                  e.preventDefault();
+                  window.history.back();
+                }
+              }}
+              aria-label="بازگشت"
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-surface-2 text-foreground outline-none transition-colors hover:bg-foreground/10 focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <IconArrowRight size={17} aria-hidden="true" />
+            </Link>
+          )}
+          {primaryAction && (
+            <div className="min-w-0 flex-1" data-tour="new-project">
+              {primaryAction}
+            </div>
+          )}
         </div>
       )}
-      {primaryAction && <div className="px-3 pb-2" data-tour="new-project">{primaryAction}</div>}
       <nav aria-label="منوی اصلی" className="mt-3 min-h-0 flex-1 overflow-y-auto px-3">
         <NavGroups nav={nav} onNavigate={() => setOpen(false)} />
       </nav>

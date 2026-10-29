@@ -15,6 +15,7 @@ import {
   uploadSkillFile,
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import Select from "@/components/ui/select";
 
 interface Props {
   getToken: () => string;
@@ -166,7 +167,7 @@ export default function SkillsManager({ getToken: getTokenProp, settings, onSett
             </label>
             <label className="flex items-center gap-2 text-xs text-muted-foreground">
               قطعه در هر دسته
-              <select
+              <Select
                 value={topK}
                 onChange={(e) => saveGlobal({ skills_top_k: Number(e.target.value) })}
                 className="admin-input !w-16 !py-1.5"
@@ -174,11 +175,11 @@ export default function SkillsManager({ getToken: getTokenProp, settings, onSett
                 {[1, 2, 3, 4].map((n) => (
                   <option key={n} value={n}>{n}</option>
                 ))}
-              </select>
+              </Select>
             </label>
             <label className="flex items-center gap-2 text-xs text-muted-foreground">
               مهارت در JSON هر دسته
-              <select
+              <Select
                 value={briefTopK}
                 onChange={(e) => saveGlobal({ skills_brief_top_k: Number(e.target.value) })}
                 className="admin-input !w-16 !py-1.5"
@@ -186,7 +187,7 @@ export default function SkillsManager({ getToken: getTokenProp, settings, onSett
                 {[1, 2, 3, 4, 5].map((n) => (
                   <option key={n} value={n}>{n}</option>
                 ))}
-              </select>
+              </Select>
             </label>
             <button
               onClick={async () => {

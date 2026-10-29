@@ -1,14 +1,98 @@
 "use client";
 
-import { useState, useEffect, FormEvent, Suspense } from "react";
+import { useState, useEffect, useRef, FormEvent, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { IconArrowLeft, IconBriefcase, IconChevronLeft, IconRefresh, IconUser } from "@tabler/icons-react";
+import { IconArrowLeft, IconBrandGithub, IconPencil, IconRefresh } from "@tabler/icons-react";
 import {
-  fetchChatHandoff, linkFreelancerPhone, panelHref, passwordLogin, saveSession, sendOtp, verifyOtp, submitOrder,
-  PANELS, Message, OrderFile, Proposal, Role, Session,
+  exchangeSocialCode, fetchChatHandoff, fetchSocialProviders, linkFreelancerPhone, passwordLogin, saveSession, sendOtp, verifyOtp, submitOrder,
+  socialStartUrl, Message, OrderFile, Proposal, Session, SocialProvider,
 } from "@/lib/api";
 import AuthLayout from "@/components/AuthLayout";
 import { Button } from "@/components/ui/button";
+
+const CODE_LENGTH = 5;
+const PERSIAN_DIGITS = "۰۱۲۳۴۵۶۷۸۹";
+const ARABIC_DIGITS = "٠١٢٣٤٥٦٧٨٩";
+
+function onlyDigits(text: string) {
+  return text
+    .replace(/[۰-۹]/g, (d) => String(PERSIAN_DIGITS.indexOf(d)))
+    .replace(/[٠-٩]/g, (d) => String(ARABIC_DIGITS.indexOf(d)))
+    .replace(/\D/g, "");
+}
+
+/** One box per digit of the SMS code; typing, pasting and SMS autofill all spread across the boxes. */
+function CodeBoxes({ id, value, onChange }: { id: string; value: string; onChange: (code: string) => void }) {
+  const refs = useRef<(HTMLInputElement | null)[]>([]);
+  // Quick typing can fire several events before React re-renders, so edits build on the latest value, not the rendered one.
+  const latest = useRef(value);
+  latest.current = value;
+
+  function commit(next: string) {
+    latest.current = next;
+    onChange(next);
+  }
+
+  function fill(index: number, digits: string) {
+    if (!digits) return;
+    const next = (latest.current.slice(0, index) + digits).slice(0, CODE_LENGTH);
+    commit(next);
+    refs.current[Math.min(index + digits.length, CODE_LENGTH - 1)]?.focus();
+  }
+
+  return (
+    <div dir="ltr" className="flex justify-between gap-2" role="group" aria-label="کد تایید">
+      {Array.from({ length: CODE_LENGTH }, (_, index) => (
+        <input
+          key={index}
+          id={`${id}-${index}`}
+          ref={(el) => { refs.current[index] = el; }}
+          type="text"
+          inputMode="numeric"
+          autoComplete={index === 0 ? "one-time-code" : "off"}
+          maxLength={CODE_LENGTH}
+          value={value[index] || ""}
+          autoFocus={index === 0}
+          aria-label={`رقم ${index + 1}`}
+          onChange={(e) => {
+            const digits = onlyDigits(e.target.value);
+            if (!digits) return commit(latest.current.slice(0, index) + latest.current.slice(index + 1));
+            fill(index, digits);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Backspace" && !latest.current[index] && index > 0) {
+              e.preventDefault();
+              commit(latest.current.slice(0, index - 1));
+              refs.current[index - 1]?.focus();
+            } else if (e.key === "ArrowLeft" && index > 0) {
+              refs.current[index - 1]?.focus();
+            } else if (e.key === "ArrowRight" && index < CODE_LENGTH - 1) {
+              refs.current[index + 1]?.focus();
+            }
+          }}
+          onPaste={(e) => {
+            e.preventDefault();
+            fill(0, onlyDigits(e.clipboardData.getData("text")));
+          }}
+          onFocus={(e) => e.target.select()}
+          className="field h-14 min-w-0 flex-1 px-0 text-center text-2xl font-bold"
+        />
+      ))}
+    </div>
+  );
+}
+
+/** Google's multicolor "G"; the brand colors are fixed by Google's guidelines. */
+function GoogleMark() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">
+      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+    </svg>
+  );
+}
 
 function LoginContent() {
   const router = useRouter();
@@ -20,11 +104,15 @@ function LoginContent() {
   const redirect = redirectParam.startsWith("/") && !redirectParam.startsWith("//") ? redirectParam : "";
   const handoffParam = params.get("handoff") || "";
   const handoffIdParam = params.get("handoff_id") || "";
+  const socialToken = params.get("social") || "";
+  const socialCode = params.get("social_code") || "";
+  const socialError = params.get("social_error") || "";
+  const socialProvider: SocialProvider = params.get("provider") === "github" ? "github" : "google";
 
   const [phone, setPhone] = useState(phoneParam);
   const [code, setCode] = useState("");
   // if phone came from chat, skip directly to OTP step
-  const [step, setStep] = useState<"phone" | "otp" | "password" | "link" | "choose">(phoneParam ? "otp" : "phone");
+  const [step, setStep] = useState<"phone" | "otp" | "password" | "link">(phoneParam ? "otp" : "phone");
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [session, setSession] = useState<Session | null>(null);
@@ -32,6 +120,29 @@ function LoginContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [countdown, setCountdown] = useState(phoneParam ? 120 : 0);
+  const [providers, setProviders] = useState<Record<SocialProvider, boolean>>({ google: false, github: false });
+
+  useEffect(() => {
+    fetchSocialProviders().then(setProviders).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (socialError) setError("ورود با حساب اجتماعی انجام نشد. دوباره تلاش کن.");
+  }, [socialError]);
+
+  // A returning social user comes back with a one-time code that becomes the session.
+  useEffect(() => {
+    if (!socialCode) return;
+    setLoading(true);
+    exchangeSocialCode(socialCode)
+      .then((data) => {
+        saveSession(data);
+        finish(data);
+      })
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : "ورود انجام نشد"))
+      .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socialCode]);
 
   function collectMessageAttachments(messages: Message[]) {
     return messages.flatMap((message) => message.attachments || []);
@@ -114,7 +225,7 @@ function LoginContent() {
     }
   }
 
-  /** Opens the right panel: the requested page, the only panel, or a choice between several. */
+  /** After sign-in: the requested page, or the main page, whose sidebar lists every section the account may open. */
   function finish(next: Session) {
     setSession(next);
     if (redirect) return router.push(redirect);
@@ -124,10 +235,7 @@ function LoginContent() {
       setLinkSent(false);
       return setStep("link");
     }
-    // The admin panel is private: it is never offered here, only opened when it is the sole role.
-    const visible = next.roles.filter((role) => role !== "admin");
-    if (visible.length > 1) return setStep("choose");
-    router.push(visible[0] ? panelHref(visible[0], next) : next.admin_token ? PANELS.admin.href : "/account");
+    router.push("/");
   }
 
   async function handlePassword(e: FormEvent) {
@@ -172,7 +280,7 @@ function LoginContent() {
     setLoading(true);
     setError("");
     try {
-      const data = await verifyOtp(phone.trim(), code.trim());
+      const data = await verifyOtp(phone.trim(), code.trim(), socialToken || undefined);
       const token = data.access_token;
       saveSession(data);
 
@@ -189,6 +297,7 @@ function LoginContent() {
       if (handoff) {
         try {
           const order = await submitOrder(token, handoff.proposal, handoff.chatHistory, handoff.attachments);
+          saveChatToHistory(data.customer_id, anonymousChat);
           localStorage.removeItem("proposal");
           localStorage.removeItem(`chat_draft_customer_${data.customer_id}`);
           localStorage.removeItem("chat_draft_anonymous");
@@ -214,6 +323,7 @@ function LoginContent() {
           ];
           const chatHistory = draftMessages.filter((message) => message.role === "user" || message.role === "assistant").slice(1);
           const created = await submitOrder(token, proposal, chatHistory, attachments);
+          saveChatToHistory(data.customer_id, rawDraft);
           if (created.mode === "designer") designerOrderId = created.id;
           localStorage.removeItem("proposal");
           localStorage.removeItem(`chat_draft_customer_${data.customer_id}`);
@@ -245,6 +355,17 @@ function LoginContent() {
     >
       <IconRefresh size={15} aria-hidden="true" />
       {countdown > 0 ? `ارسال مجدد تا ${countdown.toLocaleString("fa-IR")} ثانیه` : "تغییر شماره یا ارسال مجدد کد"}
+    </button>
+  );
+
+  const editPhone = (onEdit: () => void) => (
+    <button
+      type="button"
+      onClick={() => { onEdit(); setCode(""); setError(""); setCountdown(0); }}
+      className="mx-auto flex items-center gap-1.5 rounded text-[13px] font-bold text-secondary-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <IconPencil size={15} aria-hidden="true" />
+      ویرایش شماره
     </button>
   );
 
@@ -281,34 +402,18 @@ function LoginContent() {
 
   const codeField = (id: string) => (
     <div>
-      <label htmlFor={id} className="field-label">کد تایید</label>
-      <input
-        id={id}
-        type="text"
-        inputMode="numeric"
-        autoComplete="one-time-code"
-        value={code}
-        onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 5))}
-        placeholder="• • • • •"
-        required
-        dir="ltr"
-        className="field min-h-14 text-center text-2xl font-bold tracking-[0.6em]"
-      />
+      <label htmlFor={`${id}-0`} className="field-label">کد تایید</label>
+      <CodeBoxes id={id} value={code} onChange={setCode} />
     </div>
   );
 
-  const ROLE_ICONS: Partial<Record<Role, typeof IconUser>> = { customer: IconUser, freelancer: IconBriefcase };
-  const ROLE_HINTS: Partial<Record<Role, string>> = {
-    customer: "درخواست‌ها، پروژه‌ها و پرداخت‌هات",
-    freelancer: "دستیار، ویجت و درخواست‌های مشتری‌هات",
-  };
-
   const copy = {
-    phone: { title: "ورود یا ثبت‌نام", description: "شماره موبایلت رو وارد کن تا کد ورود برات پیامک بشه. مشتری یا فریلنسر، همه از همین‌جا وارد می‌شن." },
+    phone: socialToken
+      ? { title: "شماره موبایلت رو تایید کن", description: `با ${socialProvider === "github" ? "گیت‌هاب" : "گوگل"} وارد شدی. شماره‌ات رو وارد کن تا کد پیامکی برات بیاد و حسابت کامل بشه.` }
+      : { title: "ورود یا ثبت‌نام", description: "شماره موبایلت رو وارد کن تا کد ورود برات پیامک بشه. مشتری یا فریلنسر، همه از همین‌جا وارد می‌شن." },
     otp: { title: "کد تایید رو وارد کن", description: <>کد ۵ رقمی به <span dir="ltr" className="font-bold text-foreground">{phone}</span> ارسال شد.</> },
     password: { title: "ورود با ایمیل و رمز", description: "برای حساب‌هایی که قبلاً با ایمیل ساخته شدن." },
     link: { title: "شماره موبایلت رو وصل کن", description: "از این به بعد مثل بقیه با کد پیامکی وارد می‌شی و پنل‌هات کنار هم میان." },
-    choose: { title: "کدوم پنل؟", description: "حسابت هم پنل مشتری داره هم پنل فریلنسر. هر وقت خواستی از منوی کناری بینشون جابه‌جا شو." },
   }[step];
 
   return (
@@ -321,13 +426,37 @@ function LoginContent() {
             {loading ? "در حال ارسال..." : "دریافت کد ورود"}
             <IconArrowLeft size={18} aria-hidden="true" />
           </Button>
-          <button
-            type="button"
-            onClick={() => { setStep("password"); setError(""); }}
-            className="mx-auto block rounded text-[13px] font-bold text-secondary-foreground underline-offset-4 outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            ورود با ایمیل و رمز عبور
-          </button>
+          {!socialToken && (providers.google || providers.github) && (
+            <>
+              <div className="flex items-center gap-3 text-xs text-muted-foreground" aria-hidden="true">
+                <span className="h-px flex-1 bg-border" />
+                یا
+                <span className="h-px flex-1 bg-border" />
+              </div>
+              <div className="grid gap-2.5">
+                {providers.google && (
+                  <button
+                    type="button"
+                    onClick={() => { window.location.href = socialStartUrl("google"); }}
+                    className="flex h-12 w-full items-center justify-center gap-3 rounded-lg border border-[#dadce0] bg-white text-sm font-bold text-[#3c4043] outline-none transition-colors hover:bg-[#f8f9fa] focus-visible:ring-2 focus-visible:ring-ring dark:border-[#8e918f] dark:bg-[#131314] dark:text-[#e3e3e3] dark:hover:bg-[#1f1f20]"
+                  >
+                    <GoogleMark />
+                    ادامه با گوگل
+                  </button>
+                )}
+                {providers.github && (
+                  <button
+                    type="button"
+                    onClick={() => { window.location.href = socialStartUrl("github"); }}
+                    className="flex h-12 w-full items-center justify-center gap-3 rounded-lg border border-white/10 bg-[#24292f] text-sm font-bold text-white outline-none transition-colors hover:bg-[#32383f] focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <IconBrandGithub size={20} aria-hidden="true" />
+                    ادامه با گیت‌هاب
+                  </button>
+                )}
+              </div>
+            </>
+          )}
         </form>
       )}
 
@@ -339,6 +468,7 @@ function LoginContent() {
             {loading ? "در حال تایید..." : "ورود"}
           </Button>
           {resend(() => setStep("phone"))}
+          {editPhone(() => setStep("phone"))}
         </form>
       )}
 
@@ -373,7 +503,7 @@ function LoginContent() {
           <Button type="submit" disabled={loading || (linkSent && code.length !== 5)} className="h-12 w-full">
             {loading ? "صبر کن..." : linkSent ? "تایید و اتصال" : "ارسال کد"}
           </Button>
-          {linkSent ? resend(() => setLinkSent(false)) : (
+          {linkSent ? (<>{resend(() => setLinkSent(false))}{editPhone(() => setLinkSent(false))}</>) : (
             <button
               type="button"
               onClick={() => finish({ ...session, needs_phone: false })}
@@ -384,32 +514,28 @@ function LoginContent() {
           )}
         </form>
       )}
-
-      {step === "choose" && session && (
-        <ul className="space-y-2.5">
-          {session.roles.filter((role) => role !== "admin").map((role) => {
-            const Icon = ROLE_ICONS[role] || IconUser;
-            return (
-              <li key={role}>
-                <button
-                  type="button"
-                  onClick={() => router.push(panelHref(role, session))}
-                  className="flex w-full items-center gap-3 rounded-xl border border-border bg-surface p-4 text-right outline-none transition-colors hover:border-foreground/30 focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-surface-2 text-foreground"><Icon size={20} aria-hidden="true" /></span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-bold text-foreground">{PANELS[role].label}</span>
-                    <span className="mt-0.5 block text-xs text-muted-foreground">{ROLE_HINTS[role]}</span>
-                  </span>
-                  <IconChevronLeft size={18} className="text-muted-foreground" aria-hidden="true" />
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
     </AuthLayout>
   );
+}
+
+/** The conversation held before signing in becomes an entry in the customer's chat history. */
+function saveChatToHistory(customerId: string, rawDraft: string | null) {
+  try {
+    const draft = rawDraft ? JSON.parse(rawDraft) : null;
+    if (!draft || !Array.isArray(draft.messages) || draft.messages.length < 2) return;
+    const key = `chat_sessions_customer_${customerId}`;
+    const sessions = JSON.parse(localStorage.getItem(key) || "[]");
+    const firstUser = (draft.messages as Message[]).find((m) => m.role === "user");
+    sessions.unshift({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      title: (firstUser?.content || "چت جدید").slice(0, 50),
+      updated_at: new Date().toISOString(),
+      draft: { ...draft, input: "", phoneStep: false },
+    });
+    localStorage.setItem(key, JSON.stringify(sessions.slice(0, 25)));
+  } catch {
+    // history is a convenience; never block the login
+  }
 }
 
 export default function LoginPage() {

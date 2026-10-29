@@ -32,6 +32,7 @@ import {
 } from "@/lib/api";
 import ThemeToggle from "@/components/ThemeToggle";
 import PreviewReview from "@/components/PreviewReview";
+import Select from "@/components/ui/select";
 
 const PATHS = [
   {
@@ -604,7 +605,7 @@ export default function ProjectWorkspace({
                     {version ? (
                       <div className="flex flex-wrap items-center gap-2">
                         {data.versions.length > 1 ? (
-                          <select
+                          <Select
                             aria-label="نسخه"
                             className={cn(inputClass, "h-9 w-auto min-w-44 py-0 text-sm")}
                             value={version.id}
@@ -615,7 +616,7 @@ export default function ProjectWorkspace({
                                 نسخه {v.number.toLocaleString("fa-IR")} · {v.stage === "design" ? "طراحی" : "توسعه"} · {v.title}
                               </option>
                             ))}
-                          </select>
+                          </Select>
                         ) : (
                           <span className="rounded-lg bg-surface-2 px-3 py-1.5 text-xs font-bold text-secondary-foreground">
                             نسخه {version.number.toLocaleString("fa-IR")} · {version.title}

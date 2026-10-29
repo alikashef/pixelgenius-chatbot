@@ -72,6 +72,7 @@ class OtpVerifyRequest(BaseModel):
     phone: str
     code: str
     first_name: Optional[str] = None
+    social_token: Optional[str] = None
 
 
 class CustomerTokenOut(BaseModel):
