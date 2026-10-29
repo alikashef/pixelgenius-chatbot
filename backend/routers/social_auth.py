@@ -6,7 +6,7 @@ from urllib.parse import urlencode, urlsplit
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from jose import JWTError, jwt
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -107,7 +107,8 @@ async def _github_profile(client: httpx.AsyncClient, config: dict, code: str) ->
 
 @router.get("/auth/social/providers")
 async def providers():
-    return {name: _configured(name) for name in PROVIDERS}
+    # The CDN in front of the site would otherwise keep serving an old answer after the keys change.
+    return JSONResponse({name: _configured(name) for name in PROVIDERS}, headers={"Cache-Control": "no-store"})
 
 
 @router.get("/auth/{provider}/start")
