@@ -11,6 +11,7 @@ from schemas import HandoffCreateIn, HandoffCreateOut, HandoffOut, OtpSendReques
 from otp_store import generate_otp, verify_otp
 from sms import SmsSendError, send_otp
 from auth import build_session
+from routers.social_auth import link_identity
 
 router = APIRouter()
 
@@ -78,6 +79,9 @@ async def verify(body: OtpVerifyRequest, db: AsyncSession = Depends(get_db)):
         db.add(customer)
         await db.commit()
         await db.refresh(customer)
+
+    if body.social_token:
+        await link_identity(db, customer, body.social_token)
 
     session = await build_session(db, customer=customer)
     return OtpSessionOut(**session.model_dump(), **session.customer.model_dump())
