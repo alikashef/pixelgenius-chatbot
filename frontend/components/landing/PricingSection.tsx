@@ -1,5 +1,5 @@
-import { IconCheck } from "@tabler/icons-react";
-import { BILLING_ENABLED, formatToman, Plan, yearly } from "@/lib/plans";
+import { IconCheck, IconGift } from "@tabler/icons-react";
+import { BILLING_ENABLED, FREELANCER_PLANS, formatToman, HOSTING_PLANS, Plan, yearly } from "@/lib/plans";
 import { cn } from "@/lib/utils";
 
 /** A row of plan cards; purchase stays "coming soon" until payment is live. */
@@ -49,5 +49,36 @@ export default function PricingSection({ id, title, description, plans }: { id: 
         ))}
       </div>
     </section>
+  );
+}
+
+/** Everything the pricing page shows below its title: the free-for-now notice and both plan rows. */
+export function PricingPlans() {
+  return (
+    <>
+      <div className="mb-8 flex items-start gap-3 rounded-xl border border-accent-line bg-accent-soft p-4">
+        <IconGift size={22} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
+        <div>
+          <p className="text-sm font-bold text-foreground">فعلاً همه‌چیز رایگانه</p>
+          <p className="mt-0.5 text-[13px] leading-6 text-secondary-foreground">
+            پرداخت آنلاین به‌زودی فعال می‌شه. تا اون موقع از همه‌ی امکانات رایگان استفاده کن؛ سایت‌ها هم در دو روز آخر مهلت رایگان تمدید می‌شن.
+          </p>
+        </div>
+      </div>
+      <div className="space-y-12">
+        <PricingSection
+          id="hosting"
+          title="میزبانی سایت"
+          description="هر سایتی که منتشر می‌کنی ۵ روز رایگان روشنه؛ بعد با اشتراک ماهانه روشن می‌مونه و می‌تونی دامنه‌ی خودت رو وصل کنی."
+          plans={HOSTING_PLANS}
+        />
+        <PricingSection
+          id="freelancer"
+          title="دستیار فریلنسر"
+          description="چت‌بات اختصاصی روی سایتت که با خدمات و قیمت‌های خودت با مشتری‌ها نیازسنجی می‌کنه."
+          plans={FREELANCER_PLANS}
+        />
+      </div>
+    </>
   );
 }
