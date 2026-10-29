@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { testImageGeneration, updateAISettings } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/admin/SkillsManager";
+import Select from "@/components/ui/select";
 
 type LayerKey = "frontend" | "backend" | "database" | "extras";
 
@@ -155,13 +156,13 @@ export default function DesignerSettings({ getToken: getTokenProp, settings, onS
 
         <div className="space-y-2">
           <label htmlFor="designer-chat-model" className="block text-sm font-semibold text-foreground">مدل گفتگوی طراح محصول</label>
-          <select id="designer-chat-model" value={chatModel} onChange={(event) => { setChatModel(event.target.value); setDirty(true); }} className="admin-input" dir="auto">
+          <Select id="designer-chat-model" value={chatModel} onChange={(event) => { setChatModel(event.target.value); setDirty(true); }} className="admin-input" dir="auto">
             <option value="">همان مدل پیش‌فرض فروش</option>
             <option value="gapgpt-qwen-3.6">GapGPT Qwen 3.6</option>
             <option value="gpt-5-mini">GPT-5 mini</option>
             <option value="claude-sonnet-5-5">Claude Sonnet 5.5</option>
             <option value="claude-opus-4-6">Claude Opus 4.6</option>
-          </select>
+          </Select>
         </div>
 
         <div className="grid gap-4 lg:grid-cols-3">
@@ -211,11 +212,11 @@ export default function DesignerSettings({ getToken: getTokenProp, settings, onS
           </label>
           <label className="block">
             <span className="block text-muted-foreground text-xs mb-2">اندازهٔ تصویر</span>
-            <select className="admin-input" value={image.size} onChange={(e) => patchImage({ size: e.target.value })}>
+            <Select className="admin-input" value={image.size} onChange={(e) => patchImage({ size: e.target.value })}>
               {IMAGE_SIZES.map((s) => (
                 <option key={s} value={s}>{s}</option>
               ))}
-            </select>
+            </Select>
           </label>
           <label className="block">
             <span className="block text-muted-foreground text-xs mb-2">حداکثر تصویر در هر پروژه</span>

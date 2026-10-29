@@ -14,6 +14,7 @@ import {
 import AppShell, { NewProjectLink, ShellLoading, useAccountNav } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import Select from "@/components/ui/select";
 
 const FIELDS: { id: Exclude<FreelancerField, "">; label: string; templates: string[] }[] = [
   { id: "web", label: "طراحی و توسعه وب", templates: ["لندینگ پیج", "سایت شرکتی", "فروشگاه اینترنتی"] },
@@ -267,9 +268,9 @@ export default function FreelancerTrainingPage() {
                   <NumberField id={`s-max-${i}`} label="قیمت تا" value={service.price_max} onChange={(v) => updateService(i, { price_max: v })} suffix={formatToman(service.price_max)} />
                   <div>
                     <label htmlFor={`s-unit-${i}`} className="field-label">واحد</label>
-                    <select id={`s-unit-${i}`} className="field" value={service.unit} onChange={(e) => updateService(i, { unit: e.target.value as FreelancerService["unit"] })}>
+                    <Select id={`s-unit-${i}`} className="field" value={service.unit} onChange={(e) => updateService(i, { unit: e.target.value as FreelancerService["unit"] })}>
                       {UNITS.map((u) => <option key={u.id} value={u.id}>{u.label}</option>)}
-                    </select>
+                    </Select>
                   </div>
                 </div>
                 <div className="mt-1 grid gap-3 sm:grid-cols-[1fr_1fr_2fr]">
