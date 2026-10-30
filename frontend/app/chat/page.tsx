@@ -1232,6 +1232,7 @@ function ChatPageInner() {
         </nav>
       </div>
       <FreelancerPromo onNavigate={() => setSidebarOpen(false)} />
+      <div className="flex shrink-0 justify-center border-t border-border p-2" dangerouslySetInnerHTML={{ __html: `<a referrerpolicy='origin' target='_blank' href='https://trustseal.enamad.ir/?id=8441161&Code=ubbJKqqt7Jwvj4xUeC4HOHsV2zyV2iEv'><img referrerpolicy='origin' src='https://trustseal.enamad.ir/logo.aspx?id=8441161&Code=ubbJKqqt7Jwvj4xUeC4HOHsV2zyV2iEv' alt='' style='cursor:pointer' code='ubbJKqqt7Jwvj4xUeC4HOHsV2zyV2iEv'></a>` }} />
       <div className="flex items-center gap-2 border-t border-border p-3">
         <Link href={customerToken ? "/account?tab=account" : "/login?redirect=/account?tab=account"} data-tour="account" className="flex h-10 min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2 text-sm font-bold text-foreground outline-none transition-colors hover:bg-foreground/5 focus-visible:ring-2 focus-visible:ring-ring">
           <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-surface-2 text-muted-foreground">
