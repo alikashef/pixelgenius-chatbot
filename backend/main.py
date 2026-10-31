@@ -10,7 +10,7 @@ from database import SessionLocal, create_tables
 from services import liara
 from services import skills as skills_service
 from lib.ai.analyze_lead import _base_urls
-from routers import chat, payment, orders, auth, customer_auth, customer, settings, freelancer_auth, site_mcp, skills, github, hosting, social_auth
+from routers import chat, payment, orders, auth, customer_auth, customer, settings, freelancer_auth, site_mcp, skills, github, hosting, social_auth, video_maker
 
 UPLOAD_DIR = Path("/app/uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -76,6 +76,7 @@ app.include_router(freelancer_auth.router, prefix="/api")
 app.include_router(github.router, prefix="/api")
 app.include_router(social_auth.router, prefix="/api")
 app.include_router(hosting.router, prefix="/api")
+app.include_router(video_maker.router, prefix="/api")
 app.include_router(site_mcp.router)
 
 

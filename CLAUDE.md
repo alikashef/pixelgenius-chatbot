@@ -92,6 +92,7 @@ Milestone ارسال می‌کند، مشتری تایید و پرداخت مر�
 | Multi-tenant SaaS (هر فریلنسر workspace جدا) | 🟡 نسبی — دستیار، ویجت و سفارش‌ها per-freelancer؛ پرداخت هنوز مشترک |
 | White-label Widget (embed با برند فریلنسر) | ✅ پیاده شده — روبات، رنگ، صدا، جایگاه |
 | آموزش دستیار فریلنسر (حوزه، خدمات، قیمت، FAQ) | ✅ پیاده شده |
+| ویدیوساز (`/video`): استوری‌بورد با AI، رندر واقعی FFmpeg، نسخه‌ها و ویرایش با چت | 🟡 MVP — بدون اعتبار/پرداخت، ایجنت کدنویس و ورکر ایزوله |
 
 ---
 
@@ -189,7 +190,9 @@ backend/
     hosting.py                    ← /api/customer/sites: لیست سایت‌ها، renew رایگان، دامنه‌ی اختصاصی (add/verify/delete)
     github.py                     ← /api/github/status|connect|callback|repos + DELETE (توکن رمزشده روی customers)؛ `review_repository` سورس مخزن انتخاب‌شده را (ساختار، زبان‌ها، فایل‌های کلیدی) با کش ۳۰ دقیقه‌ای در کانتکس چت می‌گذارد؛ مرحله‌ی progress: `reviewing`
     settings.py                   ← تنظیمات AI
+    video_maker.py                ← /api/video: پروژه، کلیپ، استوری‌بورد، رندر پس‌زمینه، نسخه‌ها؛ فایل‌ها در uploads/video/{customer}/{project}؛ مدیا با لینک امضاشده
   services/
+    video_maker.py                ← استوری‌بورد (gapgpt) + رندر FFmpeg/libass (فونت YekanBakh در backend/fonts)
     ai_settings.py
 ```
 
@@ -363,6 +366,16 @@ ELEVENLABS_API_KEY=... python3 scripts/generate_tour_audio.py
 
 کلید فقط از env خوانده می‌شود و **هرگز** commit نمی‌شود. اختیاری: `ELEVENLABS_VOICE_ID`، `ELEVENLABS_MODEL_ID` (پیش‌فرض `eleven_v3`).
 اگر فایل صدا نباشد، تور بدون صدا (فقط متن) کار می‌کند.
+
+### ویدیوساز
+
+- زیرنویس فارسی فقط با فیلتر `ass=...:shaping=complex` درست شکل می‌گیرد؛ FFmpeg مک (brew) libass ندارد، رندر باید داخل Docker (ایمیج backend) اجرا شود
+- libass در متن راست‌به‌چپ اجزای رنگ‌شده را چپ‌به‌راست می‌چیند؛ `_highlight_line` اجزا را برعکس می‌فرستد، فاصله‌ی مرز را `\h` و داخل هر جزء RLM می‌گذارد — قبل از دست‌زدن `test_video_maker.py` را اجرا کن
+- تست‌ها: `docker run --rm -v $PWD/backend:/app -w /app <image> sh -c "pip install pytest && pytest test_video_maker.py test_video_api.py"`
+
+- مدل‌ها: دستیار سناریو `VIDEO_AI_MODEL` (پیش‌فرض `claude-opus-5-5`، پشتیبان Sonnet) از gapgpt؛ صدا ElevenLabs v3 از Kaya (`KAYA_API_KEY`، مسیر `/audio/speech`، voice باید شناسه‌ی ElevenLabs باشد نه `alloy`) و در خطا `gpt-4o-mini-tts`؛ زمان‌بندی زیرنویس با `whisper-1`
+- سبک‌ها در `STYLE_CATALOG` (برچسب، قیمت اضافه، کلیپ لازم)؛ پیش‌نمایش هر سبک و هر گوینده یک‌بار ساخته و در `uploads/video/_previews` کش می‌شود (نمونه‌ی fallback کش نمی‌شود)
+- Kaya برای حساب‌های کم‌موجودی ۱۰ درخواست در دقیقه است؛ `_kaya_tts` روی ۴۲۹ و قطع اتصال دوباره تلاش می‌کند
 
 ### دستیار و ویجت فریلنسر
 

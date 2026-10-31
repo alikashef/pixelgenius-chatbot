@@ -1045,3 +1045,124 @@ export async function fetchChatModels(signal?: AbortSignal): Promise<ChatModels>
   if (!res.ok) throw new Error("دریافت مدل گفتگو ناموفق بود");
   return res.json();
 }
+
+export interface VideoScene {
+  kind: "hook" | "body" | "cta";
+  title: string;
+  text: string;
+  highlight: string;
+  narration: string;
+  duration: number;
+  asset: number | null;
+}
+
+export interface VideoScenario {
+  title: string;
+  scenes: VideoScene[];
+}
+
+export interface VideoSettings {
+  format: "9:16" | "4:5" | "1:1" | "16:9";
+  style: "typography" | "shapes" | "particles" | "waveform" | "steps" | "clips" | "phone" | "before_after";
+  voice: "male_warm" | "female_formal" | "male_energetic";
+  speed: "slow" | "normal" | "fast";
+  subtitle_mode: "word" | "sentence";
+  subtitle_pos: "top" | "middle" | "bottom";
+  cover_title: string;
+  duration: number;
+}
+
+export interface VideoVersion {
+  n: number;
+  kind: "initial" | "edit";
+  note: string;
+  video_url: string;
+  poster_url: string;
+  cover_url: string;
+  created_at: number;
+  scenario: VideoScenario;
+  settings: VideoSettings;
+}
+
+export interface VideoProject {
+  id: string;
+  title: string;
+  settings: VideoSettings;
+  info: { brand?: string; cta?: string; format_reason?: string; style_reason?: string };
+  messages: { role: "user" | "assistant"; content: string }[];
+  quick_replies: string[];
+  scenario: VideoScenario | null;
+  clips: { index: number; name: string; width: number; height: number; duration: number }[];
+  has_logo: boolean;
+  styles: { value: VideoSettings["style"]; label: string; hint: string; credits: number; clips: number; category: string }[];
+  ready: boolean;
+  estimate: { format: string; seconds: number; lines: { label: string; credits: number }[]; total: number; included_edits: number; extra_edit: number };
+  edits: { used: number; included: number };
+  status: "draft" | "rendering" | "ready" | "failed";
+  stage: string | null;
+  error: string | null;
+  last_failure: string | null;
+  versions: VideoVersion[];
+  created_at: number;
+  updated_at: number;
+}
+
+async function videoRequest<T>(token: string, path: string, init: RequestInit = {}): Promise<T> {
+  const res = await fetch(`${API_URL}/api/video${path}`, {
+    ...init,
+    headers: { Authorization: `Bearer ${token}`, ...(init.body && !(init.body instanceof FormData) ? { "Content-Type": "application/json" } : {}) },
+  });
+  if (res.status === 401) throw new Error("UNAUTHORIZED");
+  if (!res.ok) throw new Error(await readDetail(res, "درخواست ناموفق بود"));
+  const data = await res.json();
+  for (const project of Array.isArray(data) ? data : [data]) {
+    for (const version of project?.versions ?? []) {
+      for (const key of ["video_url", "poster_url", "cover_url"]) version[key] = `${API_URL}${version[key]}`;
+    }
+  }
+  return data;
+}
+
+const send = (method: string, body?: unknown): RequestInit => ({ method, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+const upload = (file: File): RequestInit => {
+  const form = new FormData();
+  form.append("file", file);
+  return { method: "POST", body: form };
+};
+
+export const fetchVideoProjects = (token: string) => videoRequest<VideoProject[]>(token, "/projects");
+export const fetchVideoProject = (token: string, id: string) => videoRequest<VideoProject>(token, `/projects/${id}`);
+export const createVideoProject = (token: string) => videoRequest<VideoProject>(token, "/projects", send("POST", {}));
+export const deleteVideoProject = (token: string, id: string) => videoRequest<{ ok: true }>(token, `/projects/${id}`, send("DELETE"));
+export const chatVideo = (token: string, id: string, message: string) => videoRequest<VideoProject>(token, `/projects/${id}/chat`, send("POST", { message }));
+export const uploadVideoClip = (token: string, id: string, file: File) => videoRequest<VideoProject>(token, `/projects/${id}/clips`, upload(file));
+export const uploadVideoLogo = (token: string, id: string, file: File) => videoRequest<VideoProject>(token, `/projects/${id}/logo`, upload(file));
+export const saveVideoScenario = (token: string, id: string, scenario: VideoScenario) => videoRequest<VideoProject>(token, `/projects/${id}/scenario`, send("PUT", scenario));
+export const saveVideoSettings = (token: string, id: string, patch: Partial<VideoSettings>) => videoRequest<VideoProject>(token, `/projects/${id}/settings`, send("PUT", patch));
+export const renderVideo = (token: string, id: string) => videoRequest<VideoProject>(token, `/projects/${id}/render`, send("POST"));
+export const reviseVideo = (token: string, id: string, request: string) => videoRequest<VideoProject>(token, `/projects/${id}/revise`, send("POST", { request }));
+export const rollbackVideo = (token: string, id: string, n: number) => videoRequest<VideoProject>(token, `/projects/${id}/rollback/${n}`, send("POST"));
+
+export async function fetchVoicePreview(token: string, voice: VideoSettings["voice"]): Promise<string> {
+  const res = await fetch(`${API_URL}/api/video/voices/${voice}/preview`, { headers: { Authorization: `Bearer ${token}` } });
+  if (res.status === 401) throw new Error("UNAUTHORIZED");
+  if (!res.ok) throw new Error(await readDetail(res, "ساخت نمونه‌ی صدا ناموفق بود"));
+  return URL.createObjectURL(await res.blob());
+}
+
+export async function fetchStylePreview(token: string, style: VideoSettings["style"]): Promise<string> {
+  const res = await fetch(`${API_URL}/api/video/styles/${style}/preview`, { headers: { Authorization: `Bearer ${token}` } });
+  if (res.status === 401) throw new Error("UNAUTHORIZED");
+  if (!res.ok) throw new Error(await readDetail(res, "ساخت پیش‌نمایش سبک ناموفق بود"));
+  return URL.createObjectURL(await res.blob());
+}
+
+/** Video maker is early-access: true only for allowed accounts; anything else (or an error) counts as "coming soon". */
+export async function fetchVideoAccess(token: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_URL}/api/video/access`, { headers: { Authorization: `Bearer ${token}` } });
+    return res.ok && (await res.json()).allowed === true;
+  } catch {
+    return false;
+  }
+}

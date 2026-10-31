@@ -9,7 +9,7 @@ import {
 } from "@tabler/icons-react";
 import { BrandLogo } from "@/components/Brand";
 import ThemeToggle from "@/components/ThemeToggle";
-import { Role, signedInRoles } from "@/lib/api";
+import { Role, fetchVideoAccess, signedInRoles } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 export interface ShellNavItem {
@@ -34,7 +34,7 @@ const CUSTOMER_NAV: (Omit<ShellNavItem, "key"> & { key: CustomerTab | "templates
   { key: "sites", group: "طراحی محصول", label: "سایت‌ها و دامنه", icon: IconWorld },
   { key: "connect", group: "طراحی محصول", label: "اتصال به هوش مصنوعی", icon: IconPlugConnected },
   { key: "templates", group: "طراحی محصول", label: "سایت‌های آماده", icon: IconLayoutGrid, comingSoon: true },
-  { key: "video", group: "طراحی محصول", label: "ویدیوساز", icon: IconMovie, comingSoon: true },
+  { key: "video", group: "طراحی محصول", label: "ویدیوساز", icon: IconMovie, href: "/video" },
   { key: "orders", group: "فروش", label: "سفارش‌ها", icon: IconClipboardList },
 ];
 const FREELANCER_NAV: ShellNavItem[] = [
@@ -54,9 +54,30 @@ type Section = { id: string; label: string; icon: Icon; href: string; role: Role
 const SECTIONS: Section[] = [
   { id: "طراحی محصول", label: "طراحی محصول", icon: IconWand, href: "/account?tab=design", role: "customer" },
   { id: "فروش", label: "فروش", icon: IconClipboardList, href: "/account?tab=orders", role: "customer" },
+  { id: "ویدیوساز", label: "ویدیوساز", icon: IconMovie, href: "/video", role: "customer" },
   { id: "فریلنسر", label: "فریلنسر", icon: IconBriefcase, href: "/freelancer/dashboard", role: "freelancer" },
   { id: "ادمین", label: "ادمین", icon: IconShield, href: "/admin/dashboard", role: "admin" },
 ];
+
+/** Whether this account may use the video maker; cached per tab so the sidebar does not refetch on every page. */
+export function useVideoAccess(): boolean {
+  const [allowed, setAllowed] = useState(false);
+  useEffect(() => {
+    const token = localStorage.getItem("customer_token");
+    if (!token) return;
+    const key = `video_access:${token.slice(-16)}`;
+    const cached = sessionStorage.getItem(key);
+    if (cached) {
+      setAllowed(cached === "1");
+      return;
+    }
+    fetchVideoAccess(token).then((ok) => {
+      sessionStorage.setItem(key, ok ? "1" : "0");
+      setAllowed(ok);
+    });
+  }, []);
+  return allowed;
+}
 
 function useRoles() {
   const [roles, setRoles] = useState<Role[]>([]);
@@ -78,15 +99,19 @@ export function useAccountNav({
   onCustomerTab?: (tab: CustomerTab) => void;
 }): ShellNavItem[] {
   const roles = useRoles();
+  const videoAllowed = useVideoAccess();
   const customerItem = ({ key, ...item }: Omit<ShellNavItem, "key"> & { key: CustomerTab | "templates" | "video" }): ShellNavItem => ({
     ...item,
+    ...(key === "video" && !videoAllowed ? { comingSoon: true } : {}),
     key,
     active: active === key,
     count: counts[key],
-    ...(item.comingSoon || key === "templates" || key === "video"
+    ...(item.comingSoon || key === "templates" || (key === "video" && !videoAllowed)
       ? {}
+      : item.href
+        ? { href: item.href }
       : onCustomerTab
-        ? { onSelect: () => onCustomerTab(key) }
+        ? { onSelect: () => onCustomerTab(key as CustomerTab) }
         : { href: `/account?tab=${key}` }),
   });
   const customer = roles.includes("customer");
@@ -103,11 +128,12 @@ export function useAccountNav({
 /** The main page's sidebar: one link per section the account may open; a guest sees the customer sections and signs in on click. */
 export function useSectionLinks(counts: Partial<Record<string, number>> = {}, pricing?: { active: boolean; onSelect: () => void }): ShellNavItem[] {
   const roles = useRoles();
+  const videoAllowed = useVideoAccess();
   const [ready, setReady] = useState(false);
   useEffect(() => setReady(true), []);
   if (!ready) return [];
   const guest = roles.length === 0;
-  const sections: ShellNavItem[] = SECTIONS.filter((section) => roles.includes(section.role) || (guest && section.role === "customer")).map((section) => ({
+  const sections: ShellNavItem[] = SECTIONS.filter((section) => (roles.includes(section.role) || (guest && section.role === "customer")) && (section.id !== "ویدیوساز" || videoAllowed)).map((section) => ({
     key: `section-${section.id}`,
     label: section.label,
     icon: section.icon,
@@ -115,7 +141,7 @@ export function useSectionLinks(counts: Partial<Record<string, number>> = {}, pr
     count: guest ? undefined : counts[section.id],
   }));
   const upcoming: ShellNavItem[] = roles.includes("customer") || guest
-    ? CUSTOMER_NAV.filter((item) => item.comingSoon).map(({ key, label, icon, comingSoon }) => ({ key, label, icon, comingSoon }))
+    ? CUSTOMER_NAV.filter((item) => item.comingSoon || (item.key === "video" && !videoAllowed)).map(({ key, label, icon, comingSoon }) => ({ key, label, icon, comingSoon }))
     : [];
   const pricingItem: ShellNavItem = pricing
     ? { key: "pricing", label: PRICING_NAV.label, icon: PRICING_NAV.icon, active: pricing.active, onSelect: pricing.onSelect }
