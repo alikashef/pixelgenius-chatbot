@@ -32,7 +32,7 @@ function VerifyContent() {
     const authority = params.get("Authority") || "";
     const status = params.get("Status") || "";
 
-    verifyPayment(authority, status)
+    verifyPayment(authority, status, params.get("RefId") || "")
       .then((data) => {
         if (data.success) {
           setState("success");

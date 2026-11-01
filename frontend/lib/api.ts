@@ -504,8 +504,8 @@ export async function requestPayment(token: string, orderId: string, callbackUrl
   return res.json();
 }
 
-export async function verifyPayment(authority: string, status: string) {
-  const res = await fetch(`${API_URL}/api/payment/verify?Authority=${authority}&Status=${status}`);
+export async function verifyPayment(authority: string, status: string, refId = "") {
+  const res = await fetch(`${API_URL}/api/payment/verify?Authority=${encodeURIComponent(authority)}&Status=${encodeURIComponent(status)}&RefId=${encodeURIComponent(refId)}`);
   if (!res.ok) throw new Error("خطا در تایید پرداخت");
   return res.json();
 }
