@@ -15,6 +15,7 @@ from schemas import (
 )
 from auth import _decode, build_session, freelancer_session, get_current_admin, get_current_freelancer, optional_bearer
 from otp_store import verify_otp
+from services import credits
 from routers.orders import add_order_file, approve, load_order, save_proposal, summarize
 
 router = APIRouter()
@@ -54,7 +55,7 @@ def _invite_out(invite: InviteCode) -> InviteOut:
     if expires is not None and expires.tzinfo is None:
         expires = expires.replace(tzinfo=timezone.utc)
     active = not invite.revoked and invite.used_count < invite.max_uses and (expires is None or expires > datetime.now(timezone.utc))
-    return InviteOut.model_validate({**{c: getattr(invite, c) for c in ("code", "note", "max_uses", "used_count", "revoked", "created_at")}, "expires_at": expires, "active": active})
+    return InviteOut.model_validate({**{c: getattr(invite, c) for c in ("code", "note", "max_uses", "used_count", "percent", "revoked", "created_at")}, "expires_at": expires, "active": active})
 
 
 @router.post("/freelancer/register", response_model=SessionOut, status_code=201)
@@ -63,7 +64,7 @@ async def register(
     db: AsyncSession = Depends(get_db),
     credentials: HTTPAuthorizationCredentials | None = Depends(optional_bearer),
 ):
-    """Turn a signed-in account into a freelancer with an invite code (the account's phone is the login)."""
+    """Turn a signed-in account into a freelancer; a plan must be bought before the assistant goes live."""
     customer = None
     if credentials:
         payload = _decode(credentials.credentials)
@@ -80,28 +81,11 @@ async def register(
         if existing.scalar_one_or_none():
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="این ایمیل قبلاً ثبت شده")
 
-    code = normalize_code(body.invite_code)
-    # Claim one use atomically so two sign-ups cannot both take the last use of a code.
-    claimed = await db.execute(
-        update(InviteCode)
-        .where(
-            InviteCode.code == code,
-            InviteCode.revoked.is_(False),
-            InviteCode.used_count < InviteCode.max_uses,
-            (InviteCode.expires_at.is_(None)) | (InviteCode.expires_at > datetime.now(timezone.utc)),
-        )
-        .values(used_count=InviteCode.used_count + 1)
-    )
-    if not code or claimed.rowcount != 1:
-        await db.rollback()
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="کد دعوت نامعتبر است یا ظرفیتش تمام شده")
-
     freelancer = Freelancer(
         email=body.email.strip() if body.email else None,
         password_hash=_hash_password(body.password) if body.password else None,
         phone=customer.phone if customer else None,
         name=body.name or (" ".join(filter(None, [customer.first_name, customer.last_name])) if customer else None) or None,
-        invite_code=code,
     )
     db.add(freelancer)
     await db.commit()
@@ -256,6 +240,9 @@ async def get_bot_profile(bot_token: str, db: AsyncSession = Depends(get_db)):
     freelancer = result.scalar_one_or_none()
     if not freelancer or not freelancer.onboarding_completed:
         raise HTTPException(status_code=404, detail="Bot not found")
+    owner = (await db.execute(select(Customer.id).where(Customer.phone == freelancer.phone))).scalar_one_or_none() if freelancer.phone else None
+    if not owner or not await credits.has_credits(db, owner):
+        raise HTTPException(status_code=404, detail="Bot not found")
     return BotProfileOut(name=freelancer.name or "", position=freelancer.position or "", widget=widget_settings(freelancer))
 
 
@@ -304,6 +291,7 @@ async def create_invite(body: InviteCreateIn, db: AsyncSession = Depends(get_db)
         code=code,
         note=body.note.strip() or None,
         max_uses=body.max_uses,
+        percent=body.percent,
         expires_at=datetime.now(timezone.utc) + timedelta(days=body.expires_days) if body.expires_days else None,
     )
     db.add(invite)

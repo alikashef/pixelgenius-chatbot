@@ -12,12 +12,14 @@ from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Body, Depends, HTTPException, UploadFile, File
 from fastapi.security import HTTPAuthorizationCredentials
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth import _decode, optional_bearer
 from database import get_db
 from lib.ai.analyze_lead import analyze_lead
 from models import ChatSession, Customer, Freelancer
+from services import credits
 from routers.github import review_repository
 from services import workspace
 from schemas import ChatAttachmentIn, ChatRequest, ChatResponse, ChatSessionCreateIn, ChatSessionCreateOut, ChatSessionUpdateIn, OrderFileOut
@@ -48,6 +50,22 @@ def _set_progress(progress_id: str | None, stage: str) -> None:
     if progress_id not in _chat_progress and len(_chat_progress) >= 1000:
         _chat_progress.pop(next(iter(_chat_progress)))
     _chat_progress[progress_id] = (stage, now)
+
+
+def _claims(credentials: HTTPAuthorizationCredentials | None) -> dict | None:
+    if not credentials:
+        return None
+    try:
+        return _decode(credentials.credentials)
+    except HTTPException:
+        return None
+
+
+async def _wallet_owner(db: AsyncSession, freelancer: Freelancer) -> str | None:
+    """A freelancer pays from the wallet of the customer account with the same phone."""
+    if not freelancer.phone:
+        return None
+    return (await db.execute(select(Customer.id).where(Customer.phone == freelancer.phone))).scalar_one_or_none()
 
 
 @router.get("/chat/progress/{progress_id}")
@@ -242,7 +260,19 @@ async def chat(
             source_attachments = [request.source_file, *[item for item in source_attachments if item.url != request.source_file.url]]
     messages = [{"role": m.role, "content": m.content} for m in request.messages]
 
+    # Product design is billed to the signed-in customer; widget chats to the freelancer; sales chat stays free.
+    payer_id, bill_kind, bill_label = None, None, ""
+    if request.mode == "designer" and not request.bot_token:
+        claims = _claims(credentials)
+        if not claims or claims.get("role") != "customer":
+            raise HTTPException(status_code=401, detail="برای طراحی محصول اول وارد حساب خودت شو")
+        payer_id, bill_kind, bill_label = claims["sub"], "designer", "طراحی محصول"
+        if not await credits.has_credits(db, payer_id):
+            raise HTTPException(status_code=402, detail="موجودی کردیت کافی نیست؛ کیف پولت را شارژ کن")
+    usage_bucket = credits.start_usage()
+
     progress_id = str(request.progress_id) if request.progress_id else None
+    freelancer_payer = None
     _set_progress(progress_id, "thinking")
     try:
         settings = await get_ai_settings(db)
@@ -266,6 +296,10 @@ async def chat(
             result = await db.execute(select(Freelancer).where(Freelancer.bot_token == request.bot_token))
             freelancer = result.scalar_one_or_none()
             if freelancer:
+                freelancer_payer = await _wallet_owner(db, freelancer)
+                if not freelancer_payer or not await credits.has_credits(db, freelancer_payer):
+                    raise HTTPException(status_code=402, detail="این دستیار فعلاً غیرفعال است")
+            if freelancer:
                 settings.update({
                     "freelancer_name": freelancer.name or "",
                     "freelancer_position": freelancer.position or "",
@@ -279,6 +313,12 @@ async def chat(
             _set_progress(progress_id, "working")
         content = await analyze_lead(settings, _merge_attachments(messages, source_attachments), request.mode, request.finalize, on_stage=lambda stage: _set_progress(progress_id, stage))
         _set_progress(progress_id, "done")
+        if request.bot_token and freelancer_payer:
+            payer_id, bill_kind, bill_label = freelancer_payer, "widget", "پاسخ دستیار به مشتری"
+        if payer_id and bill_kind:
+            cost, tokens = credits.usage_credits(usage_bucket)
+            if cost:
+                await credits.charge_up_to(db, payer_id, cost, bill_kind, f"{bill_label} · {tokens:,} توکن")
         return ChatResponse(content=content)
     except HTTPException:
         _set_progress(progress_id, "error")

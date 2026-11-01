@@ -7,6 +7,9 @@ except ImportError:  # the server's deploy gate runs plain unittest, where pytes
     raise unittest.SkipTest("pytest is not installed")
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from unittest.mock import AsyncMock
+
+from database import get_db
 
 from routers import video_maker as router_module
 from services import video_maker
@@ -21,6 +24,10 @@ def client(tmp_path, monkeypatch):
     app.include_router(router_module.router, prefix="/api")
     state = {"sub": "a" * 32}
     app.dependency_overrides[router_module.video_customer] = lambda: {"sub": state["sub"], "role": "customer"}
+    app.dependency_overrides[get_db] = lambda: None
+    # Renders are paid from the wallet; the ledger itself is tested in test_credits.
+    monkeypatch.setattr(router_module.credits, "charge", AsyncMock(return_value=0))
+    monkeypatch.setattr(router_module.credits, "has_credits", AsyncMock(return_value=True))
     monkeypatch.setattr(video_maker, "tts_bytes", fake_tts)
     monkeypatch.setattr(video_maker, "stt_words", fake_stt)
     turns = iter([

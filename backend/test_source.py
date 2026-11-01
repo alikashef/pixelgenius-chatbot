@@ -28,7 +28,13 @@ class SourceIntakeTests(unittest.IsolatedAsyncioTestCase):
         self.root = Path(self.folder.name)
         self.uploads = self.root / 'chat-files'
         self.uploads.mkdir()
-        self.patches = [patch.object(chat, 'UPLOAD_ROOT', self.root), patch.object(chat, 'CHAT_UPLOAD_DIR', self.uploads)]
+        self.patches = [
+            patch.object(chat, 'UPLOAD_ROOT', self.root),
+            patch.object(chat, 'CHAT_UPLOAD_DIR', self.uploads),
+            patch.object(chat, '_claims', return_value={'sub': 'customer-1', 'role': 'customer'}),
+            patch.object(chat.credits, 'has_credits', AsyncMock(return_value=True)),
+            patch.object(chat.credits, 'charge_up_to', AsyncMock()),
+        ]
         for item in self.patches:
             item.start()
         self.client = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url='http://backend')

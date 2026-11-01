@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth import ALGORITHM, JWT_SECRET, get_current_customer, normalize_phone
 from database import get_db
+from services import credits
 from models import Customer
 from services import video_maker
 
@@ -353,38 +354,57 @@ def _render_job(path: Path, number: int) -> None:
 
 def _fail(path: Path, number: int, message: str) -> dict:
     project = _load(path)
-    next(v for v in project["versions"] if v["n"] == number).update(status="failed", error=message)
+    version = next(v for v in project["versions"] if v["n"] == number)
+    version.update(status="failed", error=message)
+    if version.get("charged") and not version.get("refunded"):
+        try:
+            credits.refund_in_thread(version["customer"], version["charged"], f"بازگشت کردیت ویدیو · نسخه {number}", f"{path.name}:v{number}")
+            version["refunded"] = True
+        except Exception:
+            logger.exception("Video credit refund failed")
     project.update(status="failed", stage=None, error=message)
     return project
 
 
-def _begin_render(path: Path, project: dict, kind: str, note: str = "") -> None:
+def _begin_render(path: Path, project: dict, kind: str, note: str = "", charged: int = 0, customer_id: str = "") -> None:
     number = len(project["versions"]) + 1
     project["versions"].append({"n": number, "kind": kind, "note": note, "status": "rendering", "scenario": project["scenario"],
-                                "settings": project["settings"], "created_at": int(time.time())})
+                                "settings": project["settings"], "created_at": int(time.time()), "charged": charged, "customer": customer_id})
     project.update(status="rendering", stage="rendering", error=None)
     _save(path, project)
     threading.Thread(target=_render_job, args=(path, number), daemon=True).start()
 
 
+async def _pay(db: AsyncSession, customer: dict, amount: int, reason: str, project_id: str) -> None:
+    try:
+        await credits.charge(db, customer["sub"], amount, "video", reason, project_id)
+    except credits.InsufficientCredits as exc:
+        raise HTTPException(status_code=402, detail=f"موجودی کافی نیست: {exc.need} کردیت لازم است و {exc.have} داری. کیف پولت را شارژ کن")
+
+
 @router.post("/projects/{project_id}/render")
-async def start_render(project_id: str, customer: dict = Depends(video_customer)):
+async def start_render(project_id: str, customer: dict = Depends(video_customer), db: AsyncSession = Depends(get_db)):
     path = _dir(customer, project_id)
     project = _load(path)
     _busy(project)
     if not _is_ready(project):
         raise HTTPException(status_code=400, detail="اول با دستیار سناریو را کامل کنید (نام برند و دعوت به اقدام لازم است)")
-    _begin_render(path, project, "initial", "ساخت اولیه")
+    cost = video_maker.estimate_cost(project)["total"]
+    await _pay(db, customer, cost, f"ساخت ویدیو «{(project.get('scenario') or {}).get('title', '')[:60]}»", project_id)
+    _begin_render(path, project, "initial", "ساخت اولیه", cost, customer["sub"])
     return _public(customer, project)
 
 
 @router.post("/projects/{project_id}/revise")
-async def revise(project_id: str, body: ReviseIn, customer: dict = Depends(video_customer)):
+async def revise(project_id: str, body: ReviseIn, customer: dict = Depends(video_customer), db: AsyncSession = Depends(get_db)):
     path = _dir(customer, project_id)
     project = _load(path)
     _busy(project)
     if not project["versions"]:
         raise HTTPException(status_code=400, detail="اول ویدیو را بسازید")
+    edit_cost = video_maker.CREDIT_PRICES["extra_edit"]
+    if not await credits.has_credits(db, customer["sub"], edit_cost):
+        raise HTTPException(status_code=402, detail=f"برای ویرایش {edit_cost} کردیت لازم است؛ کیف پولت را شارژ کن")
     try:
         result = await video_maker.revise(project, body.request.strip())
     except video_maker.VideoError as exc:
@@ -395,7 +415,8 @@ async def revise(project_id: str, body: ReviseIn, customer: dict = Depends(video
     if result["scenario"]:
         project["scenario"] = result["scenario"]
     project["settings"] = result["settings"]
-    _begin_render(path, project, "edit", result["reply"] or body.request.strip())
+    await _pay(db, customer, edit_cost, "ویرایش ویدیو با دستیار", project_id)
+    _begin_render(path, project, "edit", result["reply"] or body.request.strip(), edit_cost, customer["sub"])
     return _public(customer, project)
 
 

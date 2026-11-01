@@ -247,11 +247,11 @@ export async function updateChatSession(
   });
 }
 
-export async function freelancerRegister(customerToken: string, inviteCode: string, name?: string): Promise<Session> {
+export async function freelancerRegister(customerToken: string, name?: string): Promise<Session> {
   const res = await fetch(`${API_URL}/api/freelancer/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${customerToken}` },
-    body: JSON.stringify({ name, invite_code: inviteCode }),
+    body: JSON.stringify({ name }),
   });
   if (res.status === 401) throw new Error("UNAUTHORIZED");
   if (!res.ok) throw new Error(await readDetail(res, "خطا در ثبت‌نام"));
@@ -263,6 +263,7 @@ export interface InviteCode {
   note: string | null;
   max_uses: number;
   used_count: number;
+  percent: number;
   revoked: boolean;
   expires_at: string | null;
   created_at: string;
@@ -291,10 +292,25 @@ async function adminRequest<T>(token: string, path: string, init: RequestInit = 
 }
 
 export const fetchInvites = (token: string) => adminRequest<InviteCode[]>(token, "invites");
-export const createInvite = (token: string, body: { note: string; max_uses: number; expires_days: number | null }) =>
+export const createInvite = (token: string, body: { note: string; max_uses: number; expires_days: number | null; percent: number }) =>
   adminRequest<InviteCode>(token, "invites", { method: "POST", body: JSON.stringify(body) });
 export const revokeInvite = (token: string, code: string) =>
   adminRequest<InviteCode>(token, `invites/${encodeURIComponent(code)}`, { method: "DELETE" });
+export interface AdminCustomer {
+  id: string;
+  phone: string;
+  name: string | null;
+  credits: number;
+  added: number;
+  spent: number;
+  created_at: string;
+}
+export const fetchAdminCustomers = (token: string, q = "") => adminRequest<AdminCustomer[]>(token, `customers?q=${encodeURIComponent(q)}`);
+export const grantCredits = (token: string, phone: string, credits: number, note: string) =>
+  adminRequest<{ credits: number }>(token, "credits/grant", { method: "POST", body: JSON.stringify({ phone, credits, note }) });
+export const fetchCustomerCount = (token: string) => adminRequest<{ count: number }>(token, "customers/count");
+export const grantCreditsToAll = (token: string, credits: number, note: string, expectedCount: number) =>
+  adminRequest<{ count: number }>(token, "credits/grant-all", { method: "POST", body: JSON.stringify({ credits, note, expected_count: expectedCount }) });
 export const fetchAdminFreelancers = (token: string) => adminRequest<AdminFreelancer[]>(token, "freelancers");
 
 export interface ChatHandoff {
@@ -509,6 +525,35 @@ export async function verifyPayment(authority: string, status: string, refId = "
   if (!res.ok) throw new Error("خطا در تایید پرداخت");
   return res.json();
 }
+
+export interface WalletReport {
+  credits: number;
+  toman_per_credit: number;
+  min_topup_toman: number;
+  days: number;
+  spent: number;
+  by_kind: { kind: string; label: string; credits: number; count: number }[];
+  daily: { date: string; credits: number }[];
+  ledger: { id: string; delta: number; balance_after: number; kind: string; label: string; reason: string; created_at: string }[];
+}
+
+async function walletRequest<T>(token: string, path: string, init: RequestInit = {}): Promise<T> {
+  const res = await fetch(`${API_URL}/api/wallet${path}`, {
+    ...init,
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+  });
+  if (res.status === 401 || res.status === 403) throw new Error("UNAUTHORIZED");
+  if (!res.ok) throw new Error(await readDetail(res, "درخواست ناموفق بود"));
+  return res.json();
+}
+
+export const fetchWallet = (token: string, days = 30) => walletRequest<WalletReport>(token, `?days=${days}`);
+export const quoteTopup = (token: string, amountToman: number, code: string) =>
+  walletRequest<{ credits: number; bonus: number; total: number }>(token, `/quote?amount_toman=${amountToman}&code=${encodeURIComponent(code)}`);
+export const startTopup = (token: string, amountToman: number, code: string, callbackUrl: string) =>
+  walletRequest<{ payment_url: string }>(token, "/topup", { method: "POST", body: JSON.stringify({ amount_toman: amountToman, code, callback_url: callbackUrl }) });
+export const verifyTopup = (token: string, authority: string, status: string, refId = "") =>
+  walletRequest<{ success: boolean; message: string; credits: number }>(token, `/verify?Authority=${encodeURIComponent(authority)}&Status=${encodeURIComponent(status)}&RefId=${encodeURIComponent(refId)}`);
 
 // ── Admin ─────────────────────────────────────────────────────────────────────
 export async function fetchOrders(token: string): Promise<Order[]> {

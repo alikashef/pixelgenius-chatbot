@@ -17,6 +17,7 @@ from services.skills import retrieve_skills, select_skills_for_brief
 from services.images import fill_brief_images
 from prompts.stack_tiers import render_stack_tiers
 from lib.ai.parse_ai_response import parse_ai_response
+from services.credits import record_usage
 
 logger = logging.getLogger(__name__)
 
@@ -248,6 +249,8 @@ async def analyze_lead(settings: dict, messages: list[dict], mode: str = "design
                     **_completion_parameters(model, 2000, 0.25),
                 )
                 content = response.choices[0].message.content or ""
+                if getattr(response, "usage", None):
+                    record_usage(model, response.usage.prompt_tokens, response.usage.completion_tokens)
                 parsed = parse_ai_response(content)
                 return await evaluate_sales_lead(parsed, messages, settings) if mode == "sales" else parsed
             except (APIConnectionError, APITimeoutError) as e:

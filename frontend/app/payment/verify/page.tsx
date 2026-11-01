@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { IconCheck, IconX } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import ThemeToggle from "@/components/ThemeToggle";
-import { verifyPayment } from "@/lib/api";
+import { verifyPayment, verifyTopup } from "@/lib/api";
 
 function Shell({ children }: { children: ReactNode }) {
   return (
@@ -27,17 +27,24 @@ function VerifyContent() {
   const [refId, setRefId] = useState("");
   const [orderId, setOrderId] = useState("");
   const [message, setMessage] = useState("");
+  const [wallet, setWallet] = useState<{ credits: number } | null>(null);
 
   useEffect(() => {
     const authority = params.get("Authority") || "";
     const status = params.get("Status") || "";
 
-    verifyPayment(authority, status, params.get("RefId") || "")
+    const refParam = params.get("RefId") || "";
+    const isWallet = params.get("kind") === "wallet";
+    const verify = isWallet
+      ? verifyTopup(localStorage.getItem("customer_token") || "", authority, status, refParam).then((d) => ({ ...d, ref_id: refParam, order_id: "" }))
+      : verifyPayment(authority, status, refParam);
+    verify
       .then((data) => {
         if (data.success) {
           setState("success");
           setRefId(data.ref_id || "");
           setOrderId(data.order_id || "");
+          if (isWallet) { setWallet({ credits: (data as { credits?: number }).credits ?? 0 }); window.dispatchEvent(new Event("wallet:refresh")); }
           localStorage.removeItem("proposal");
         } else {
           setState("failure");
@@ -75,10 +82,28 @@ function VerifyContent() {
         </div>
         <div>
           <h1 className="mb-2 text-xl font-black text-foreground">{success ? "پرداخت موفق!" : "پرداخت ناموفق"}</h1>
-          <p className="text-sm text-muted-foreground">{success ? "سفارش شما با موفقیت ثبت شد" : message}</p>
+          <p className="text-sm text-muted-foreground">{success ? (wallet ? "کیف پول شما شارژ شد" : "سفارش شما با موفقیت ثبت شد") : message}</p>
         </div>
 
-        {success ? (
+        {success && wallet ? (
+          <>
+            <dl className="space-y-3 text-right">
+              {refId && (
+                <div className="rounded-xl border border-border bg-surface-2 p-4">
+                  <dt className="mb-1 text-xs text-muted-foreground">کد پیگیری پرداخت</dt>
+                  <dd className="font-mono text-lg font-bold text-success" dir="ltr">{refId}</dd>
+                </div>
+              )}
+              <div className="rounded-xl border border-border bg-surface-2 p-4">
+                <dt className="mb-1 text-xs text-muted-foreground">موجودی جدید</dt>
+                <dd className="text-lg font-black text-foreground">{wallet.credits.toLocaleString("fa-IR")} کردیت</dd>
+              </div>
+            </dl>
+            <Button className="w-full" onClick={() => router.push("/account?tab=wallet")}>
+              مشاهده کیف پول
+            </Button>
+          </>
+        ) : success ? (
           <>
             <dl className="space-y-3 text-right">
               {refId && (
@@ -101,7 +126,7 @@ function VerifyContent() {
           </>
         ) : (
           <div className="flex gap-3">
-            <Button variant="secondary" className="flex-1" onClick={() => router.push("/proposal")}>
+            <Button variant="secondary" className="flex-1" onClick={() => router.push(wallet || params.get("kind") === "wallet" ? "/account?tab=wallet" : "/proposal")}>
               تلاش مجدد
             </Button>
             <Button className="flex-1" onClick={() => router.push("/chat")}>

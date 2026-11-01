@@ -276,13 +276,13 @@ class FreelancerRegisterIn(BaseModel):
     email: Optional[str] = None
     password: Optional[str] = Field(default=None, min_length=8)
     name: Optional[str] = None
-    invite_code: str = Field(default="", max_length=32)
 
 
 class InviteCreateIn(BaseModel):
     note: str = Field(default="", max_length=120)
     max_uses: int = Field(default=1, ge=1, le=500)
     expires_days: int | None = Field(default=None, ge=1, le=365)
+    percent: int = Field(default=100, ge=1, le=100)
 
 
 class InviteOut(BaseModel):
@@ -290,6 +290,7 @@ class InviteOut(BaseModel):
     note: Optional[str] = None
     max_uses: int
     used_count: int
+    percent: int = 100
     revoked: bool
     expires_at: Optional[datetime] = None
     created_at: datetime

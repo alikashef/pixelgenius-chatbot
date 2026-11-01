@@ -5,10 +5,10 @@ import Link from "next/link";
 import {
   IconBrush, IconClipboardList, IconHelp, IconLayoutDashboard, IconLayoutGrid, IconLogout, IconMenu2, IconMessage, IconPlugConnected, IconReceipt, IconWorld,
   IconSchool, IconSettings, IconWand, IconX, type Icon,
-  IconBriefcase, IconArrowRight, IconMovie, IconShield,
-} from "@tabler/icons-react";
+  IconBriefcase, IconArrowRight, IconMovie, IconShield, IconCoin } from "@tabler/icons-react";
 import { BrandLogo } from "@/components/Brand";
 import ThemeToggle from "@/components/ThemeToggle";
+import { SidebarWallet } from "@/components/WalletUsage";
 import { Role, fetchVideoAccess, signedInRoles } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -26,7 +26,7 @@ export interface ShellNavItem {
   comingSoon?: boolean;
 }
 
-type CustomerTab = "design" | "sites" | "connect" | "orders" | "chats" | "account";
+type CustomerTab = "design" | "sites" | "connect" | "orders" | "chats" | "wallet" | "account";
 
 // One sidebar for every signed-in account: its sections follow the account's permissions.
 const CUSTOMER_NAV: (Omit<ShellNavItem, "key"> & { key: CustomerTab | "templates" | "video" })[] = [
@@ -44,6 +44,7 @@ const FREELANCER_NAV: ShellNavItem[] = [
 ];
 const ACCOUNT_NAV: (Omit<ShellNavItem, "key"> & { key: CustomerTab })[] = [
   { key: "chats", group: "حساب کاربری", label: "گفتگوهای ناتمام", icon: IconMessage },
+  { key: "wallet", group: "حساب کاربری", label: "کیف پول و مصارف", icon: IconCoin },
   { key: "account", group: "حساب کاربری", label: "تنظیمات حساب", icon: IconSettings },
 ];
 const PRICING_NAV: ShellNavItem = { key: "pricing", group: "حساب کاربری", label: "تعرفه‌ها", icon: IconReceipt, href: "/pricing" };
@@ -143,10 +144,14 @@ export function useSectionLinks(counts: Partial<Record<string, number>> = {}, pr
   const upcoming: ShellNavItem[] = roles.includes("customer") || guest
     ? CUSTOMER_NAV.filter((item) => item.comingSoon || (item.key === "video" && !videoAllowed)).map(({ key, label, icon, comingSoon }) => ({ key, label, icon, comingSoon }))
     : [];
+  // Anyone without a freelancer panel can open the sign-up from the main menu; a guest signs in first and lands on it.
+  const assistant: ShellNavItem[] = roles.includes("freelancer")
+    ? []
+    : [{ key: "freelancer-signup", label: "دستیار فریلنسر", icon: IconBriefcase, href: guest ? `/login?redirect=${encodeURIComponent("/freelancer/register")}` : "/freelancer/register" }];
   const pricingItem: ShellNavItem = pricing
     ? { key: "pricing", label: PRICING_NAV.label, icon: PRICING_NAV.icon, active: pricing.active, onSelect: pricing.onSelect }
     : { key: "pricing", label: PRICING_NAV.label, icon: PRICING_NAV.icon, href: PRICING_NAV.href };
-  return [...sections, ...upcoming, pricingItem];
+  return [...sections, ...assistant, ...upcoming, pricingItem];
 }
 
 /** The primary button at the top of the panel sidebar: back to the chat. */
@@ -289,15 +294,7 @@ export default function AppShell({
           {backHref && (
             <Link
               href={backHref}
-              onClick={(e) => {
-                setOpen(false);
-                // Go back to the page the user came from; fall back to backHref when there is none inside the app.
-                const external = document.referrer && new URL(document.referrer).origin !== window.location.origin;
-                if (window.history.length > 1 && !external) {
-                  e.preventDefault();
-                  window.history.back();
-                }
-              }}
+              onClick={() => setOpen(false)}
               aria-label="بازگشت"
               className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-surface-2 text-foreground outline-none transition-colors hover:bg-foreground/10 focus-visible:ring-2 focus-visible:ring-ring"
             >
@@ -314,6 +311,7 @@ export default function AppShell({
       <nav aria-label="منوی اصلی" className="mt-3 min-h-0 flex-1 overflow-y-auto px-3">
         <NavGroups nav={nav} onNavigate={() => setOpen(false)} />
       </nav>
+      <SidebarWallet />
       <div className="border-t border-border p-3" data-tour="shell-footer">
         <div className="flex items-center gap-2">
           {user && (

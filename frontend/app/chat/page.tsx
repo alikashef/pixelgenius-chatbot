@@ -15,6 +15,7 @@ import { NavGroups, useSectionLinks } from "@/components/AppShell";
 import { PricingPlans } from "@/components/landing/PricingSection";
 import GuidedTour, { startTour } from "@/components/GuidedTour";
 import FreelancerPromo from "@/components/FreelancerPromo";
+import { SidebarWallet } from "@/components/WalletUsage";
 import GithubRepoPicker from "@/components/GithubRepoPicker";
 import { fetchChatModels, ChatModels, fetchBotProfile, BotProfile, fetchOrderBrief, fetchChatProgress, ChatProgressStage, sendChat, sendOtp, submitOrder, uploadChatFile, createChatSession, updateChatSession, ChatMode, ProjectPath, Message, Proposal, LeadAnalysis, OrderFile, Order, fetchMyOrders, fetchCustomerProfile } from "@/lib/api";
 
@@ -799,6 +800,7 @@ function ChatPageInner() {
 
       const apiMessages = newMessages.slice(1);
       const reply = await sendChat(apiMessages, currentAttachments, activeMode, botToken, finalize, activeMode === "designer" ? projectPath : undefined, activeMode === "designer" && projectPath === "source" && sourceType === "github" ? sourceUrl : "", activeMode === "designer" && projectPath === "source" ? sourceType : undefined, activeMode === "designer" && projectPath === "source" && sourceType === "zip" ? sourceArchive : undefined, requestProgressId, abort.signal, customerToken || undefined);
+      window.dispatchEvent(new Event("wallet:refresh"));
       // Past this point the answer is being applied (and maybe an order created), so it can no longer be stopped.
       replyAbortRef.current = null;
       setStoppable(false);
@@ -1231,8 +1233,9 @@ function ChatPageInner() {
           )}
         </nav>
       </div>
+      <SidebarWallet />
       <FreelancerPromo onNavigate={() => setSidebarOpen(false)} />
-      <div className="flex shrink-0 justify-center border-t border-border p-2" dangerouslySetInnerHTML={{ __html: `<a referrerpolicy='origin' target='_blank' href='https://trustseal.enamad.ir/?id=8441161&Code=ubbJKqqt7Jwvj4xUeC4HOHsV2zyV2iEv'><img referrerpolicy='origin' src='https://trustseal.enamad.ir/logo.aspx?id=8441161&Code=ubbJKqqt7Jwvj4xUeC4HOHsV2zyV2iEv' alt='' style='cursor:pointer' code='ubbJKqqt7Jwvj4xUeC4HOHsV2zyV2iEv'></a>` }} />
+      <div className="shrink-0 border-t border-border px-4 py-2 [&_a]:inline-block [&_a]:rounded-md [&_a]:bg-white [&_a]:p-0.5 [&_img]:h-auto [&_img]:w-12" dangerouslySetInnerHTML={{ __html: `<a referrerpolicy='origin' target='_blank' href='https://trustseal.enamad.ir/?id=8441161&Code=ubbJKqqt7Jwvj4xUeC4HOHsV2zyV2iEv'><img referrerpolicy='origin' src='https://trustseal.enamad.ir/logo.aspx?id=8441161&Code=ubbJKqqt7Jwvj4xUeC4HOHsV2zyV2iEv' alt='' style='cursor:pointer' code='ubbJKqqt7Jwvj4xUeC4HOHsV2zyV2iEv'></a>` }} />
       <div className="flex items-center gap-2 border-t border-border p-3">
         <Link href={customerToken ? "/account?tab=account" : "/login?redirect=/account?tab=account"} data-tour="account" className="flex h-10 min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2 text-sm font-bold text-foreground outline-none transition-colors hover:bg-foreground/5 focus-visible:ring-2 focus-visible:ring-ring">
           <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-surface-2 text-muted-foreground">
@@ -1537,6 +1540,17 @@ function ChatPageInner() {
               className="mb-5 flex items-center justify-between gap-3 rounded-xl border border-danger/20 bg-danger/10 px-4 py-3 text-sm text-danger"
             >
               <span>{error}</span>
+              <div className="flex shrink-0 items-center gap-2">
+              {error.includes("کردیت") && (
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new Event("wallet:topup"))}
+                  className="flex shrink-0 items-center gap-1.5 rounded-lg border border-danger/30 px-3 py-1.5 text-xs font-semibold text-danger outline-none transition-colors hover:bg-danger/15 focus-visible:ring-2 focus-visible:ring-danger"
+                >
+                  <IconCoin size={14} stroke={2.2} aria-hidden="true" />
+                  شارژ کیف پول
+                </button>
+              )}
               {lastAttemptRef.current && !phoneStep && (
                 <button
                   type="button"
@@ -1548,6 +1562,7 @@ function ChatPageInner() {
                   تلاش دوباره
                 </button>
               )}
+              </div>
             </div>
           )}
             <div ref={bottomRef} />

@@ -17,17 +17,17 @@ function inviteStatus(invite: InviteCode) {
   return { label: "فعال", tone: "bg-success/10 text-success" };
 }
 
-/** Admin: issue invite codes (freelancer sign-up is invite-only) and see who joined with them. */
-export default function FreelancerInvites({ getToken, onUnauthorized }: { getToken: () => string; onUnauthorized: () => void }) {
+/** Admin: discount codes (credit bonus on wallet top-ups) in one view, the freelancer list in the other. */
+export default function FreelancerInvites({ view, getToken, onUnauthorized }: { view: "codes" | "members"; getToken: () => string; onUnauthorized: () => void }) {
   const [invites, setInvites] = useState<InviteCode[]>([]);
   const [freelancers, setFreelancers] = useState<AdminFreelancer[]>([]);
   const [note, setNote] = useState("");
   const [maxUses, setMaxUses] = useState(1);
+  const [percent, setPercent] = useState(100);
   const [expiresDays, setExpiresDays] = useState("");
   const [creating, setCreating] = useState(false);
   const [copied, setCopied] = useState("");
   const [error, setError] = useState("");
-  const [origin, setOrigin] = useState("");
 
   const handle = useCallback(
     (err: unknown) => {
@@ -38,7 +38,6 @@ export default function FreelancerInvites({ getToken, onUnauthorized }: { getTok
   );
 
   useEffect(() => {
-    setOrigin(window.location.origin);
     Promise.all([fetchInvites(getToken()), fetchAdminFreelancers(getToken())])
       .then(([i, f]) => {
         setInvites(i);
@@ -52,10 +51,11 @@ export default function FreelancerInvites({ getToken, onUnauthorized }: { getTok
     setCreating(true);
     setError("");
     try {
-      const invite = await createInvite(getToken(), { note, max_uses: maxUses, expires_days: expiresDays ? Number(expiresDays) : null });
+      const invite = await createInvite(getToken(), { note, max_uses: maxUses, expires_days: expiresDays ? Number(expiresDays) : null, percent });
       setInvites((prev) => [invite, ...prev]);
       setNote("");
       setMaxUses(1);
+      setPercent(100);
       setExpiresDays("");
     } catch (err) {
       handle(err);
@@ -76,7 +76,7 @@ export default function FreelancerInvites({ getToken, onUnauthorized }: { getTok
 
   async function copyLink(code: string) {
     try {
-      await navigator.clipboard.writeText(`${origin}/freelancer/register?invite=${code}`);
+      await navigator.clipboard.writeText(code);
       setCopied(code);
       setTimeout(() => setCopied(""), 1800);
     } catch {
@@ -88,13 +88,17 @@ export default function FreelancerInvites({ getToken, onUnauthorized }: { getTok
     <div className="space-y-6">
       {error && <p role="alert" className="rounded-lg border border-danger/25 bg-danger/10 px-4 py-2.5 text-sm text-danger">{error}</p>}
 
-      <form onSubmit={handleCreate} className="rounded-xl border border-border bg-surface p-5">
-        <h2 className="font-bold text-foreground">ساخت کد دعوت</h2>
-        <p className="mt-1 text-[13px] leading-6 text-muted-foreground">ثبت‌نام فریلنسر فقط با کد دعوت ممکنه. لینک دعوت رو برای فریلنسر بفرست؛ کد خودکار در فرم ثبت‌نام پر می‌شه.</p>
-        <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_8rem_8rem_auto] sm:items-end">
+      {view === "codes" && <form onSubmit={handleCreate} className="rounded-xl border border-border bg-surface p-5">
+        <h2 className="font-bold text-foreground">ساخت کد تخفیف</h2>
+        <p className="mt-1 text-[13px] leading-6 text-muted-foreground">کاربر کد رو موقع شارژ کیف پول وارد می‌کنه و همون درصد از کردیت شارژش رو هدیه می‌گیره؛ مثلاً ۲۰٪ یعنی روی شارژ ۱۰۰۰ کردیتی ۲۰۰ کردیت اضافه. ۱۰۰٪ یعنی دو برابر.</p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_6rem_8rem_8rem_auto] sm:items-end">
           <div>
             <label htmlFor="inv-note" className="field-label">یادداشت (برای چه کسی)</label>
             <input id="inv-note" className="field" maxLength={120} value={note} onChange={(e) => setNote(e.target.value)} placeholder="مثلاً سارا رضایی — موشن" />
+          </div>
+          <div>
+            <label htmlFor="inv-percent" className="field-label">درصد هدیه</label>
+            <input id="inv-percent" type="number" min={1} max={100} className="field" value={percent} onChange={(e) => setPercent(Math.max(1, Math.min(100, Number(e.target.value) || 100)))} />
           </div>
           <div>
             <label htmlFor="inv-uses" className="field-label">تعداد استفاده</label>
@@ -109,16 +113,16 @@ export default function FreelancerInvites({ getToken, onUnauthorized }: { getTok
             {creating ? "در حال ساخت..." : "ساخت کد"}
           </Button>
         </div>
-      </form>
+      </form>}
 
-      <section aria-labelledby="invites-title" className="overflow-hidden rounded-xl border border-border bg-surface">
+      {view === "codes" && <section aria-labelledby="invites-title" className="overflow-hidden rounded-xl border border-border bg-surface">
         <div className="border-b border-border px-5 py-4">
-          <h2 id="invites-title" className="font-bold text-foreground">کدهای دعوت</h2>
+          <h2 id="invites-title" className="font-bold text-foreground">کدهای تخفیف</h2>
         </div>
         {invites.length === 0 ? (
           <div className="px-5 py-12 text-center">
             <IconTicket size={30} stroke={1.4} className="mx-auto mb-2 text-muted-foreground" aria-hidden="true" />
-            <p className="text-sm text-muted-foreground">هنوز کد دعوتی نساختی.</p>
+            <p className="text-sm text-muted-foreground">هنوز کد تخفیفی نساختی.</p>
           </div>
         ) : (
           <ul className="divide-y divide-border">
@@ -132,7 +136,7 @@ export default function FreelancerInvites({ getToken, onUnauthorized }: { getTok
                     {status.label}
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    {invite.used_count.toLocaleString("fa-IR")} از {invite.max_uses.toLocaleString("fa-IR")} استفاده
+                    {invite.percent.toLocaleString("fa-IR")}٪ · {invite.used_count.toLocaleString("fa-IR")} از {invite.max_uses.toLocaleString("fa-IR")} استفاده
                     {invite.expires_at ? ` · تا ${formatDate(invite.expires_at)}` : ""}
                   </span>
                   {invite.note && <span className="min-w-0 truncate text-xs text-secondary-foreground">{invite.note}</span>}
@@ -141,7 +145,7 @@ export default function FreelancerInvites({ getToken, onUnauthorized }: { getTok
                       <>
                         <Button type="button" variant="outline" size="sm" onClick={() => copyLink(invite.code)}>
                           {copied === invite.code ? <IconCheck size={15} className="text-success" aria-hidden="true" /> : <IconCopy size={15} aria-hidden="true" />}
-                          {copied === invite.code ? "کپی شد" : "کپی لینک دعوت"}
+                          {copied === invite.code ? "کپی شد" : "کپی کد"}
                         </Button>
                         <Button type="button" variant="ghost" size="sm" onClick={() => handleRevoke(invite.code)} aria-label={`لغو کد ${invite.code}`}>
                           <IconBan size={15} aria-hidden="true" />
@@ -155,9 +159,9 @@ export default function FreelancerInvites({ getToken, onUnauthorized }: { getTok
             })}
           </ul>
         )}
-      </section>
+      </section>}
 
-      <section aria-labelledby="freelancers-title" className="overflow-hidden rounded-xl border border-border bg-surface">
+      {view === "members" && <section aria-labelledby="freelancers-title" className="overflow-hidden rounded-xl border border-border bg-surface">
         <div className="border-b border-border px-5 py-4">
           <h2 id="freelancers-title" className="font-bold text-foreground">فریلنسرها</h2>
         </div>
@@ -168,7 +172,7 @@ export default function FreelancerInvites({ getToken, onUnauthorized }: { getTok
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border bg-surface-2/70">
-                  {["فریلنسر", "ایمیل", "کد دعوت", "وضعیت", "درخواست‌ها", "عضویت"].map((h) => (
+                  {["فریلنسر", "ایمیل", "کد تخفیف", "وضعیت", "درخواست‌ها", "عضویت"].map((h) => (
                     <th key={h} className="px-5 py-3 text-right text-xs font-bold text-muted-foreground">{h}</th>
                   ))}
                 </tr>
@@ -193,7 +197,7 @@ export default function FreelancerInvites({ getToken, onUnauthorized }: { getTok
             </table>
           </div>
         )}
-      </section>
+      </section>}
     </div>
   );
 }

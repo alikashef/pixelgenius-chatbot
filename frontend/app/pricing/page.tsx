@@ -12,7 +12,7 @@ export default function PricingPage() {
       primaryAction={<NewProjectLink />}
       width="wide"
       title="تعرفه‌ها"
-      description="میزبانی سایت‌هایی که با طراح محصول می‌سازی و اشتراک دستیار فریلنسر."
+      description="قیمت کردیت هر بخش و اشتراک میزبانی سایت."
     >
       <PricingPlans />
     </AppShell>

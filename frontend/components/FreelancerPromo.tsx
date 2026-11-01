@@ -12,7 +12,7 @@ const RobotHead = dynamic(() => import("robot-heads").then((module) => module.Ro
 
 const DISMISS_KEY = "freelancer_promo_dismissed_at";
 const DISMISS_DAYS = 7;
-const PERKS = ["نیازسنجی ۲۴ ساعته‌ی مشتری", "برآورد قیمت با نرخ‌های خودت", "ویجت با برند خودت روی سایتت"];
+const PERKS = ["نیازسنجی ۲۴ ساعته‌ی مشتری", "برآورد قیمت با نرخ‌های خودت", "ویجت با برند خودت روی سایتت", "پنل رایگان؛ هر پاسخ حدود ۳ تا ۸ کردیت"];
 
 /** Sidebar banner on the main site that invites freelancers to build their own chatbot. */
 export default function FreelancerPromo({ onNavigate }: { onNavigate?: () => void }) {
@@ -96,7 +96,7 @@ export default function FreelancerPromo({ onNavigate }: { onNavigate?: () => voi
           onClick={onNavigate}
           className="relative mt-4 flex h-10 items-center justify-center gap-2 rounded-lg bg-brand-solid text-sm font-bold text-brand-foreground outline-none transition-colors hover:bg-brand-solid/90 focus-visible:ring-2 focus-visible:ring-background focus-visible:ring-offset-2 focus-visible:ring-offset-foreground"
         >
-          ثبت‌نام با کد دعوت
+          ساخت دستیار
           <IconArrowLeft size={16} aria-hidden="true" />
         </Link>
       </section>

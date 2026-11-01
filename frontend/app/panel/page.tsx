@@ -8,6 +8,7 @@ import { fetchCustomerProfile, fetchMyOrders, updateCustomerProfile, CustomerPro
 import AppShell, { NewProjectLink, ShellLoading, useAccountNav } from "@/components/AppShell";
 import McpTour, { isMcpTourDone } from "@/components/McpTour";
 import HostingSites from "@/components/HostingSites";
+import WalletUsage from "@/components/WalletUsage";
 import SalesOrders, { toman } from "@/components/SalesOrders";
 import GuidedTour, { startTour } from "@/components/GuidedTour";
 import { Button } from "@/components/ui/button";
@@ -71,6 +72,7 @@ const TABS = [
   { key: "connect", group: "طراحی محصول", label: "اتصال به هوش مصنوعی", icon: IconPlugConnected },
   { key: "orders", group: "فروش", label: "سفارش‌ها", icon: IconClipboardList },
   { key: "chats", group: "حساب کاربری", label: "گفتگوهای ناتمام", icon: IconMessage },
+  { key: "wallet", group: "حساب کاربری", label: "کیف پول و مصارف", icon: IconCoin },
   { key: "account", group: "حساب کاربری", label: "تنظیمات حساب", icon: IconSettings },
 ] as const;
 
@@ -305,6 +307,7 @@ export default function PanelPage() {
       description: "درخواست‌هایی که برای ساخت توسط تیم توسعه ثبت کردی؛ وضعیت، قیمت و پرداخت‌ها.",
     },
     chats: { title: "گفتگوهای ناتمام", description: "گفتگوهایی که هنوز به پروژه تبدیل نشده‌اند را ادامه بده." },
+    wallet: { title: "کیف پول و مصارف", description: "کردیتت رو شارژ کن و ببین هر کدوم از کارها چقدر ازش خرج کرده." },
     account: { title: "تنظیمات حساب", description: "این اطلاعات برای شخصی‌سازی گفتگو استفاده می‌شه." },
   };
 
@@ -406,6 +409,13 @@ export default function PanelPage() {
             </ul>
           )}
         </div>
+      )}
+
+      {activeTab === "wallet" && (
+        <WalletUsage
+          token={localStorage.getItem("customer_token") || ""}
+          onUnauthorized={() => { clearSession(); router.replace("/login?redirect=/account?tab=wallet"); }}
+        />
       )}
 
       {activeTab === "account" && (

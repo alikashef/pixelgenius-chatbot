@@ -17,10 +17,20 @@ from lib.ai import analyze_lead as analysis
 class ChatProgressTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         chat._chat_progress.clear()
+        # Product-design chat is billed to a signed-in customer; the wallet itself is covered elsewhere.
+        self.billing = [
+            patch.object(chat, '_claims', return_value={'sub': 'customer-1', 'role': 'customer'}),
+            patch.object(chat.credits, 'has_credits', AsyncMock(return_value=True)),
+            patch.object(chat.credits, 'charge_up_to', AsyncMock()),
+        ]
+        for item in self.billing:
+            item.start()
         self.client = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url='http://backend')
 
     async def asyncTearDown(self):
         await self.client.aclose()
+        for item in reversed(self.billing):
+            item.stop()
         chat._chat_progress.clear()
 
     async def test_live_search_stage_and_completion_are_isolated(self):

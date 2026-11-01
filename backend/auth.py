@@ -66,6 +66,15 @@ def get_current_freelancer(credentials: HTTPAuthorizationCredentials = Depends(b
     return payload
 
 
+def plan_active(freelancer: Freelancer) -> bool:
+    expires = freelancer.plan_expires_at
+    if not freelancer.plan or expires is None:
+        return False
+    if expires.tzinfo is None:
+        expires = expires.replace(tzinfo=timezone.utc)
+    return expires > datetime.now(timezone.utc)
+
+
 def customer_session(customer: Customer) -> CustomerTokenOut:
     return CustomerTokenOut(
         access_token=create_access_token({"sub": customer.id, "role": "customer"}),

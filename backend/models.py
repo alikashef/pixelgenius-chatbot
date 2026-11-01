@@ -26,10 +26,26 @@ class Customer(Base):
     google_sub: Mapped[str | None] = mapped_column(String(64), unique=True, index=True, nullable=True)
     github_id: Mapped[str | None] = mapped_column(String(32), unique=True, index=True, nullable=True)
     github_token: Mapped[str | None] = mapped_column(Text, nullable=True)
+    credits: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    wallet_pending: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
     orders: Mapped[list["Order"]] = relationship("Order", back_populates="customer")
+
+
+class CreditLedger(Base):
+    """Every credit movement: positive = top-up/refund/bonus, negative = usage. `kind` groups the usage report."""
+    __tablename__ = "credit_ledger"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    customer_id: Mapped[str] = mapped_column(String(36), ForeignKey("customers.id"), index=True)
+    delta: Mapped[int] = mapped_column(Integer)
+    balance_after: Mapped[int] = mapped_column(Integer)
+    kind: Mapped[str] = mapped_column(String(30))
+    reason: Mapped[str] = mapped_column(String(200))
+    ref: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
 
 
 class Freelancer(Base):
@@ -50,6 +66,9 @@ class Freelancer(Base):
     widget_settings: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     knowledge: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     invite_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    plan: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    plan_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    billing_pending: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
@@ -57,13 +76,14 @@ class Freelancer(Base):
 
 
 class InviteCode(Base):
-    """Freelancer sign-up is invite-only; an admin issues codes with a use limit."""
+    """Discount code for freelancer plans; an admin issues codes with a use limit and a percent off (100 = free)."""
     __tablename__ = "invite_codes"
 
     code: Mapped[str] = mapped_column(String(32), primary_key=True)
     note: Mapped[str | None] = mapped_column(String(120), nullable=True)
     max_uses: Mapped[int] = mapped_column(Integer, default=1)
     used_count: Mapped[int] = mapped_column(Integer, default=0)
+    percent: Mapped[int] = mapped_column(Integer, default=100)
     revoked: Mapped[bool] = mapped_column(Boolean, default=False)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
