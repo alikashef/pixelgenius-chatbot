@@ -50,7 +50,7 @@ Milestone ارسال می‌کند، مشتری تایید و پرداخت مر�
 ```
 مشتری Proposal را بررسی می‌کند
   → در صورت تایید، Project Space ایجاد می‌شود
-  → پرداخت مرحله‌ای per Milestone (Zarinpal)
+  → پرداخت مرحله‌ای per Milestone (PayPing)
 ```
 
 ### ۴ — Project Space
@@ -81,7 +81,8 @@ Milestone ارسال می‌کند، مشتری تایید و پرداخت مر�
 | Intake Widget (چت‌بات embed) | ✅ MVP آماده |
 | OTP Auth مشتری | ✅ پیاده شده |
 | Proposal Engine (AI خلاصه + قیمت) | ✅ پیاده شده |
-| پرداخت پایه Zarinpal | ✅ پیاده شده |
+| پرداخت PayPing (شارژ کیف پول و سفارش‌ها) | ✅ پیاده شده |
+| کیف پول کردیت (شارژ، مصرف، گزارش مصارف، هدیه‌ی ادمین) | ✅ پیاده شده — همه‌چیز کردیتی به‌جز چت فروش و میزبانی |
 | پنل مشتری | ✅ پیاده شده |
 | پنل ادمین | ✅ پیاده شده |
 | لندینگ پیج SaaS | ✅ پیاده شده |
@@ -101,7 +102,7 @@ Milestone ارسال می‌کند، مشتری تایید و پرداخت مر�
 Frontend:  Next.js 14 (App Router) + Tailwind CSS + shadcn/ui  → port 3000
 Backend:   FastAPI (Python) + SQLAlchemy async                  → port 8000
 Database:  PostgreSQL 16
-Payment:   Zarinpal v4 API
+Payment:   PayPing v3 API (درگاه سِپ پشت آن؛ مبالغ به تومان)
 AI:        Anthropic Claude (claude-sonnet-4-20250514)
 Deploy:    Docker Compose + Caddy (TLS auto)
 ```
@@ -123,7 +124,7 @@ frontend/
       [id]/page.tsx               ← جزئیات سفارش (client)
     login/page.tsx                ← ورود واحد همه (OTP + ایمیل/رمز)؛ نشست همه‌ی پنل‌ها را می‌سازد
     proposal/page.tsx             ← نمایش پروپوزال (client)
-    payment/verify/page.tsx       ← تایید پرداخت Zarinpal (client)
+    payment/verify/page.tsx       ← برگشت از درگاه: تایید سفارش یا شارژ کیف پول (client، `?kind=wallet`)
     admin/
       dashboard/page.tsx          ← داشبورد ادمین (لینکش هیچ‌جا نمایش داده نمی‌شود)
   components/
@@ -208,6 +209,15 @@ backend/
 - **ناوبری دو سطحی:** سایدبار صفحه‌ی اصلی (چت) فقط لینک بخش‌ها را دارد (`useSectionLinks`: طراحی محصول، فروش، فریلنسر؛ حساب کاربری از لینک پایین سایدبار) و زیرش «گفتگوهای اخیر» با چیپ ظریف «فروش» (کهربایی) یا «محصول» (بنفش). هر بخش صفحه‌ی خودش را با `AppShell` باز می‌کند (با `backHref="/"` دکمه‌ی «بازگشت» دارد) و سایدبارش فقط لینک‌های داخلی همان بخش است (`useAccountNav` بر اساس `active`). بخش «فریلنسر» فقط با دسترسی فریلنسر. بدون چیپ و بدون سوییچ پنل
 - **پنل ادمین خصوصی است:** در انتخاب پنل و سایدبار هرگز نمایش داده نمی‌شود
 
+### کیف پول کردیت
+- هر ۱ کردیت = ۱۰۰ تومان (`TOMAN_PER_CREDIT` در `services/credits.py`)؛ موجودی روی `customers.credits` و هر حرکت در `credit_ledger` (kind: topup, bonus, refund, widget, designer, video, admin)
+- کسر اتمیک با `UPDATE ... WHERE credits >= :n`؛ هرگز موجودی را مستقیم تغییر نده، فقط `credits.charge/grant/charge_up_to`
+- چت AI از مصرف واقعی توکن قیمت می‌گیرد: `usage_credits` = هزینه‌ی مدل × `USD_TOMAN` × `CREDIT_MARKUP`؛ قیمت مدل‌ها در `MODEL_USD_PER_MTOK`
+- طراحی محصول از کیف پول خود مشتری (ورود لازم)، پاسخ ویجت از کیف پول فریلنسر (حساب مشتری با همان شماره)؛ چت فروش و میزبانی کردیت نمی‌گیرند
+- ویدیوساز هنگام رندر برآورد را کم می‌کند و در شکست برمی‌گرداند (`refund_in_thread`)؛ دسترسی فعلاً فقط `VIDEO_PHONES`
+- کد تخفیف (`invite_codes.percent`) روی شارژ درصدی کردیت هدیه می‌دهد؛ فقط ادمین می‌سازد
+- verify شارژ idempotent است؛ `wallet_pending` قبل از اعتبار دادن اتمیک پاک می‌شود
+
 ### میزبانی و دامنه
 - هر سایت منتشرشده ۵ روز رایگان (`SITE_TTL_DAYS`، `LIARA_TTL_HOURS=120`)؛ سایت استاتیک منقضی‌شده تا `SITE_GRACE_DAYS` (۷) فایل‌هایش می‌ماند
 - پرداخت فعلاً خاموش (`HOSTING_BILLING` در backend، `BILLING_ENABLED` در `lib/plans.ts`)؛ تا آن موقع «تمدید رایگان» در دو روز آخر مهلت
@@ -220,15 +230,20 @@ backend/
 - «تأیید نهایی توسعه» فقط وقتی سایت منتشر شده و در حال انتشار نیست؛ تسک‌های باز نسخه‌های قبلی روی آخرین نسخه هم دیده می‌شوند
 - تب پیش‌نمایش نوار زنده‌ی انتشار دارد (مراحل + لاگ)؛ هنگام انتشار هر ۴ ثانیه poll می‌کند و بعد از `READY` پیش‌نمایش خودکار reload می‌شود
 
-### Zarinpal
-- API v4: `api.zarinpal.com/pg/v4/...`
-- Order قبل از redirect ساخته می‌شود
-- authority روی Order ذخیره می‌شود برای verify
+### PayPing
+- API v3: `POST /v3/pay` (امضا با هدر `Authorization: Bearer <PAYPING_TOKEN>`)، سپس کاربر به `url` برگشتی می‌رود؛ مبلغ **تومان** است (دیتابیس ریال، تقسیم بر ۱۰)
+- `returnUrl` = `/api/payment/return?cb=<صفحه‌ی فرانت>`؛ PayPing اینجا POST می‌کند و کاربر با ۳۰۳ به `/payment/verify` برمی‌گردد (`cb` فقط روی دامنه‌ی خودمان مجاز است)
+- verify: `POST /v3/pay/verify` با `paymentRefId`، `paymentCode`، `amount`؛ ۲۰۲/۵۰۲ یعنی هنوز در حال پردازش و ۴۰۹ با `metaData.code=110` یعنی قبلاً وریفای شده؛ بعد از ۱۰ دقیقه بدون verify پول برمی‌گردد
+- `orders.zarinpal_authority` اسم قدیمی است و حالا `paymentCode` را نگه می‌دارد
 
 ### Environment Variables — Backend
 ```
 ANTHROPIC_API_KEY
-ZARINPAL_MERCHANT_ID
+PAYPING_TOKEN          ← توکن پی‌پینگ؛ خالی = حالت DEV با پرداخت ساختگی
+PAYPING_BASE_URL       ← پیش‌فرض https://api.payping.ir
+PUBLIC_API_URL         ← آدرس عمومی API برای returnUrl (پیش‌فرض همان PUBLIC_APP_URL)
+USD_TOMAN              ← نرخ دلار برای قیمت‌گذاری کردیت چت AI
+CREDIT_MARKUP          ← ضریب سود روی هزینه‌ی واقعی API (پیش‌فرض 1.5)
 DATABASE_URL          postgresql+asyncpg://postgres:postgres@db:5432/freelance_intake
 JWT_SECRET
 ADMIN_USERNAME
