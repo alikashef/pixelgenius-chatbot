@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import uuid
@@ -402,54 +403,66 @@ def _num(value) -> float | None:
     return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
 
 
+def _line(label: str, usd: float, rate: float) -> dict:
+    return {"label": label, "usd": round(usd, 3), "toman": round(usd * rate)}
+
+
+async def _gapgpt_balance(client: httpx.AsyncClient, rate: float) -> dict:
+    key = os.getenv("GAPGPT_API_KEY", "")
+    out = {"name": "gapgpt", "title": "gapgpt (مدل‌ها و تصویر)", "topup_url": "https://gapgpt.app/platform-v2/wallet", "ok": False, "lines": [], "error": ""}
+    if not key:
+        out["error"] = "کلید تنظیم نشده است"
+        return out
+    for base in GAP_APIS:
+        usage = await _get_json(client, f"{base}/v1/dashboard/billing/usage", key)
+        if usage is None:
+            continue
+        out["ok"] = True
+        used = (_num(usage.get("total_usage")) or 0) / 100  # reported in cents
+        out["lines"].append(_line("مصرف تجمعی", used, rate))
+        plan = await _get_json(client, f"{base}/v1/dashboard/billing/subscription", key) or {}
+        limit = _num(plan.get("hard_limit_usd"))
+        if limit is not None and limit < 1_000_000:
+            out["lines"].append(_line("باقی‌مانده", limit - used, rate))
+        return out
+    out["error"] = "پاسخی از gapgpt نیامد"
+    return out
+
+
+async def _kaya_balance(client: httpx.AsyncClient, rate: float) -> dict:
+    key = os.getenv("KAYA_API_KEY", "")
+    out = {"name": "kaya", "title": "Kaya (صدای گوینده)", "topup_url": "https://kayaai.ir", "ok": False, "lines": [], "error": ""}
+    if not key:
+        out["error"] = "کلید تنظیم نشده است"
+        return out
+    credit = await _get_json(client, f"{KAYA_API}/credits", key)
+    data = credit.get("data") if isinstance(credit, dict) and isinstance(credit.get("data"), dict) else credit
+    total, used = _num((data or {}).get("total_credits")), _num((data or {}).get("total_usage"))
+    if total is not None:
+        out["ok"] = True
+        out["lines"].append(_line("باقی‌مانده", total - (used or 0), rate))
+        if used is not None:
+            out["lines"].append(_line("مصرف تجمعی", used, rate))
+        return out
+    info = await _get_json(client, f"{KAYA_API}/auth/key", key)
+    data = info.get("data") if isinstance(info, dict) and isinstance(info.get("data"), dict) else info
+    left, spent = _num((data or {}).get("limit_remaining")), _num((data or {}).get("usage"))
+    if left is not None:
+        out["lines"].append(_line("باقی‌مانده", left, rate))
+    if spent is not None:
+        out["lines"].append(_line("مصرف تجمعی", spent, rate))
+    out["ok"] = bool(out["lines"])
+    if not out["ok"]:
+        out["error"] = "Kaya موجودی را از طریق API نمی‌دهد یا پاسخ نداد؛ از داشبورد خودش ببین"
+    return out
+
+
 @router.get("/admin/provider-balances")
 async def admin_provider_balances(_: dict = Depends(get_current_admin)):
     """What the AI providers behind the video maker report for our keys: gapgpt (all models) and Kaya (voice)."""
     rate = credits.USD_TOMAN
-    async with httpx.AsyncClient(timeout=12) as client:
-        gap_key, kaya_key = os.getenv("GAPGPT_API_KEY", ""), os.getenv("KAYA_API_KEY", "")
-        gap = {"name": "gapgpt", "title": "gapgpt (مدل‌ها و تصویر)", "topup_url": "https://gapgpt.app/platform-v2/wallet", "ok": False, "lines": [], "error": ""}
-        if not gap_key:
-            gap["error"] = "کلید تنظیم نشده است"
-        for base in GAP_APIS if gap_key else []:
-            usage = await _get_json(client, f"{base}/v1/dashboard/billing/usage", gap_key)
-            if usage is None:
-                continue
-            gap["ok"] = True
-            used = (_num(usage.get("total_usage")) or 0) / 100  # reported in cents
-            gap["lines"].append({"label": "مصرف تجمعی", "usd": round(used, 3), "toman": round(used * rate)})
-            plan = await _get_json(client, f"{base}/v1/dashboard/billing/subscription", gap_key) or {}
-            limit = _num(plan.get("hard_limit_usd"))
-            if limit is not None and limit < 1_000_000:
-                gap["lines"].append({"label": "باقی‌مانده", "usd": round(limit - used, 3), "toman": round((limit - used) * rate)})
-            break
-        if gap_key and not gap["ok"]:
-            gap["error"] = "پاسخی از gapgpt نیامد"
-
-        kaya = {"name": "kaya", "title": "Kaya (صدای گوینده)", "topup_url": "https://kayaai.ir", "ok": False, "lines": [], "error": ""}
-        if not kaya_key:
-            kaya["error"] = "کلید تنظیم نشده است"
-        else:
-            credit = await _get_json(client, f"{KAYA_API}/credits", kaya_key)
-            data = (credit or {}).get("data") if isinstance((credit or {}).get("data"), dict) else credit
-            total, used = _num((data or {}).get("total_credits")), _num((data or {}).get("total_usage"))
-            if total is not None:
-                kaya.update(ok=True)
-                kaya["lines"].append({"label": "باقی‌مانده", "usd": round(total - (used or 0), 3), "toman": round((total - (used or 0)) * rate)})
-                if used is not None:
-                    kaya["lines"].append({"label": "مصرف تجمعی", "usd": round(used, 3), "toman": round(used * rate)})
-            else:
-                info = await _get_json(client, f"{KAYA_API}/auth/key", kaya_key)
-                data = (info or {}).get("data") if isinstance((info or {}).get("data"), dict) else info
-                left, spent = _num((data or {}).get("limit_remaining")), _num((data or {}).get("usage"))
-                if left is not None or spent is not None:
-                    kaya["ok"] = True
-                    if left is not None:
-                        kaya["lines"].append({"label": "باقی‌مانده", "usd": round(left, 3), "toman": round(left * rate)})
-                    if spent is not None:
-                        kaya["lines"].append({"label": "مصرف تجمعی", "usd": round(spent, 3), "toman": round(spent * rate)})
-            if not kaya["ok"]:
-                kaya["error"] = "Kaya موجودی را از طریق API نمی‌دهد یا پاسخ نداد؛ از داشبورد خودش ببین"
+    async with httpx.AsyncClient(timeout=6) as client:
+        gap, kaya = await asyncio.gather(_gapgpt_balance(client, rate), _kaya_balance(client, rate))
     return {"rate": rate, "providers": [gap, kaya]}
 
 

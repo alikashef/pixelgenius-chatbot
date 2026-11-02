@@ -3,7 +3,7 @@ FROM ${PYTHON_IMAGE}
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg fontconfig && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg fontconfig chromium fonts-liberation && rm -rf /var/lib/apt/lists/*
 
 ARG PIP_INDEX_URL=https://pypi.org/simple
 ARG PIP_TRUSTED_HOST=
@@ -18,8 +18,7 @@ RUN if [ -n "$PIP_TRUSTED_HOST" ]; then \
       pip install --no-cache-dir -r requirements.txt; \
     fi
 
-ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
-RUN playwright install --with-deps chromium && rm -rf /var/lib/apt/lists/*
+ENV CHROMIUM_PATH=/usr/bin/chromium
 
 COPY . .
 

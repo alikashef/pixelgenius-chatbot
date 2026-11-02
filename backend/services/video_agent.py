@@ -260,7 +260,7 @@ class _Page:
 
     def __enter__(self):
         self._pw = _chromium()().start()
-        self._browser = self._pw.chromium.launch(executable_path=os.getenv("CHROMIUM_PATH") or None, args=["--font-render-hinting=none", "--disable-gpu"])
+        self._browser = self._pw.chromium.launch(executable_path=os.getenv("CHROMIUM_PATH") or None, args=["--font-render-hinting=none", "--disable-gpu", "--no-sandbox"])
         context = self._browser.new_context(viewport={"width": self.size[0], "height": self.size[1]}, device_scale_factor=self.scale)
         root = self.comp.as_uri()
         context.route("**/*", lambda route: route.continue_() if route.request.url.startswith(root) else route.abort())

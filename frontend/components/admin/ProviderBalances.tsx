@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { IconExternalLink, IconRefresh } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { fetchProviderBalances, ProviderBalances as Balances } from "@/lib/api";
@@ -13,17 +13,22 @@ export default function ProviderBalances({ getToken, onUnauthorized }: { getToke
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const unauthorized = useRef(onUnauthorized);
+  unauthorized.current = onUnauthorized;
+  const token = useRef(getToken);
+  token.current = getToken;
+
   const load = useCallback(() => {
     setLoading(true);
     setError("");
-    fetchProviderBalances(getToken())
+    fetchProviderBalances(token.current())
       .then(setData)
       .catch((err) => {
-        if (err instanceof Error && err.message === "UNAUTHORIZED") onUnauthorized();
+        if (err instanceof Error && err.message === "UNAUTHORIZED") unauthorized.current();
         else setError(err instanceof Error ? err.message : "درخواست ناموفق بود");
       })
       .finally(() => setLoading(false));
-  }, [getToken, onUnauthorized]);
+  }, []);
 
   useEffect(load, [load]);
 
