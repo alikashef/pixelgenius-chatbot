@@ -172,21 +172,34 @@ def _ask_html(messages: list[dict], system: str) -> str:
     if not api_key:
         raise AgentError("کلید هوش مصنوعی تنظیم نشده است")
     for model in dict.fromkeys(vm.AI_MODELS):
-        payload = {"model": model, "messages": [{"role": "system", "content": system}, *messages], "temperature": 0.8, "max_tokens": 24000, "stream": True}
+        payload = {"model": model, "messages": [{"role": "system", "content": system}, *messages], "temperature": 0.8, "max_tokens": 24000, "stream": True,
+                   "reasoning": {"effort": "low"}}  # hidden reasoning otherwise eats the whole token budget and leaves no HTML
         for base_url in _base_urls():
             try:
                 # streamed: a full composition takes minutes and gateways drop silent long-running responses
                 parts: list[str] = []
+                finish, stray = None, []
                 with httpx.Client(timeout=httpx.Timeout(600, connect=20)) as client:
                     with client.stream("POST", f"{base_url}/chat/completions", headers={"Authorization": f"Bearer {api_key}"}, json=payload) as response:
                         response.raise_for_status()
                         for line in response.iter_lines():
-                            if not line.startswith("data:") or line.strip() == "data: [DONE]":
+                            if not line.startswith("data:"):
+                                if line.strip() and not line.startswith(":"):
+                                    stray.append(line[:300])
                                 continue
-                            choices = json.loads(line[5:]).get("choices") or [{}]
+                            if line.strip() == "data: [DONE]":
+                                continue
+                            event = json.loads(line[5:])
+                            choices = event.get("choices") or [{}]
                             parts.append((choices[0].get("delta") or {}).get("content") or "")
+                            finish = choices[0].get("finish_reason") or finish
+                            if event.get("error"):
+                                stray.append(str(event["error"])[:300])
                 if "".join(parts).strip():
                     return "".join(parts)
+                logger.warning("Video agent call to %s via %s returned no text (finish=%s, %s)", model, base_url, finish, stray[:2])
+                if finish == "length":  # the whole budget went to hidden reasoning; another gateway would burn the same
+                    raise AgentError("طراحی ویدیو زمان زیادی برد و ناتمام ماند، دوباره تلاش کنید")
             except (httpx.HTTPError, KeyError, IndexError, ValueError) as exc:
                 logger.warning("Video agent call to %s failed via %s: %s", model, base_url, exc)
     raise AgentError("ارتباط با دستیار طراحی برقرار نشد، دوباره تلاش کنید")
