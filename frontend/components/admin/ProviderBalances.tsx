@@ -58,8 +58,14 @@ export default function ProviderBalances({ getToken, onUnauthorized }: { getToke
                   <div key={line.label} className="flex items-baseline justify-between gap-3 border-t border-border pt-3 first:border-0 first:pt-0">
                     <dt className="text-xs text-muted-foreground">{line.label}</dt>
                     <dd className="text-end">
-                      <span className="block text-base font-black text-foreground">{fa(line.toman)} تومان</span>
-                      <span className="block text-xs text-muted-foreground" dir="ltr">${line.usd.toLocaleString("en-US")}</span>
+                      {line.text ? (
+                        <span className="block text-base font-black text-foreground">{line.text}</span>
+                      ) : (
+                        <>
+                          <span className="block text-base font-black text-foreground">{fa(line.toman ?? 0)} تومان</span>
+                          <span className="block text-xs text-muted-foreground" dir="ltr">${(line.usd ?? 0).toLocaleString("en-US")}</span>
+                        </>
+                      )}
                     </dd>
                   </div>
                 ))}

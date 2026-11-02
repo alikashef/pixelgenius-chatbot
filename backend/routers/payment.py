@@ -431,29 +431,19 @@ async def _gapgpt_balance(client: httpx.AsyncClient, rate: float) -> dict:
 
 async def _kaya_balance(client: httpx.AsyncClient, rate: float) -> dict:
     key = os.getenv("KAYA_API_KEY", "")
-    out = {"name": "kaya", "title": "Kaya (صدای گوینده)", "topup_url": "https://kayaai.ir", "ok": False, "lines": [], "error": ""}
+    out = {"name": "kaya", "title": "Kaya (صدای گوینده)", "topup_url": "https://kayaai.ir/dashboard", "ok": False, "lines": [], "error": ""}
     if not key:
         out["error"] = "کلید تنظیم نشده است"
         return out
-    credit = await _get_json(client, f"{KAYA_API}/credits", key)
-    data = credit.get("data") if isinstance(credit, dict) and isinstance(credit.get("data"), dict) else credit
-    total, used = _num((data or {}).get("total_credits")), _num((data or {}).get("total_usage"))
-    if total is not None:
-        out["ok"] = True
-        out["lines"].append(_line("باقی‌مانده", total - (used or 0), rate))
-        if used is not None:
-            out["lines"].append(_line("مصرف تجمعی", used, rate))
+    account = await _get_json(client, f"{KAYA_API.removesuffix('/v1')}/account", key)
+    credit = (account or {}).get("credits") if isinstance(account, dict) else None
+    if not isinstance(credit, dict) or _num(credit.get("balance")) is None:
+        out["error"] = "پاسخی از Kaya نیامد"
         return out
-    info = await _get_json(client, f"{KAYA_API}/auth/key", key)
-    data = info.get("data") if isinstance(info, dict) and isinstance(info.get("data"), dict) else info
-    left, spent = _num((data or {}).get("limit_remaining")), _num((data or {}).get("usage"))
-    if left is not None:
-        out["lines"].append(_line("باقی‌مانده", left, rate))
-    if spent is not None:
-        out["lines"].append(_line("مصرف تجمعی", spent, rate))
-    out["ok"] = bool(out["lines"])
-    if not out["ok"]:
-        out["error"] = "Kaya موجودی را از طریق API نمی‌دهد یا پاسخ نداد؛ از داشبورد خودش ببین"
+    out["ok"] = True
+    out["lines"].append({"label": "موجودی", "text": f"{_num(credit['balance']):,.1f} اعتبار"})
+    if _num(credit.get("totalUsed")) is not None:
+        out["lines"].append({"label": "مصرف تجمعی", "text": f"{_num(credit['totalUsed']):,.1f} اعتبار"})
     return out
 
 

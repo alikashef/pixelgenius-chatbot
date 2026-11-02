@@ -313,7 +313,7 @@ export const grantCreditsToAll = (token: string, credits: number, note: string, 
   adminRequest<{ count: number }>(token, "credits/grant-all", { method: "POST", body: JSON.stringify({ credits, note, expected_count: expectedCount }) });
 export interface ProviderBalances {
   rate: number;
-  providers: { name: string; title: string; topup_url: string; ok: boolean; error: string; lines: { label: string; usd: number; toman: number }[] }[];
+  providers: { name: string; title: string; topup_url: string; ok: boolean; error: string; lines: { label: string; usd?: number; toman?: number; text?: string }[] }[];
 }
 export const fetchProviderBalances = (token: string) => adminRequest<ProviderBalances>(token, "provider-balances");
 export const fetchAdminFreelancers = (token: string) => adminRequest<AdminFreelancer[]>(token, "freelancers");
