@@ -13,3 +13,4 @@ openai==1.30.0
 python-dotenv==1.0.1
 pypdf==4.2.0
 python-multipart
+playwright==1.44.0

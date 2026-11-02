@@ -100,21 +100,33 @@ def test_primary_voice_failure_falls_back_to_second_provider(monkeypatch):
     assert seen == [("kaya", "female_formal"), ("openai", "female_formal")]
 
 
-def test_voice_preview_is_cached_only_for_the_primary_provider(tmp_path, monkeypatch):
+def test_voice_preview_never_uses_fallback_and_remembers_failures(tmp_path, monkeypatch):
+    monkeypatch.setattr(video_maker, "BUNDLED_PREVIEWS", tmp_path / "none")
+    video_maker._preview_failed.clear()
     calls = []
     monkeypatch.setattr(video_maker, "_kaya_tts", lambda text, voice: calls.append(voice) or b"mp3data")
     first = video_maker.voice_preview("male_warm", tmp_path)
     assert video_maker.voice_preview("male_warm", tmp_path) == first and first.read_bytes() == b"mp3data" and calls == ["male_warm"]
 
     def down(text, voice):
+        calls.append(voice)
         raise video_maker.VideoError("down")
 
     monkeypatch.setattr(video_maker, "_kaya_tts", down)
-    monkeypatch.setattr(video_maker, "_openai_tts", lambda text, voice: b"fallback")
-    sample = video_maker.voice_preview("female_formal", tmp_path)
-    assert sample.read_bytes() == b"fallback" and not (tmp_path / "female_formal.mp3").exists()
+    monkeypatch.setattr(video_maker, "_openai_tts", lambda text, voice: pytest.fail("previews never use the fallback"))
+    for _ in range(3):
+        with pytest.raises(video_maker.VideoError):
+            video_maker.voice_preview("female_formal", tmp_path)
+    assert calls.count("female_formal") == 1
     with pytest.raises(video_maker.VideoError):
         video_maker.voice_preview("nobody", tmp_path)
+
+
+def test_bundled_voice_preview_makes_no_request(tmp_path, monkeypatch):
+    (tmp_path / "male_warm.mp3").write_bytes(b"bundled")
+    monkeypatch.setattr(video_maker, "BUNDLED_PREVIEWS", tmp_path)
+    monkeypatch.setattr(video_maker, "_kaya_tts", lambda text, voice: pytest.fail("no request expected"))
+    assert video_maker.voice_preview("male_warm", tmp_path / "cache").read_bytes() == b"bundled"
 
 
 def test_empty_kaya_base_url_env_uses_the_default(monkeypatch):
@@ -171,3 +183,13 @@ def test_kaya_connection_hiccup_is_retried_before_falling_back(monkeypatch):
     monkeypatch.setattr(video_maker.httpx, "post", post)
     monkeypatch.setattr(video_maker.time, "sleep", lambda s: None)
     assert video_maker._kaya_tts("سلام", "male_warm") == b"audio" and len(attempts) == 3
+
+
+def test_agent_price_scales_with_length_and_stays_above_cost():
+    settings = video_maker.clean_settings({})
+    scenario = video_maker.normalize_scenario(SCENARIO, 1)
+    longer = {**scenario, "scenes": [{**scene, "duration": scene["duration"] * 3} for scene in scenario["scenes"]]}
+    short_cost = video_maker.estimate_cost({"settings": settings, "scenario": scenario})
+    long_cost = video_maker.estimate_cost({"settings": settings, "scenario": longer})
+    assert long_cost["total"] > short_cost["total"]
+    assert short_cost["total"] >= 2260

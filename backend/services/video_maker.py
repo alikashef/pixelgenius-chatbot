@@ -29,12 +29,16 @@ STYLE_CATALOG = {
     "steps": {"label": "مراحل و دیاگرام", "hint": "نشانگر مرحله‌ها بالای صفحه؛ مناسب «سه دلیل»، آموزش و فرآیند", "credits": 30, "clips": 0, "category": "Diagrams"},
     "clips": {"label": "کلیپ‌های تو و راوی", "hint": "صدای گوینده روی کلیپ‌هایی که فرستادی", "credits": 20, "clips": 1, "category": "Photos"},
     "phone": {"label": "قاب موبایل", "hint": "کلیپ یا اسکرین‌رکورد تو داخل قاب گوشی؛ مناسب نمایش سایت و اپ", "credits": 50, "clips": 1, "category": "Phone / Product UI"},
+    "cinematic": {"label": "سینمایی طلایی", "hint": "صحنه‌ی تیره با ذرات و درخشش طلایی، تیتر شکوهمند؛ حس برند لوکس", "credits": 0, "clips": 0, "category": "Cinematic", "agent": True},
+    "one_take": {"label": "حرکت دوربین ممتد", "hint": "یک نمای پیوسته که دوربین بین صحنه‌ها سُر می‌خورد، بدون برش", "credits": 0, "clips": 0, "category": "One take", "agent": True},
+    "collage": {"label": "کولاژ کاغذی", "hint": "تکه‌های کاغذ، عکس هافتون و برچسب روی میز؛ حس رسانه‌ای و خلاق", "credits": 0, "clips": 0, "category": "Collage", "agent": True},
+    "cartoon": {"label": "انیمیشن کارتونی", "hint": "شخصیت و تصویرسازی وکتوری متحرک؛ مناسب توضیح ایده‌ها", "credits": 0, "clips": 0, "category": "Cartoon", "agent": True},
+    "poster": {"label": "پوستر هافتون", "hint": "تایپ درشت با جابه‌جایی رنگ، مهر و بافت چاپی؛ جسور و متمایز", "credits": 0, "clips": 0, "category": "Print", "agent": True},
     "before_after": {"label": "قبل و بعد", "hint": "مقایسه‌ی دو کلیپ در صفحه‌ی تقسیم‌شده", "credits": 30, "clips": 2, "category": "Product UI"},
 }
 STYLES = tuple(STYLE_CATALOG)
 # ElevenLabs premade voices (George, Rachel, Adam); the OpenAI names are the fallback provider's equivalents
 VOICES = {"male_warm": "JBFqnCBsd6RMkjVDRZzb", "female_formal": "21m00Tcm4TlvDq8ikWAM", "male_energetic": "pNInz6obpgDQGcFmaJgB"}
-FALLBACK_VOICES = {"male_warm": "onyx", "female_formal": "nova", "male_energetic": "echo"}
 VOICE_LABELS = {"male_warm": "گوینده‌ی مرد · گرم و صمیمی", "female_formal": "گوینده‌ی زن · رسمی و شفاف", "male_energetic": "گوینده‌ی مرد · پرانرژی"}
 PREVIEW_TEXT = "سلام! من گوینده‌ی ویدیوی شما هستم. چرا سایتت بازدید داره، ولی کسی نمی‌خره؟"
 KAYA_URL = "https://kayaai.ir/api/v1"
@@ -44,6 +48,7 @@ VOICE_STYLE = {
     "female_formal": "formal, clear and professional",
     "male_energetic": "energetic, upbeat and punchy",
 }
+FALLBACK_VOICES = {"male_warm": "onyx", "female_formal": "nova", "male_energetic": "echo"}
 SPEEDS = {"slow": 0.9, "normal": 1.0, "fast": 1.15}
 SUBTITLE_MODES = ("word", "sentence")
 SUBTITLE_POSITIONS = ("top", "middle", "bottom")
@@ -58,7 +63,7 @@ DEFAULT_SETTINGS = {
 }
 
 # Starting prices in credits; change here (or move to the admin panel later), nothing downstream hardcodes them.
-CREDIT_PRICES = {"script": 80, "narration_per_30s": 120, "subtitles": 40, "cover": 60, "render": 40, "extra_edit": 120}
+CREDIT_PRICES = {"script": 80, "narration_per_30s": 120, "subtitles": 40, "cover": 60, "render": 40, "agent": 2260, "agent_per_second": 100, "cover_ai": 800, "cover_ai_ref": 600, "extra_edit": 1400}
 
 FONTS_DIR = Path(__file__).resolve().parent.parent / "fonts"
 FONT_BOLD = "Yekan Bakh FaNum"
@@ -73,20 +78,22 @@ Reply ONLY with one JSON object, no markdown:
 {
  "reply": "your message in Persian (friendly, short, one question at a time)",
  "quick_replies": ["up to 3 short Persian answer suggestions for your question, or []"],
- "info": {"brand": null or string, "cta": null or string, "format": null or "9:16"|"4:5"|"1:1"|"16:9", "format_reason": null or string, "style": null or "typography"|"shapes"|"particles"|"waveform"|"steps"|"clips"|"phone"|"before_after", "style_reason": null or string},
- "scenario": null or {"title": "hook headline, the question the video opens with", "scenes": [{"kind": "hook|body|cta", "title": "short scene label", "text": "on-screen headline, max 10 words, use \\n for line breaks", "highlight": "one word from text", "narration": "what the narrator says, 1-2 sentences", "duration": seconds, "asset": null or uploaded clip index}]},
+ "info": {"brand": null or string, "cta": null or string, "format": null or "9:16"|"4:5"|"1:1"|"16:9", "format_reason": null or string, "style": null or "typography"|"shapes"|"particles"|"waveform"|"steps"|"cinematic"|"one_take"|"collage"|"cartoon"|"poster"|"clips"|"phone"|"before_after", "style_reason": null or string},
+ "scenario": null or {"title": "hook headline, the question the video opens with", "grammar": "problem_solution|listicle|storytime|myth_vs_truth|explainer|before_after|kinetic", "scenes": [{"kind": "hook|body|cta", "title": "short scene label", "text": "on-screen headline, max 10 words, use \\n for line breaks", "highlight": "one word from text", "narration": "what the narrator says, 1-2 sentences", "visual": "one sentence storyboard: the concrete image/motion the viewer sees (a diagram, an object, a gesture, a before/after), never just 'text on screen'", "duration": seconds, "asset": null or uploaded clip index}]},
  "ready": true or false
 }
 Process: first learn what the video is for and what the viewer should do. Required to finish: brand name and the call to action. The logo is optional (ask once if missing). Detect the format from the user's words (reel/story => 9:16, feed post => 4:5, YouTube/site => 16:9) and say so in format_reason; do not ask about it.
 As soon as you know the goal, write the full scenario (3-6 scenes, total close to the requested duration, first scene a hook, last scene the CTA) and keep refining it as the user answers. Set ready=true only when brand and cta are known and the scenario exists.
 Narration length must fit the scene: at most 2.3 words per second of the scene duration, and the scene durations must add up to the requested duration. Narration must be natural, standard spoken Persian that a text-to-speech voice can read correctly: full words, no slang contractions, numbers as words.
-Pick style from the situation: "typography" (big word-by-word text), "shapes" (floating geometric shapes, modern brand feel), "particles" (soft rising particles, calm professional feel), "waveform" (live voice waveform, educational/audio content), "steps" (step indicator, good for "three reasons"/how-to), all needing no footage; "clips" (narration over the user's uploaded clips) and "phone" (a clip inside a phone frame, good for showing a website or app) need 1+ uploaded clips; "before_after" (split screen) needs 2+ clips. Never pick a style whose clips are missing. Explain the choice in style_reason in one sentence without claiming research you did not do.
+Pick style from the situation: "typography" (big word-by-word text), "shapes" (floating geometric shapes, modern brand feel), "particles" (soft rising particles, calm professional feel), "waveform" (live voice waveform, educational/audio content), "steps" (step indicator, good for "three reasons"/how-to), "cinematic" (dark gold, luxury/brand film), "one_take" (one continuous camera move through the scenes, storytelling), "collage" (paper-collage media look, culture/news/explainer), "cartoon" (animated illustration, explaining ideas to a wide audience), "poster" (bold halftone print poster look, sales/launch), all needing no footage; "clips" (narration over the user's uploaded clips) and "phone" (a clip inside a phone frame, good for showing a website or app) need 1+ uploaded clips; "before_after" (split screen) needs 2+ clips. Never pick a style whose clips are missing. Explain the choice in style_reason in one sentence without claiming research you did not do.
+Work like a scriptwriter with a beat sheet: first pick the grammar that fits the goal (problem_solution = pain, why it happens, fix, action; listicle = promise a number, deliver each item in one beat; storytime = situation, complication, turn, lesson; myth_vs_truth = a common belief then the correction; explainer = one question answered step by step; before_after = the cost of the old way against the new; kinetic = a punchy manifesto of short lines). Then write each scene as a beat with a narration line and a "visual" storyboard sentence the motion designer will build, so the video shows the idea, it does not just read it.
+Scenario craft (this decides whether the video is good): the hook (first 2 seconds) must be a concrete tension, a surprising number the user gave, or a question the viewer feels personally, never a greeting or the brand name. One idea per scene and one concrete image or example per idea; build curiosity so each scene makes the next one necessary. Short punchy on-screen headlines (max 7 words) that add to the narration instead of repeating it word for word. The last scene closes the loop of the hook and gives exactly one clear action. Vary scene rhythm (a fast 3s beat after a 6s one), and write like a person talks, not like an ad.
 Never invent facts, prices, results or customer claims the user did not give. Never claim you analysed trending videos."""
 
 REVISE_PROMPT = """You edit an existing Persian short-video scenario for a user. Reply ONLY with one JSON object, no markdown:
 {"reply": "one short Persian sentence saying what you changed",
  "scenario": null or the FULL updated scenario in the same shape as the current one (only when text, order, timing or narration must change; change as little as possible and keep untouched scenes byte-identical),
- "settings": {} or a patch with any of: "voice": male_warm|female_formal|male_energetic, "speed": slow|normal|fast, "subtitle_mode": word|sentence, "subtitle_pos": top|middle|bottom, "cover_title": string, "style": typography|shapes|particles|waveform|steps|clips|phone|before_after}
+ "settings": {} or a patch with any of: "voice": male_warm|female_formal|male_energetic, "speed": slow|normal|fast, "subtitle_mode": word|sentence, "subtitle_pos": top|middle|bottom, "cover_title": string, "style": typography|shapes|particles|waveform|steps|cinematic|one_take|collage|cartoon|poster|clips|phone|before_after}
 If the request is impossible with these options, set scenario null, settings {} and explain in reply. Never invent facts the user did not give."""
 
 
@@ -115,6 +122,7 @@ def _clamp_scene(raw: dict, clip_count: int) -> dict:
         "narration": narration[:400],
         "duration": round(min(MAX_SCENE, max(MIN_SCENE, duration)), 1),
         "asset": asset,
+        "visual": str(raw.get("visual") or "").strip()[:240],
     }
 
 
@@ -124,6 +132,7 @@ def normalize_scenario(data: dict, clip_count: int) -> dict:
         raise VideoError("سناریو معتبر نیست")
     return {
         "title": str(data.get("title", ""))[:120],
+        "grammar": str(data.get("grammar") or "").strip()[:40],
         "scenes": [_clamp_scene(s, clip_count) for s in scenes[:MAX_SCENES] if isinstance(s, dict)],
     }
 
@@ -142,7 +151,7 @@ def clean_settings(patch: dict, current: dict | None = None) -> dict:
     return out
 
 
-async def _ask_json(system: str, user: str, history: list[dict] | None = None) -> dict:
+async def _ask_json(system: str, user: str | list[dict], history: list[dict] | None = None) -> dict:
     api_key = os.getenv("GAPGPT_API_KEY", "")
     if not api_key:
         raise VideoError("کلید هوش مصنوعی تنظیم نشده است")
@@ -176,7 +185,7 @@ def _state_for_prompt(project: dict) -> str:
     }, ensure_ascii=False)
 
 
-async def chat_turn(project: dict, message: str) -> dict:
+async def chat_turn(project: dict, message: str | list[dict]) -> dict:
     """One agent turn: returns reply, quick replies, info patch, updated scenario (or None) and readiness."""
     history = [{"role": m["role"], "content": m["content"]} for m in project["messages"][-16:]]
     data = await _ask_json(AGENT_PROMPT + "\n\nCurrent state:\n" + _state_for_prompt(project), message, history)
@@ -226,6 +235,7 @@ def estimate_cost(project: dict) -> dict:
         {"label": "زیرنویس", "credits": prices["subtitles"]},
         {"label": "کاور", "credits": prices["cover"]},
         {"label": "رندر نهایی", "credits": prices["render"]},
+        {"label": "طراحی و موشن اختصاصی با هوش مصنوعی", "credits": prices["agent"] + round(prices["agent_per_second"] * seconds)},
     ]
     style = STYLE_CATALOG[settings["style"]]
     if style["credits"]:
@@ -289,24 +299,35 @@ def tts_bytes(text: str, voice: str) -> bytes:
         return _openai_tts(text, voice)
 
 
+BUNDLED_PREVIEWS = Path(__file__).resolve().parent.parent / "assets" / "voice_previews"
+_preview_failed: dict[str, float] = {}
+PREVIEW_RETRY_SECONDS = 600
+
+
 def voice_preview(voice: str, cache_dir: Path) -> Path:
-    """A short sample of one narrator. Only the primary voice is cached; a fallback sample is served once and never stored."""
+    """A short sample of one narrator. Bundled files win, then the disk cache; a paid TTS call is made at most once per voice,
+    never for the fallback voice, and a failure is remembered so replaying does not keep spending requests."""
     if voice not in VOICES:
         raise VideoError("گوینده پیدا نشد")
+    bundled = BUNDLED_PREVIEWS / f"{voice}.mp3"
+    if bundled.exists():
+        return bundled
     cache_dir.mkdir(parents=True, exist_ok=True)
     out = cache_dir / f"{voice}.mp3"
     if out.exists():
         return out
+    if time.time() - _preview_failed.get(voice, 0) < PREVIEW_RETRY_SECONDS:
+        raise VideoError("نمونه‌ی صدا فعلاً در دسترس نیست؛ چند دقیقه بعد دوباره امتحان کنید")
     try:
-        data, cache = _kaya_tts(PREVIEW_TEXT, voice), True
+        data = _kaya_tts(PREVIEW_TEXT, voice)
     except VideoError as exc:
-        logger.warning("Primary TTS failed for preview (%s); serving fallback sample uncached", exc)
-        data, cache = _openai_tts(PREVIEW_TEXT, voice), False
-    target = out if cache else cache_dir / f"{voice}.fallback.mp3"
-    tmp = target.with_suffix(".tmp")
+        _preview_failed[voice] = time.time()
+        logger.warning("Voice preview for %s failed (%s); not retrying for %ss", voice, exc, PREVIEW_RETRY_SECONDS)
+        raise VideoError("نمونه‌ی صدا فعلاً در دسترس نیست؛ چند دقیقه بعد دوباره امتحان کنید")
+    tmp = out.with_suffix(".tmp")
     tmp.write_bytes(data)
-    tmp.replace(target)
-    return target
+    tmp.replace(out)
+    return out
 
 
 def stt_words(audio: Path) -> list[dict]:
@@ -341,7 +362,7 @@ def probe(path: Path) -> dict:
     return {
         "width": video["width"], "height": video["height"],
         "fps": round(int(num) / int(den or 1), 2),
-        "duration": float(data["format"]["duration"]),
+        "duration": float(data["format"].get("duration", 0)),
         "has_audio": any(s["codec_type"] == "audio" for s in data["streams"]),
     }
 
@@ -359,7 +380,11 @@ def narrate(text: str, voice: str, speed: str, cache: Path) -> dict:
     raw.unlink(missing_ok=True)
     duration = probe(audio)["duration"]
     words = text.split()
-    heard = stt_words(audio)
+    try:
+        heard = stt_words(audio)
+    except VideoError as exc:  # timing falls back to spreading the script's words by length
+        logger.warning("Word timing unavailable (%s); spreading words proportionally", exc)
+        heard = []
     if len(heard) == len(words):
         timing = heard
     else:  # the recogniser split words differently: spread the script's words over the voiced span by length
@@ -662,6 +687,9 @@ def style_preview(style: str, cache_dir: Path) -> Path:
     """One frame of a sample scene rendered in the given style, so the user can choose by eye; cached on disk."""
     if style not in STYLE_CATALOG:
         raise VideoError("سبک پیدا نشد")
+    if STYLE_CATALOG[style].get("agent"):
+        from services import video_agent
+        return video_agent.style_preview(style, cache_dir)
     cache_dir.mkdir(parents=True, exist_ok=True)
     out = cache_dir / f"style_{style}.jpg"
     if out.exists():

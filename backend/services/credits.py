@@ -15,11 +15,12 @@ MIN_TOPUP_TOMAN = 50_000
 
 # AI chat is billed from the real token usage: provider cost x USD rate x MARKUP, converted to credits.
 # Everything here is editable through env vars; USD per 1M tokens (input, output) per model.
-USD_TOMAN = float(os.getenv("USD_TOMAN", "100000"))
+USD_TOMAN = float(os.getenv("USD_TOMAN", "275000"))
 MARKUP = float(os.getenv("CREDIT_MARKUP", "1.5"))
 MODEL_USD_PER_MTOK = {
     "gapgpt-qwen-3.6": (0.4, 1.2),
     "claude-opus-4-6": (5.0, 25.0),
+    "claude-opus-5-5": (4.0, 20.0),
     "claude-sonnet-5-5": (3.0, 15.0),
     "gpt-5-mini": (0.25, 2.0),
 }

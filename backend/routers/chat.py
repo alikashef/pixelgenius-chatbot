@@ -1,3 +1,4 @@
+import os
 import logging
 import base64
 import re
@@ -27,9 +28,9 @@ from services.ai_settings import get_ai_settings
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-CHAT_UPLOAD_DIR = Path("/app/uploads/chat-files")
+CHAT_UPLOAD_DIR = Path(os.getenv("UPLOADS_DIR", "/app/uploads") + "/chat-files")
 CHAT_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-UPLOAD_ROOT = Path("/app/uploads")
+UPLOAD_ROOT = Path(os.getenv("UPLOADS_DIR", "/app/uploads"))
 MAX_TEXT_CHARS = 20000
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
 TEXT_EXTENSIONS = {".txt", ".md", ".csv", ".json", ".log", ".xml", ".html", ".css", ".js", ".ts", ".tsx", ".py", ".svg"}

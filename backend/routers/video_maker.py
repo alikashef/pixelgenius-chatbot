@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import json
 import logging
 import os
@@ -19,12 +20,12 @@ from auth import ALGORITHM, JWT_SECRET, get_current_customer, normalize_phone
 from database import get_db
 from services import credits
 from models import Customer
-from services import video_maker
+from services import video_agent, video_maker
 
 router = APIRouter(prefix="/video", tags=["video"])
 logger = logging.getLogger(__name__)
 
-ROOT = Path("/app/uploads/video")
+ROOT = Path(os.getenv("UPLOADS_DIR", "/app/uploads") + "/video")
 ROOT.mkdir(parents=True, exist_ok=True)
 MAX_CLIP_BYTES = 200 * 1024 * 1024
 MAX_LOGO_BYTES = 5 * 1024 * 1024
@@ -33,6 +34,15 @@ CLIP_SUFFIXES = {".mp4", ".mov", ".m4v"}
 LOGO_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
 MEDIA_TTL = 3600
 MEDIA_FILES = {"final.mp4", "poster.jpg", "cover.jpg"}
+MAX_ATTACH_BYTES = 20 * 1024 * 1024
+MAX_IMAGE_BYTES = 5 * 1024 * 1024
+FILE_TTL = 60 * 60 * 24 * 30
+ATTACH_SUFFIXES = {
+    ".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg",
+    ".mp4", ".mov", ".m4v", ".mp3", ".wav", ".m4a",
+    ".pdf", ".doc", ".docx", ".txt", ".csv", ".zip", ".rar", ".ppt", ".pptx", ".xls", ".xlsx",
+}
+VISION_IMAGE_TYPES = {"image/png", "image/jpeg", "image/webp", "image/gif"}
 RENDER_SLOTS = threading.BoundedSemaphore(2)
 GREETING = "سلام! بگو این ویدیو برای چیه تا سناریوش رو با هم دربیاریم. حوزه‌ی کارت چیه و می‌خوای بیننده بعد از دیدنش چی‌کار کنه؟"
 _lock = threading.Lock()
@@ -63,8 +73,25 @@ class ProjectIn(BaseModel):
     duration: int = Field(default=30)
 
 
+class AttachmentIn(BaseModel):
+    name: str = Field(default="file", max_length=150)
+    url: str
+    size: int | None = None
+    content_type: str | None = None
+
+
 class ChatIn(BaseModel):
-    message: str = Field(min_length=1, max_length=2000)
+    message: str = Field(default="", max_length=2000)
+    attachments: list[AttachmentIn] = Field(default_factory=list)
+
+
+class CoverIn(BaseModel):
+    title: str = Field(min_length=1, max_length=80)
+    ai: bool = False
+
+
+class CoverChoiceIn(BaseModel):
+    file: str = Field(max_length=80)
 
 
 class ReviseIn(BaseModel):
@@ -127,14 +154,61 @@ def _sign(customer_id: str, project_id: str, rel: str) -> str:
     return jwt.encode({"scope": "video-media", "sub": customer_id, "p": project_id, "f": rel, "exp": int(time.time()) + MEDIA_TTL}, JWT_SECRET, algorithm=ALGORITHM)
 
 
+def _sign_file(customer_id: str, project_id: str, rel: str) -> str:
+    return jwt.encode({"scope": "video-file", "sub": customer_id, "p": project_id, "f": rel, "exp": int(time.time()) + FILE_TTL}, JWT_SECRET, algorithm=ALGORITHM)
+
+
+def _attachment_content(path: Path, message: str, attachments: list["AttachmentIn"]) -> str | list[dict]:
+    """Plain text for the model, plus base64 image parts (OpenAI vision format) for any image attachment."""
+    if not attachments:
+        return message
+    notes = []
+    image_parts = []
+    for a in attachments[:6]:
+        notes.append(a.name)
+        if (a.content_type or "") in VISION_IMAGE_TYPES:
+            fname = a.url.split("/")[-1].split("?")[0]
+            fpath = path / "files" / fname
+            if fpath.exists() and fpath.stat().st_size <= MAX_IMAGE_BYTES:
+                data = base64.b64encode(fpath.read_bytes()).decode("ascii")
+                image_parts.append({"type": "image_url", "image_url": {"url": f"data:{a.content_type};base64,{data}"}})
+    note_line = "فایل‌های پیوست‌شده: " + "، ".join(notes)
+    text = f"{message}\n\n{note_line}" if message else note_line
+    return [{"type": "text", "text": text}] + image_parts if image_parts else text
+
+
 def _is_ready(project: dict) -> bool:
     return bool(project["scenario"] and project["info"].get("brand") and project["info"].get("cta"))
+
+
+def _reference_source(path: Path, project: dict) -> tuple[Path, float] | None:
+    """The customer's own footage a cover can be built from: their first clip, else the latest finished video."""
+    for clip in project["clips"]:
+        file = path / "clips" / clip["file"]
+        if file.exists():
+            return file, min(1.0, max(float(clip.get("duration") or 1) * 0.3, 0.1))
+    for version in reversed(project["versions"]):
+        file = path / f"v{version['n']}" / "final.mp4"
+        if version["status"] == "done" and file.exists():
+            return file, 1.2
+    return None
+
+
+def _reference_frame(path: Path, project: dict) -> Path | None:
+    source = _reference_source(path, project)
+    if source is None:
+        return None
+    out = path / "covers" / "_reference.jpg"
+    out.parent.mkdir(exist_ok=True)
+    video_maker._run(["ffmpeg", "-y", "-ss", f"{source[1]:.2f}", "-i", str(source[0]), "-frames:v", "1", "-q:v", "2", str(out)], timeout=60)
+    return out if out.exists() else None
 
 
 def _public(customer: dict, project: dict) -> dict:
     def media(rel: str) -> str:
         return f"/api/video/media/{project['id']}/{rel}?t={_sign(customer['sub'], project['id'], rel)}"
 
+    has_reference = _reference_source(ROOT / customer["sub"] / project["id"], project) is not None
     versions = [
         {**v, "video_url": media(f"v{v['n']}/final.mp4"), "poster_url": media(f"v{v['n']}/poster.jpg"), "cover_url": media(f"v{v['n']}/cover.jpg")}
         for v in project["versions"] if v["status"] == "done"
@@ -144,6 +218,8 @@ def _public(customer: dict, project: dict) -> dict:
     return {
         **{k: project[k] for k in keys},
         "has_logo": bool(project.get("logo")),
+        "covers": {"title": (project.get("covers") or {}).get("title", ""), "chosen": (project.get("covers") or {}).get("chosen"), "price": video_maker.CREDIT_PRICES["cover_ai_ref" if has_reference else "cover_ai"], "has_reference": has_reference,
+                   "options": [{"file": o["file"], "label": o["label"], "url": media(f"covers/{o['file']}")} for o in (project.get("covers") or {}).get("options", [])]},
         "styles": [{"value": key, **{k: v[k] for k in ("label", "hint", "credits", "clips", "category")}} for key, v in video_maker.STYLE_CATALOG.items()],
         "ready": _is_ready(project),
         "estimate": video_maker.estimate_cost(project),
@@ -273,17 +349,57 @@ async def upload_logo(project_id: str, file: UploadFile = File(...), customer: d
     return _public(customer, project)
 
 
+@router.post("/projects/{project_id}/files")
+async def upload_file(project_id: str, file: UploadFile = File(...), customer: dict = Depends(video_customer)):
+    path = _dir(customer, project_id)
+    suffix = Path(file.filename or "").suffix.lower()
+    if suffix not in ATTACH_SUFFIXES:
+        raise HTTPException(status_code=400, detail="این نوع فایل پشتیبانی نمی‌شود")
+    (path / "files").mkdir(exist_ok=True)
+    target = path / "files" / f"{uuid.uuid4().hex}{suffix}"
+    await _store(file, target, MAX_ATTACH_BYTES, "حجم فایل بیشتر از ۲۰ مگابایت است")
+    rel = f"files/{target.name}"
+    return {
+        "name": (file.filename or "file")[:150],
+        "size": target.stat().st_size,
+        "content_type": file.content_type,
+        "url": f"/api/video/file/{project_id}/{target.name}?t={_sign_file(customer['sub'], project_id, rel)}",
+    }
+
+
+@router.get("/file/{project_id}/{name}")
+async def get_file(project_id: str, name: str, t: str = Query(...)):
+    try:
+        claims = jwt.decode(t, JWT_SECRET, algorithms=[ALGORITHM])
+    except JWTError:
+        raise HTTPException(status_code=403, detail="لینک منقضی شده است")
+    rel = f"files/{name}"
+    if claims.get("scope") != "video-file" or claims.get("p") != project_id or claims.get("f") != rel:
+        raise HTTPException(status_code=403, detail="دسترسی مجاز نیست")
+    file = ROOT / claims["sub"] / _id(project_id) / "files" / name
+    if not file.exists():
+        raise HTTPException(status_code=404, detail="فایل پیدا نشد")
+    return FileResponse(file)
+
+
 @router.post("/projects/{project_id}/chat")
 async def chat(project_id: str, body: ChatIn, customer: dict = Depends(video_customer)):
+    message = body.message.strip()
+    if not message and not body.attachments:
+        raise HTTPException(status_code=400, detail="متن یا فایلی برای ارسال لازم است")
     path = _dir(customer, project_id)
     project = _load(path)
     _busy(project)
+    content = _attachment_content(path, message, body.attachments)
     try:
-        turn = await video_maker.chat_turn(project, body.message.strip())
+        turn = await video_maker.chat_turn(project, content)
     except video_maker.VideoError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
     project = _load(path)
-    project["messages"] += [{"role": "user", "content": body.message.strip()}, {"role": "assistant", "content": turn["reply"]}]
+    user_msg = {"role": "user", "content": message}
+    if body.attachments:
+        user_msg["attachments"] = [a.model_dump() for a in body.attachments]
+    project["messages"] += [user_msg, {"role": "assistant", "content": turn["reply"]}]
     project["quick_replies"] = turn["quick_replies"]
     info = turn["info"]
     for key in ("brand", "cta", "format_reason", "style_reason"):
@@ -340,7 +456,12 @@ def _render_job(path: Path, number: int) -> None:
             project = _load(path)
             clips = [path / "clips" / c["file"] for c in project["clips"]]
             logo = path / project["logo"] if project.get("logo") else None
-            info = video_maker.render(project["scenario"], project["settings"], clips, logo, path / f"v{number}", path / "audio")
+            version = next(v for v in project["versions"] if v["n"] == number)
+            previous = next((path / f"v{v['n']}" / "comp" / "index.html" for v in reversed(project["versions"]) if v["n"] < number and v["status"] == "done"
+                             and (path / f"v{v['n']}" / "comp" / "index.html").exists()), None)
+            info = video_agent.build(project["scenario"], project["settings"], clips, logo, path / f"v{number}", path / "audio",
+                                     note=version["note"] if version["kind"] == "edit" else "", base_html=previous.read_text(encoding="utf-8") if previous else None,
+                                     info=project.get("info"), cover_file=(path / "covers" / chosen) if (chosen := (project.get("covers") or {}).get("chosen")) else None)
         project = _load(path)
         next(v for v in project["versions"] if v["n"] == number).update(status="done", info=info, finished_at=int(time.time()))
         project.update(status="ready", stage=None, error=None)
@@ -420,6 +541,62 @@ async def revise(project_id: str, body: ReviseIn, customer: dict = Depends(video
     return _public(customer, project)
 
 
+@router.post("/projects/{project_id}/covers")
+async def make_covers(project_id: str, body: CoverIn, customer: dict = Depends(video_customer), db: AsyncSession = Depends(get_db)):
+    path = _dir(customer, project_id)
+    project = _load(path)
+    _busy(project)
+    if not project["scenario"]:
+        raise HTTPException(status_code=400, detail="اول سناریو را کامل کنید")
+    title = body.title.strip()
+    logo = path / project["logo"] if project.get("logo") else None
+    batch = uuid.uuid4().hex[:8]
+    reference = await asyncio.to_thread(_reference_frame, path, project)
+    if not body.ai:  # the no-AI cover is free and needs the customer's own footage
+        if reference is None:
+            raise HTTPException(status_code=400, detail="برای کاور رایگان یک کلیپ بفرست یا اول ویدیو را بساز؛ یا طرح هوش مصنوعی را بزن")
+        try:
+            options = [await asyncio.to_thread(video_agent.make_frame_cover, project, title, logo, reference, path / "covers", batch)]
+        except video_maker.VideoError as exc:
+            raise HTTPException(status_code=502, detail=str(exc))
+        keep = [o for o in (project.get("covers") or {}).get("options", []) if o["model"] != "frame"]
+    else:
+        price = video_maker.CREDIT_PRICES["cover_ai_ref" if reference is not None else "cover_ai"]
+        await _pay(db, customer, price, "ساخت کاور با هوش مصنوعی", project_id)
+        try:
+            options = await asyncio.to_thread(video_agent.make_cover_options, project, title, logo, path / "covers", batch, reference)
+        except video_maker.VideoError as exc:
+            try:
+                credits.refund_in_thread(customer["sub"], price, "بازگشت کردیت ساخت کاور", project_id)
+            except Exception:
+                logger.exception("Cover credit refund failed")
+            raise HTTPException(status_code=502, detail=str(exc))
+        keep = [o for o in (project.get("covers") or {}).get("options", []) if o["model"] == "frame"]
+    project = _load(path)
+    chosen = (project.get("covers") or {}).get("chosen")
+    merged = [*keep, *options]
+    project["covers"] = {"title": title, "options": merged, "chosen": chosen if chosen in [o["file"] for o in merged] else None}
+    project["settings"] = video_maker.clean_settings({"cover_title": title}, project["settings"])
+    _save(path, project)
+    return _public(customer, project)
+
+
+@router.post("/projects/{project_id}/covers/choose")
+async def choose_cover(project_id: str, body: CoverChoiceIn, customer: dict = Depends(video_customer)):
+    path = _dir(customer, project_id)
+    project = _load(path)
+    covers = project.get("covers") or {}
+    if body.file not in [o["file"] for o in covers.get("options", [])]:
+        raise HTTPException(status_code=404, detail="کاور پیدا نشد")
+    covers["chosen"] = body.file
+    project["covers"] = covers
+    done = [v for v in project["versions"] if v["status"] == "done"]
+    if done:  # the video already exists: swap its cover right away
+        shutil.copy(path / "covers" / body.file, path / f"v{done[-1]['n']}" / "cover.jpg")
+    _save(path, project)
+    return _public(customer, project)
+
+
 @router.post("/projects/{project_id}/rollback/{number}")
 async def rollback(project_id: str, number: int, customer: dict = Depends(video_customer)):
     path = _dir(customer, project_id)
@@ -473,7 +650,7 @@ async def media(project_id: str, version: str, name: str, t: str = Query(...), d
     rel = f"{version}/{name}"
     if claims.get("scope") != "video-media" or claims.get("p") != project_id or claims.get("f") != rel:
         raise HTTPException(status_code=403, detail="دسترسی مجاز نیست")
-    if not re.fullmatch(r"v\d+", version) or name not in MEDIA_FILES:
+    if not (re.fullmatch(r"v\d+", version) and name in MEDIA_FILES) and not (version == "covers" and re.fullmatch(r"cover_[0-9a-f]+_(?:\d|f)\.jpg", name)):
         raise HTTPException(status_code=404, detail="فایل پیدا نشد")
     file = ROOT / claims["sub"] / _id(project_id) / version / name
     if not file.exists():

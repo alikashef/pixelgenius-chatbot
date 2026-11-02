@@ -18,7 +18,7 @@ GAPGPT_URL = "https://api.gapgpt.app/v1"
 
 router = APIRouter()
 
-UPLOAD_DIR = Path("/app/uploads")
+UPLOAD_DIR = Path(os.getenv("UPLOADS_DIR", "/app/uploads"))
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 ORDER_FILES_DIR = UPLOAD_DIR / "order-files"
 ORDER_FILES_DIR.mkdir(parents=True, exist_ok=True)

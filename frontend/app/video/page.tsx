@@ -3,15 +3,17 @@
 import { FormEvent, ReactNode, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { IconArrowUp, IconCheck, IconDownload, IconMovie, IconPaperclip, IconPencil, IconPhoto, IconPlayerPause, IconPlayerPlay, IconPlus, IconTrash, IconVideo } from "@tabler/icons-react";
+import { IconArrowUp, IconCheck, IconDownload, IconFileText, IconDeviceMobile, IconGauge, IconMicrophone, IconMovie, IconPalette, IconPencil, IconPhoto, IconTextCaption, IconPlayerPause, IconPlayerPlay, IconPlus, IconTrash, IconVideo, IconX } from "@tabler/icons-react";
 import AppShell, { NewProjectLink, ShellLoading, useAccountNav } from "@/components/AppShell";
 import { BrandMark } from "@/components/Brand";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   chatVideo, clearSession, createVideoProject, fetchVideoAccess, deleteVideoProject, fetchVideoProject, fetchVideoProjects, renderVideo, reviseVideo, rollbackVideo,
-  fetchStylePreview, fetchVoicePreview, saveVideoScenario, saveVideoSettings, uploadVideoClip, uploadVideoLogo, VideoProject, VideoScenario, VideoSettings,
+  fetchVoicePreview, saveVideoScenario, saveVideoSettings, makeVideoCovers, chooseVideoCover, uploadVideoFile, VideoAttachment, VideoProject, VideoScenario, VideoSettings,
 } from "@/lib/api";
+
+const ATTACH_ACCEPT = "image/*,.svg,video/*,audio/*,.pdf,.doc,.docx,.txt,.csv,.zip,.rar,.ppt,.pptx,.xls,.xlsx";
 
 type Fail = (err: unknown) => void;
 type Choice<T extends string> = { value: T; label: string; hint: string; disabled?: boolean };
@@ -189,49 +191,54 @@ function ScenarioStep({ token, project, onChange, onError, onNext }: { token: st
   const [pending, setPending] = useState("");
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<VideoScenario | null>(null);
-  const logoInput = useRef<HTMLInputElement>(null);
-  const clipInput = useRef<HTMLInputElement>(null);
+  const [attachments, setAttachments] = useState<VideoAttachment[]>([]);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
   const bottom = useRef<HTMLDivElement>(null);
   useEffect(() => {
     bottom.current?.scrollIntoView({ block: "end" });
   }, [project.messages.length, pending]);
 
-  async function say(message: string) {
-    if (!message.trim() || busy) return;
+  async function say(message: string, files: VideoAttachment[] = attachments) {
+    if ((!message.trim() && files.length === 0) || busy) return;
     setBusy(true);
     setError("");
-    setPending(message.trim());
+    setPending(message.trim() || "(فایل پیوست)");
     setText("");
+    setAttachments([]);
     try {
-      onChange(await chatVideo(token, project.id, message.trim()));
+      onChange(await chatVideo(token, project.id, message.trim(), files));
     } catch (err) {
       onError(err);
       setError(err instanceof Error ? err.message : "ارسال پیام ناموفق بود");
       setText(message);
+      setAttachments(files);
     } finally {
       setPending("");
       setBusy(false);
     }
   }
 
-  async function attach(kind: "logo" | "clip", files: FileList | null) {
+  async function handleFiles(files: FileList | null) {
     if (!files?.length) return;
-    setBusy(true);
+    setUploadingFile(true);
     setError("");
     try {
-      let next = project;
-      for (const file of Array.from(files)) next = kind === "logo" ? await uploadVideoLogo(token, project.id, file) : await uploadVideoClip(token, project.id, file);
-      onChange(next);
-      setBusy(false);
-      if (kind === "logo") await say("لوگو رو فرستادم.");
+      for (const file of Array.from(files)) {
+        const uploaded = await uploadVideoFile(token, project.id, file);
+        setAttachments((prev) => [...prev, uploaded]);
+      }
     } catch (err) {
       onError(err);
-      setError(err instanceof Error ? err.message : "آپلود ناموفق بود");
-      setBusy(false);
+      setError(err instanceof Error ? err.message : "آپلود فایل ناموفق بود");
     } finally {
-      if (logoInput.current) logoInput.current.value = "";
-      if (clipInput.current) clipInput.current.value = "";
+      setUploadingFile(false);
+      if (fileInput.current) fileInput.current.value = "";
     }
+  }
+
+  function removeAttachment(url: string) {
+    setAttachments((prev) => prev.filter((a) => a.url !== url));
   }
 
   async function saveDraft() {
@@ -259,10 +266,27 @@ function ScenarioStep({ token, project, onChange, onError, onNext }: { token: st
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
       <section aria-label="گفتگو با دستیار" className="flex min-h-[560px] flex-col rounded-xl border border-border bg-surface">
         <div className="flex-1 space-y-5 overflow-y-auto p-5" style={{ maxHeight: "62vh" }}>
-          {[...project.messages, ...(pending ? [{ role: "user" as const, content: pending }] : [])].map((m, i) => (
+          {[...project.messages, ...(pending ? [{ role: "user" as const, content: pending, attachments: undefined as VideoAttachment[] | undefined }] : [])].map((m, i) => (
             <div key={i} className={cn("flex gap-3", m.role === "user" && "flex-row-reverse")}>
               {m.role === "assistant" ? <BrandMark size="sm" /> : null}
-              <p className={cn("max-w-[85%] whitespace-pre-line text-sm leading-7", m.role === "user" ? "rounded-xl bg-surface-2 px-4 py-2 text-foreground" : "text-foreground")}>{m.content}</p>
+              <div className={cn("max-w-[85%]", m.role === "user" ? "rounded-xl bg-surface-2 px-4 py-2" : "")}>
+                {m.attachments && m.attachments.length > 0 && (
+                  <div className="mb-2 flex flex-wrap gap-2">
+                    {m.attachments.map((a) => (
+                      <a key={a.url} href={a.url} target="_blank" rel="noreferrer" className="block">
+                        {a.content_type?.startsWith("image/") ? (
+                          <img src={a.url} alt={a.name} className="h-28 w-28 rounded-lg object-cover" />
+                        ) : (
+                          <span className="flex items-center gap-1.5 rounded-lg border border-border bg-surface px-2 py-1 text-xs text-foreground">
+                            <IconFileText size={14} aria-hidden="true" />{a.name}
+                          </span>
+                        )}
+                      </a>
+                    ))}
+                  </div>
+                )}
+                {m.content && <p className="whitespace-pre-line text-sm leading-7 text-foreground">{m.content}</p>}
+              </div>
             </div>
           ))}
           {busy && <p role="status" className="text-sm text-muted-foreground">دستیار در حال نوشتن…</p>}
@@ -277,16 +301,35 @@ function ScenarioStep({ token, project, onChange, onError, onNext }: { token: st
             </div>
           )}
           <ErrorText>{error}</ErrorText>
+          {attachments.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-2">
+              {attachments.map((a) => (
+                <span key={a.url} className="relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-lg border border-border bg-surface-2">
+                  {a.content_type?.startsWith("image/") ? (
+                    <img src={a.url} alt={a.name} className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="flex flex-col items-center gap-1 px-1 text-center text-[10px] leading-tight text-muted-foreground">
+                      <IconFileText size={18} aria-hidden="true" />
+                      <span className="line-clamp-2 break-all">{a.name}</span>
+                    </span>
+                  )}
+                  <button type="button" onClick={() => removeAttachment(a.url)} aria-label={`حذف ${a.name}`} className="absolute -right-1 -top-1 grid h-5 w-5 place-items-center rounded-full bg-foreground text-background outline-none">
+                    <IconX size={12} aria-hidden="true" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
           <form onSubmit={(e: FormEvent) => { e.preventDefault(); say(text); }} className="flex items-end gap-2">
             <label htmlFor="v-msg" className="sr-only">پیام</label>
             <textarea id="v-msg" rows={2} maxLength={2000} value={text} disabled={busy} onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); say(text); } }}
               placeholder="مثلاً: طراح سایتم و می‌خوام یه ریل بسازم که…" className="field min-h-0 flex-1" />
-            <button type="button" onClick={() => logoInput.current?.click()} disabled={busy} aria-label="ارسال لوگو (PNG یا JPG)" title="ارسال لوگو" className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-border text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"><IconPhoto size={18} aria-hidden="true" /></button>
-            <button type="button" onClick={() => clipInput.current?.click()} disabled={busy} aria-label="ارسال کلیپ" title="ارسال کلیپ" className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-border text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"><IconPaperclip size={18} aria-hidden="true" /></button>
-            <Button type="submit" size="icon" disabled={busy || !text.trim()} aria-label="ارسال"><IconArrowUp size={18} aria-hidden="true" /></Button>
-            <input ref={logoInput} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(e) => attach("logo", e.target.files)} />
-            <input ref={clipInput} type="file" accept="video/mp4,video/quicktime,.mp4,.mov,.m4v" multiple hidden onChange={(e) => attach("clip", e.target.files)} />
+            <button type="button" onClick={() => fileInput.current?.click()} disabled={busy || uploadingFile} aria-label="پیوست فایل" title="پیوست فایل" className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-border text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60">
+              {uploadingFile ? <span className="h-4 w-4 rounded-full border-2 border-muted-foreground/40 border-t-foreground motion-safe:animate-spin" /> : <IconPlus size={18} aria-hidden="true" />}
+            </button>
+            <Button type="submit" size="icon" disabled={busy || (!text.trim() && attachments.length === 0)} aria-label="ارسال"><IconArrowUp size={18} aria-hidden="true" /></Button>
+            <input ref={fileInput} type="file" accept={ATTACH_ACCEPT} multiple hidden onChange={(e) => handleFiles(e.target.files)} />
           </form>
           {project.clips.length > 0 && <p className="mt-2 text-xs text-muted-foreground">{fa(project.clips.length)} کلیپ فرستاده‌ای: {project.clips.map((c) => c.name).join("، ")}</p>}
         </div>
@@ -366,42 +409,19 @@ function styleLabel(style: VideoSettings["style"], styles: VideoProject["styles"
   return styles.find((s) => s.value === style)?.label ?? style;
 }
 
-function StylePicker({ token, project, onChange, onError }: { token: string; project: VideoProject; onChange: (v: VideoSettings["style"]) => void; onError: Fail }) {
-  const [previews, setPreviews] = useState<Partial<Record<VideoSettings["style"], string>>>({});
-  const loaded = useRef<Set<string>>(new Set());
-  useEffect(() => {
-    let alive = true;
-    const urls: string[] = [];
-    (async () => {
-      for (const st of project.styles) {
-        if (loaded.current.has(st.value)) continue;
-        loaded.current.add(st.value);
-        try {
-          const url = await fetchStylePreview(token, st.value);
-          urls.push(url);
-          if (alive) setPreviews((p) => ({ ...p, [st.value]: url }));
-        } catch (err) {
-          onError(err);
-        }
-      }
-    })();
-    return () => { alive = false; };
-  }, [token, project.styles, onError]);
-
+function StylePicker({ project, onChange }: { project: VideoProject; onChange: (v: VideoSettings["style"]) => void }) {
   return (
     <fieldset>
       <legend className="field-label">سبک ویدیو</legend>
       {project.info.style_reason && <p className="mt-1 text-xs text-muted-foreground">{project.info.style_reason}</p>}
-      <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-start">
+      <div className="max-h-80 min-w-0 flex-1 space-y-2 overflow-y-auto pe-1">
         {project.styles.map((st) => {
           const missing = st.clips > project.clips.length;
           return (
             <label key={st.value} className={cn("block", missing ? "cursor-not-allowed opacity-55" : "cursor-pointer")}>
               <input type="radio" className="peer sr-only" name="style" disabled={missing} checked={project.settings.style === st.value} onChange={() => onChange(st.value)} />
               <span className="block overflow-hidden rounded-xl border border-border bg-surface transition-colors peer-checked:border-foreground peer-checked:bg-surface-2 peer-focus-visible:ring-2 peer-focus-visible:ring-ring">
-                <span className="block aspect-[9/12] overflow-hidden bg-surface-2">
-                  {previews[st.value] ? <img src={previews[st.value]} alt={`نمونه‌ی سبک ${st.label}`} className="h-full w-full object-cover object-top" /> : <span className="grid h-full place-items-center text-xs text-muted-foreground">در حال ساخت نمونه…</span>}
-                </span>
                 <span className="block space-y-1 p-3">
                   <span className="flex items-center justify-between gap-2">
                     <span className="text-sm font-bold text-foreground">{st.label}</span>
@@ -415,6 +435,16 @@ function StylePicker({ token, project, onChange, onError }: { token: string; pro
           );
         })}
       </div>
+      <div className="mx-auto w-40 shrink-0 sm:mx-0 sm:w-44">
+        <div className="grid aspect-[9/16] place-items-center rounded-xl border border-dashed border-border bg-surface-2 p-3 text-center">
+          <div className="space-y-2 text-muted-foreground">
+            <IconMovie size={26} className="mx-auto" aria-hidden="true" />
+            <p className="text-xs font-bold text-foreground">{project.styles.find((st) => st.value === project.settings.style)?.label}</p>
+            <p className="text-[11px]">ویدیوی نمونه‌ی این سبک اینجا نمایش داده می‌شود</p>
+          </div>
+        </div>
+      </div>
+      </div>
       <p className="mt-2 text-xs text-muted-foreground">نمودار، شخصیت، اسلاید عکس و نمایش کد به‌زودی اضافه می‌شوند.</p>
     </fieldset>
   );
@@ -426,7 +456,16 @@ function VoicePicker({ token, value, onChange, onError }: { token: string; value
   const [error, setError] = useState("");
   const audio = useRef<HTMLAudioElement | null>(null);
   const urls = useRef<Partial<Record<VideoSettings["voice"], string>>>({});
-  useEffect(() => () => { audio.current?.pause(); Object.values(urls.current).forEach((u) => u && URL.revokeObjectURL(u)); }, []);
+  const loaded = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    for (const o of VOICES) {
+      if (loaded.current.has(o.value)) continue;
+      loaded.current.add(o.value);
+      fetchVoicePreview(token, o.value).then((url) => { urls.current[o.value] = url; }).catch((err) => onError(err));
+    }
+    return () => { audio.current?.pause(); Object.values(urls.current).forEach((u) => u && URL.revokeObjectURL(u)); };
+  }, [token, onError]);
 
   async function toggle(voice: VideoSettings["voice"]) {
     setError("");
@@ -459,7 +498,7 @@ function VoicePicker({ token, value, onChange, onError }: { token: string; value
     <fieldset>
       <legend className="field-label">صدا و دوبله</legend>
       <p className="mt-1 text-xs text-muted-foreground">گوینده‌ی فارسی متن گوینده‌ی هر صحنه را می‌خواند. با دکمه‌ی پخش نمونه‌ی صدا را بشنو.</p>
-      <div className="mt-2 grid gap-2 sm:grid-cols-3">
+      <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
         {VOICES.map((o) => (
           <div key={o.value} className="relative">
             <label className="block cursor-pointer">
@@ -481,9 +520,27 @@ function VoicePicker({ token, value, onChange, onError }: { token: string; value
   );
 }
 
+const FORMAT_RATIO: Record<VideoSettings["format"], string> = { "9:16": "9 / 16", "4:5": "4 / 5", "1:1": "1 / 1", "16:9": "16 / 9" };
+
+function Section({ icon: Icon, title, hint, children }: { icon: typeof IconMovie; title: string; hint?: string; children: ReactNode }) {
+  return (
+    <section className="[&_legend]:sr-only">
+      <header className="mb-4 flex items-start gap-3">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-brand-soft text-brand"><Icon size={18} aria-hidden="true" /></span>
+        <div>
+          <h3 className="text-sm font-bold text-foreground">{title}</h3>
+          {hint && <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{hint}</p>}
+        </div>
+      </header>
+      {children}
+    </section>
+  );
+}
+
 function SettingsStep({ token, project, onChange, onError, onBack, onRendered }: { token: string; project: VideoProject; onChange: (p: VideoProject) => void; onError: Fail; onBack: () => void; onRendered: (p: VideoProject) => void }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [coverBusy, setCoverBusy] = useState<"free" | "ai" | null>(null);
   const [cover, setCover] = useState(project.settings.cover_title || project.scenario?.title || "");
   const s = project.settings;
 
@@ -494,6 +551,29 @@ function SettingsStep({ token, project, onChange, onError, onBack, onRendered }:
     } catch (err) {
       onError(err);
       setError(err instanceof Error ? err.message : "ذخیره ناموفق بود");
+    }
+  }
+
+  async function makeCovers(ai: boolean) {
+    setCoverBusy(ai ? "ai" : "free");
+    setError("");
+    try {
+      onChange(await makeVideoCovers(token, project.id, cover.trim(), ai));
+    } catch (err) {
+      onError(err);
+      setError(err instanceof Error ? err.message : "ساخت کاور ناموفق بود");
+    } finally {
+      setCoverBusy(null);
+    }
+  }
+
+  async function pickCover(file: string) {
+    setError("");
+    try {
+      onChange(await chooseVideoCover(token, project.id, file));
+    } catch (err) {
+      onError(err);
+      setError(err instanceof Error ? err.message : "انتخاب کاور ناموفق بود");
     }
   }
 
@@ -512,24 +592,57 @@ function SettingsStep({ token, project, onChange, onError, onBack, onRendered }:
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-      <div className="space-y-7 rounded-xl border border-border bg-surface p-6">
-        <Cards legend="قالب و ابعاد" value={s.format} options={FORMATS} onChange={(v) => patch({ format: v })} columns="grid-cols-2 sm:grid-cols-4"
-          note={project.info.format_reason ? <p className="mt-1 text-xs text-muted-foreground">از گفتگوی سناریو تشخیص داده شد. {project.info.format_reason}</p> : null} />
-        <StylePicker token={token} project={project} onChange={(v) => patch({ style: v })} onError={onError} />
-        <VoicePicker token={token} value={s.voice} onChange={(v) => patch({ voice: v })} onError={onError} />
-        <Segment legend="سرعت گفتار" value={s.speed} options={SPEEDS} onChange={(v) => patch({ speed: v })} />
-        <div className="space-y-4">
-          <p className="field-label">زیرنویس <span className="font-normal text-muted-foreground">· زمان‌بندی از روی صدای گوینده تنظیم می‌شود</span></p>
+      <div className="divide-y divide-border rounded-xl border border-border bg-surface p-6 [&>*]:py-7 [&>*:first-child]:pt-0 [&>*:last-child]:pb-0">
+        <Section icon={IconDeviceMobile} title="قالب و ابعاد" hint="نسبت تصویر را بر اساس جایی که ویدیو را منتشر می‌کنی انتخاب کن.">
+          <Cards legend="قالب و ابعاد" value={s.format} options={FORMATS} onChange={(v) => patch({ format: v })} columns="grid-cols-2 sm:grid-cols-4"
+            note={project.info.format_reason ? <p className="mt-1 text-xs text-muted-foreground">از گفتگوی سناریو تشخیص داده شد. {project.info.format_reason}</p> : null} />
+        </Section>
+        <Section icon={IconPalette} title="سبک ویدیو" hint="حال‌وهوای بصری ویدیو؛ طراح هوش مصنوعی ویدیو را با همین سبک می‌سازد.">
+          <StylePicker project={project} onChange={(v) => patch({ style: v })} />
+        </Section>
+        <Section icon={IconMicrophone} title="صدا و دوبله">
+          <VoicePicker token={token} value={s.voice} onChange={(v) => patch({ voice: v })} onError={onError} />
+        </Section>
+        <Section icon={IconGauge} title="سرعت گفتار" hint="سرعت خواندن متن توسط گوینده.">
+          <Segment legend="سرعت گفتار" value={s.speed} options={SPEEDS} onChange={(v) => patch({ speed: v })} />
+        </Section>
+        <Section icon={IconTextCaption} title="زیرنویس" hint="زمان‌بندی از روی صدای گوینده تنظیم می‌شود.">
           <div className="flex flex-wrap gap-6">
             <Segment legend="سبک نمایش" value={s.subtitle_mode} options={SUB_MODES} onChange={(v) => patch({ subtitle_mode: v })} />
             <Segment legend="جای زیرنویس" value={s.subtitle_pos} options={SUB_POS} onChange={(v) => patch({ subtitle_pos: v })} />
           </div>
-        </div>
-        <div>
-          <label htmlFor="cover-title" className="field-label">عنوان روی کاور</label>
-          <textarea id="cover-title" rows={2} maxLength={80} className="field" value={cover} onChange={(e) => setCover(e.target.value)} />
-          <p className="mt-1 text-xs text-muted-foreground">کاور با عنوان درشت و لوگو ساخته می‌شود و جدا از ویدیو دانلود می‌شود.</p>
-        </div>
+        </Section>
+        <Section icon={IconPhoto} title="کاور" hint="اول عنوان را بنویس و «ساخت کاور» را بزن؛ سه طرح با سه مدل تصویرساز به اندازه‌ی قالب ویدیو ساخته می‌شود و یکی را انتخاب می‌کنی.">
+          <label htmlFor="cover-title" className="sr-only">عنوان روی کاور</label>
+          <textarea id="cover-title" rows={2} maxLength={80} className="field" placeholder="عنوان روی کاور" value={cover} onChange={(e) => setCover(e.target.value)} />
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+            <Button type="button" variant="outline" onClick={() => makeCovers(false)} disabled={!!coverBusy || !cover.trim() || !project.covers.has_reference}>
+              <IconPhoto size={17} aria-hidden="true" />{coverBusy === "free" ? "در حال ساخت…" : "کاور رایگان از قاب ویدیو"}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => makeCovers(true)} disabled={!!coverBusy || !cover.trim()}>
+              <IconPalette size={17} aria-hidden="true" />{coverBusy === "ai" ? "در حال ساخت طرح‌ها…" : "طرح‌های هوش مصنوعی"}
+            </Button>
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {project.covers.has_reference
+              ? `کاور رایگان از یک قاب کلیپ یا ویدیوی خودت ساخته می‌شود و کردیتی ندارد. طرح‌های هوش مصنوعی همان قاب را زیباتر می‌کنند و ${fa(project.covers.price)} کردیت جدا از هزینه‌ی ساخت ویدیو دارند.`
+              : `برای کاور رایگان اول یک کلیپ بفرست یا ویدیو را بساز. طرح‌های هوش مصنوعی ${fa(project.covers.price)} کردیت جدا از هزینه‌ی ساخت ویدیو دارند.`}
+            {coverBusy === "ai" ? " ساخت چند دقیقه طول می‌کشد." : ""}
+          </p>
+          {project.covers.options.length > 0 && (
+            <div className="mt-4 grid grid-cols-3 gap-3">
+              {project.covers.options.map((o) => (
+                <label key={o.file} className="block cursor-pointer">
+                  <input type="radio" name="cover" className="peer sr-only" checked={project.covers.chosen === o.file} onChange={() => pickCover(o.file)} />
+                  <span className="block overflow-hidden rounded-xl border border-border bg-surface transition-colors peer-checked:border-foreground peer-checked:bg-surface-2 peer-focus-visible:ring-2 peer-focus-visible:ring-ring">
+                    <img src={o.url} alt={`کاور ${o.label}`} className="w-full bg-surface-2 object-cover" style={{ aspectRatio: FORMAT_RATIO[s.format] }} />
+                    <span className="flex items-center justify-between gap-2 p-2 text-xs"><span className="font-bold text-foreground">{o.label}</span>{project.covers.chosen === o.file && <IconCheck size={14} aria-hidden="true" />}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          )}
+        </Section>
       </div>
 
       <aside className="h-fit space-y-4 rounded-xl border border-border bg-surface p-5">

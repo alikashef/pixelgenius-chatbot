@@ -18,6 +18,9 @@ RUN if [ -n "$PIP_TRUSTED_HOST" ]; then \
       pip install --no-cache-dir -r requirements.txt; \
     fi
 
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+RUN playwright install --with-deps chromium && rm -rf /var/lib/apt/lists/*
+
 COPY . .
 
 EXPOSE 8000

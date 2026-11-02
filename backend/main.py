@@ -12,7 +12,7 @@ from services import skills as skills_service
 from lib.ai.analyze_lead import _base_urls
 from routers import chat, payment, orders, auth, customer_auth, customer, settings, freelancer_auth, site_mcp, skills, github, hosting, social_auth, video_maker
 
-UPLOAD_DIR = Path("/app/uploads")
+UPLOAD_DIR = Path(os.getenv("UPLOADS_DIR", "/app/uploads"))
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 

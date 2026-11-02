@@ -24,3 +24,4 @@ Thumbs.db
 .vscode/
 .idea/
 .claude/
+.local-data/

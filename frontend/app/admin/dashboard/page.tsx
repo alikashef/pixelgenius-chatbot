@@ -7,6 +7,7 @@ import SkillsManager from "@/components/admin/SkillsManager";
 import DesignerSettings from "@/components/admin/DesignerSettings";
 import FreelancerInvites from "@/components/admin/FreelancerInvites";
 import UserCredits from "@/components/admin/UserCredits";
+import ProviderBalances from "@/components/admin/ProviderBalances";
 import {
   AdminSite,
   manageAdminSites,
@@ -35,7 +36,7 @@ const STATUS_CLASS: Record<Order["status"], string> = {
   cancelled: "bg-danger/10 text-danger",
 };
 
-type AdminTab = "orders" | "settings" | "design" | "sites" | "skills" | "freelancers" | "codes" | "users";
+type AdminTab = "orders" | "settings" | "design" | "sites" | "skills" | "freelancers" | "codes" | "users" | "providers";
 
 // Sales orders (priced, paid) and product-design projects (config briefs) are separate workflows.
 const ADMIN_TABS: { key: AdminTab; group: string; label: string; title: string; description: string; icon: typeof IconClipboardList }[] = [
@@ -45,6 +46,7 @@ const ADMIN_TABS: { key: AdminTab; group: string; label: string; title: string; 
   { key: "sites", group: "طراحی محصول", label: "سایت‌های منتشرشده", title: "سایت‌های منتشرشده", description: "پیش‌نمایش‌ها و انتشارهای فعال پروژه‌های طراحی؛ تمدید یا حذفشان کن.", icon: IconWorld },
   { key: "skills", group: "طراحی محصول", label: "تنظیمات طراح محصول", title: "تنظیمات طراح محصول", description: "استک‌ها، مهارت‌ها و تنظیمات تولید تصویر طراح محصول.", icon: IconPalette },
   { key: "users", group: "کاربران", label: "کاربران و کردیت", title: "کاربران و کردیت", description: "موجودی کیف پول هر کاربر را ببین و کردیت هدیه بده یا کم کن.", icon: IconCoin },
+  { key: "providers", group: "کاربران", label: "اعتبار سرویس‌ها", title: "اعتبار سرویس‌های AI", description: "مصرف و موجودی حساب gapgpt و Kaya که ویدیوساز و چت از آن‌ها خرج می‌کنند.", icon: IconCoin },
   { key: "codes", group: "کاربران", label: "کد تخفیف", title: "کدهای تخفیف", description: "کد بساز تا کاربرها موقع شارژ کیف پول درصدی کردیت هدیه بگیرند.", icon: IconTicket },
   { key: "freelancers", group: "فریلنسرها", label: "فریلنسرها", title: "فریلنسرها", description: "فریلنسرهایی که دستیار فعال کرده‌اند و تعداد درخواست‌هایشان.", icon: IconUsers },
 ];
@@ -344,6 +346,10 @@ export default function AdminDashboard() {
 
         {activeTab === "users" && (
           <UserCredits getToken={getToken} onUnauthorized={() => { localStorage.removeItem("admin_token"); router.push("/login"); }} />
+        )}
+
+        {activeTab === "providers" && (
+          <ProviderBalances getToken={getToken} onUnauthorized={() => { localStorage.removeItem("admin_token"); router.push("/login"); }} />
         )}
 
         {(activeTab === "freelancers" || activeTab === "codes") && (

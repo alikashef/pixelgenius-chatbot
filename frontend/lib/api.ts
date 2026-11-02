@@ -311,6 +311,11 @@ export const grantCredits = (token: string, phone: string, credits: number, note
 export const fetchCustomerCount = (token: string) => adminRequest<{ count: number }>(token, "customers/count");
 export const grantCreditsToAll = (token: string, credits: number, note: string, expectedCount: number) =>
   adminRequest<{ count: number }>(token, "credits/grant-all", { method: "POST", body: JSON.stringify({ credits, note, expected_count: expectedCount }) });
+export interface ProviderBalances {
+  rate: number;
+  providers: { name: string; title: string; topup_url: string; ok: boolean; error: string; lines: { label: string; usd: number; toman: number }[] }[];
+}
+export const fetchProviderBalances = (token: string) => adminRequest<ProviderBalances>(token, "provider-balances");
 export const fetchAdminFreelancers = (token: string) => adminRequest<AdminFreelancer[]>(token, "freelancers");
 
 export interface ChatHandoff {
@@ -1108,7 +1113,7 @@ export interface VideoScenario {
 
 export interface VideoSettings {
   format: "9:16" | "4:5" | "1:1" | "16:9";
-  style: "typography" | "shapes" | "particles" | "waveform" | "steps" | "clips" | "phone" | "before_after";
+  style: "typography" | "shapes" | "particles" | "waveform" | "steps" | "cinematic" | "one_take" | "collage" | "cartoon" | "poster" | "clips" | "phone" | "before_after";
   voice: "male_warm" | "female_formal" | "male_energetic";
   speed: "slow" | "normal" | "fast";
   subtitle_mode: "word" | "sentence";
@@ -1129,16 +1134,24 @@ export interface VideoVersion {
   settings: VideoSettings;
 }
 
+export interface VideoAttachment {
+  name: string;
+  url: string;
+  size: number | null;
+  content_type: string | null;
+}
+
 export interface VideoProject {
   id: string;
   title: string;
   settings: VideoSettings;
   info: { brand?: string; cta?: string; format_reason?: string; style_reason?: string };
-  messages: { role: "user" | "assistant"; content: string }[];
+  messages: { role: "user" | "assistant"; content: string; attachments?: VideoAttachment[] }[];
   quick_replies: string[];
   scenario: VideoScenario | null;
   clips: { index: number; name: string; width: number; height: number; duration: number }[];
   has_logo: boolean;
+  covers: { title: string; chosen: string | null; price: number; has_reference: boolean; options: { file: string; label: string; url: string }[] };
   styles: { value: VideoSettings["style"]; label: string; hint: string; credits: number; clips: number; category: string }[];
   ready: boolean;
   estimate: { format: string; seconds: number; lines: { label: string; credits: number }[]; total: number; included_edits: number; extra_edit: number };
@@ -1164,6 +1177,7 @@ async function videoRequest<T>(token: string, path: string, init: RequestInit = 
     for (const version of project?.versions ?? []) {
       for (const key of ["video_url", "poster_url", "cover_url"]) version[key] = `${API_URL}${version[key]}`;
     }
+    for (const option of project?.covers?.options ?? []) option.url = `${API_URL}${option.url}`;
   }
   return data;
 }
@@ -1179,10 +1193,17 @@ export const fetchVideoProjects = (token: string) => videoRequest<VideoProject[]
 export const fetchVideoProject = (token: string, id: string) => videoRequest<VideoProject>(token, `/projects/${id}`);
 export const createVideoProject = (token: string) => videoRequest<VideoProject>(token, "/projects", send("POST", {}));
 export const deleteVideoProject = (token: string, id: string) => videoRequest<{ ok: true }>(token, `/projects/${id}`, send("DELETE"));
-export const chatVideo = (token: string, id: string, message: string) => videoRequest<VideoProject>(token, `/projects/${id}/chat`, send("POST", { message }));
+export const chatVideo = (token: string, id: string, message: string, attachments: VideoAttachment[] = []) =>
+  videoRequest<VideoProject>(token, `/projects/${id}/chat`, send("POST", { message, attachments }));
+export async function uploadVideoFile(token: string, id: string, file: File): Promise<VideoAttachment> {
+  const result = await videoRequest<VideoAttachment>(token, `/projects/${id}/files`, upload(file));
+  return { ...result, url: `${API_URL}${result.url}` };
+}
 export const uploadVideoClip = (token: string, id: string, file: File) => videoRequest<VideoProject>(token, `/projects/${id}/clips`, upload(file));
 export const uploadVideoLogo = (token: string, id: string, file: File) => videoRequest<VideoProject>(token, `/projects/${id}/logo`, upload(file));
 export const saveVideoScenario = (token: string, id: string, scenario: VideoScenario) => videoRequest<VideoProject>(token, `/projects/${id}/scenario`, send("PUT", scenario));
+export const makeVideoCovers = (token: string, id: string, title: string, ai: boolean) => videoRequest<VideoProject>(token, `/projects/${id}/covers`, send("POST", { title, ai }));
+export const chooseVideoCover = (token: string, id: string, file: string) => videoRequest<VideoProject>(token, `/projects/${id}/covers/choose`, send("POST", { file }));
 export const saveVideoSettings = (token: string, id: string, patch: Partial<VideoSettings>) => videoRequest<VideoProject>(token, `/projects/${id}/settings`, send("PUT", patch));
 export const renderVideo = (token: string, id: string) => videoRequest<VideoProject>(token, `/projects/${id}/render`, send("POST"));
 export const reviseVideo = (token: string, id: string, request: string) => videoRequest<VideoProject>(token, `/projects/${id}/revise`, send("POST", { request }));

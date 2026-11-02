@@ -30,7 +30,7 @@ from services.ai_settings import get_ai_settings
 FREELANCER_PHONE = os.getenv("FREELANCER_PHONE", "")
 
 router = APIRouter()
-UPLOAD_DIR = Path("/app/uploads/order-files")
+UPLOAD_DIR = Path(os.getenv("UPLOADS_DIR", "/app/uploads") + "/order-files")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 logger = logging.getLogger(__name__)
 _brief_tasks: dict[str, asyncio.Task] = {}

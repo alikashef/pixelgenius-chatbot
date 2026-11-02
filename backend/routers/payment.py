@@ -381,6 +381,78 @@ class GrantAllIn(BaseModel):
     expected_count: int
 
 
+KAYA_API = (os.getenv("KAYA_BASE_URL") or "https://kayaai.ir/api/v1").rstrip("/")
+GAP_APIS = [u.rstrip("/") for u in (os.getenv("GAPGPT_BASE_URL"), "https://api.gapgpt.app", "https://api.gapapi.com") if u]
+
+
+async def _get_json(client: httpx.AsyncClient, url: str, key: str):
+    try:
+        response = await client.get(url, headers={"Authorization": f"Bearer {key}"})
+    except httpx.HTTPError:
+        return None
+    if response.status_code != 200:
+        return None
+    try:
+        return response.json()
+    except ValueError:
+        return None
+
+
+def _num(value) -> float | None:
+    return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+
+
+@router.get("/admin/provider-balances")
+async def admin_provider_balances(_: dict = Depends(get_current_admin)):
+    """What the AI providers behind the video maker report for our keys: gapgpt (all models) and Kaya (voice)."""
+    rate = credits.USD_TOMAN
+    async with httpx.AsyncClient(timeout=12) as client:
+        gap_key, kaya_key = os.getenv("GAPGPT_API_KEY", ""), os.getenv("KAYA_API_KEY", "")
+        gap = {"name": "gapgpt", "title": "gapgpt (مدل‌ها و تصویر)", "topup_url": "https://gapgpt.app/platform-v2/wallet", "ok": False, "lines": [], "error": ""}
+        if not gap_key:
+            gap["error"] = "کلید تنظیم نشده است"
+        for base in GAP_APIS if gap_key else []:
+            usage = await _get_json(client, f"{base}/v1/dashboard/billing/usage", gap_key)
+            if usage is None:
+                continue
+            gap["ok"] = True
+            used = (_num(usage.get("total_usage")) or 0) / 100  # reported in cents
+            gap["lines"].append({"label": "مصرف تجمعی", "usd": round(used, 3), "toman": round(used * rate)})
+            plan = await _get_json(client, f"{base}/v1/dashboard/billing/subscription", gap_key) or {}
+            limit = _num(plan.get("hard_limit_usd"))
+            if limit is not None and limit < 1_000_000:
+                gap["lines"].append({"label": "باقی‌مانده", "usd": round(limit - used, 3), "toman": round((limit - used) * rate)})
+            break
+        if gap_key and not gap["ok"]:
+            gap["error"] = "پاسخی از gapgpt نیامد"
+
+        kaya = {"name": "kaya", "title": "Kaya (صدای گوینده)", "topup_url": "https://kayaai.ir", "ok": False, "lines": [], "error": ""}
+        if not kaya_key:
+            kaya["error"] = "کلید تنظیم نشده است"
+        else:
+            credit = await _get_json(client, f"{KAYA_API}/credits", kaya_key)
+            data = (credit or {}).get("data") if isinstance((credit or {}).get("data"), dict) else credit
+            total, used = _num((data or {}).get("total_credits")), _num((data or {}).get("total_usage"))
+            if total is not None:
+                kaya.update(ok=True)
+                kaya["lines"].append({"label": "باقی‌مانده", "usd": round(total - (used or 0), 3), "toman": round((total - (used or 0)) * rate)})
+                if used is not None:
+                    kaya["lines"].append({"label": "مصرف تجمعی", "usd": round(used, 3), "toman": round(used * rate)})
+            else:
+                info = await _get_json(client, f"{KAYA_API}/auth/key", kaya_key)
+                data = (info or {}).get("data") if isinstance((info or {}).get("data"), dict) else info
+                left, spent = _num((data or {}).get("limit_remaining")), _num((data or {}).get("usage"))
+                if left is not None or spent is not None:
+                    kaya["ok"] = True
+                    if left is not None:
+                        kaya["lines"].append({"label": "باقی‌مانده", "usd": round(left, 3), "toman": round(left * rate)})
+                    if spent is not None:
+                        kaya["lines"].append({"label": "مصرف تجمعی", "usd": round(spent, 3), "toman": round(spent * rate)})
+            if not kaya["ok"]:
+                kaya["error"] = "Kaya موجودی را از طریق API نمی‌دهد یا پاسخ نداد؛ از داشبورد خودش ببین"
+    return {"rate": rate, "providers": [gap, kaya]}
+
+
 @router.get("/admin/customers/count")
 async def admin_customers_count(db: AsyncSession = Depends(get_db), _: dict = Depends(get_current_admin)):
     return {"count": (await db.execute(select(func.count()).select_from(Customer))).scalar_one()}

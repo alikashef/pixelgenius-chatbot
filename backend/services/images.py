@@ -10,7 +10,7 @@ from openai import AsyncOpenAI
 
 logger = logging.getLogger(__name__)
 
-GENERATED_DIR = Path("/app/uploads/generated")
+GENERATED_DIR = Path(os.getenv("UPLOADS_DIR", "/app/uploads") + "/generated")
 PUBLIC_BASE_URL = (os.getenv("PUBLIC_MCP_URL") or "http://localhost:8000/mcp").rsplit("/mcp", 1)[0]
 IMAGE_TIMEOUT = float(os.getenv("IMAGE_TIMEOUT_SECONDS", "90"))
 DEFAULT_IMAGE_CONFIG = {"enabled": True, "model": "gapgpt/qwen-image-2.1", "size": "1024x1024", "max_images": 4}
