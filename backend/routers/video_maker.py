@@ -10,6 +10,7 @@ import time
 import uuid
 from pathlib import Path
 
+from starlette.concurrency import run_in_threadpool
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from jose import JWTError, jwt
@@ -497,6 +498,8 @@ def _begin_render(path: Path, project: dict, kind: str, note: str = "", charged:
 
 
 async def _pay(db: AsyncSession, customer: dict, amount: int, reason: str, project_id: str) -> None:
+    if amount > 0 and not await run_in_threadpool(video_agent.check_quota):
+        raise HTTPException(status_code=503, detail=video_agent.QUOTA_MESSAGE)
     try:
         await credits.charge(db, customer["sub"], amount, "video", reason, project_id)
     except credits.InsufficientCredits as exc:

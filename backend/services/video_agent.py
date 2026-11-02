@@ -13,6 +13,8 @@ import re
 import shutil
 import subprocess
 import tempfile
+import time
+from contextvars import ContextVar
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from typing import Callable
@@ -20,7 +22,7 @@ from typing import Callable
 import httpx
 
 from lib.ai.analyze_lead import _base_urls
-from services import video_maker as vm
+from services import credits, video_maker as vm
 
 logger = logging.getLogger(__name__)
 
@@ -160,6 +162,49 @@ def _chromium():
 
 # --- model calls -----------------------------------------------------------------------------------
 
+MAX_RENDER_USD = float(os.getenv("VIDEO_MAX_USD", "2.0"))  # hard cap on provider spend for one build
+QUOTA_MESSAGE = "سرویس هوش مصنوعی موقتاً در دسترس نیست، کمی بعد دوباره تلاش کنید"
+_spend: ContextVar[dict | None] = ContextVar("video_agent_spend", default=None)
+_quota_probe = {"at": 0.0, "ok": True}
+
+
+def _record_spend(model: str, usage: dict | None) -> None:
+    tally = _spend.get()
+    if tally is None or not usage:
+        return
+    tokens_in, tokens_out = usage.get("prompt_tokens") or 0, usage.get("completion_tokens") or 0
+    price_in, price_out = next((v for k, v in credits.MODEL_USD_PER_MTOK.items() if k in model.lower()), credits.DEFAULT_USD_PER_MTOK)
+    tally["usd"] += (tokens_in * price_in + tokens_out * price_out) / 1_000_000
+    tally["in"] += tokens_in
+    tally["out"] += tokens_out
+
+
+def _check_budget() -> None:
+    tally = _spend.get()
+    if tally is not None and tally["usd"] >= MAX_RENDER_USD:
+        logger.error("Video agent stopped: spent $%.2f (cap $%.2f)", tally["usd"], MAX_RENDER_USD)
+        raise AgentError("ساخت این ویدیو بیش از حد طول کشید و متوقف شد، کردیتت برگشت؛ دوباره تلاش کن")
+
+
+def check_quota() -> bool:
+    """Cheap one-token probe so a paid action is refused before charging when the provider account is out of credit. Unknown errors do not block."""
+    if time.time() - _quota_probe["at"] < 60:
+        return _quota_probe["ok"]
+    api_key = os.getenv("GAPGPT_API_KEY", "")
+    ok = True
+    for base_url in _base_urls():
+        try:
+            response = httpx.post(f"{base_url}/chat/completions", headers={"Authorization": f"Bearer {api_key}"}, timeout=20,
+                                  json={"model": vm.SONNET_MODEL, "messages": [{"role": "user", "content": "hi"}], "max_tokens": 1})
+        except httpx.HTTPError:
+            continue
+        ok = not (response.status_code == 403 and "insufficient_user_quota" in response.text)
+        break
+    _quota_probe.update(at=time.time(), ok=ok)
+    return ok
+
+
+
 def _extract_html(text: str) -> str | None:
     match = re.search(r"```html\s*(.*?)```", text, re.S) or re.search(r"(<!doctype html.*</html>)", text, re.S | re.I)
     html = match.group(1).strip() if match else ""
@@ -175,12 +220,16 @@ def _ask_html(messages: list[dict], system: str) -> str:
         payload = {"model": model, "messages": [{"role": "system", "content": system}, *messages], "temperature": 0.8, "max_tokens": 24000, "stream": True,
                    "reasoning": {"effort": "low"}}  # hidden reasoning otherwise eats the whole token budget and leaves no HTML
         for base_url in _base_urls():
+            _check_budget()
             try:
                 # streamed: a full composition takes minutes and gateways drop silent long-running responses
                 parts: list[str] = []
-                finish, stray = None, []
+                finish, stray, usage = None, [], None
                 with httpx.Client(timeout=httpx.Timeout(600, connect=20)) as client:
                     with client.stream("POST", f"{base_url}/chat/completions", headers={"Authorization": f"Bearer {api_key}"}, json=payload) as response:
+                        if response.status_code == 403 and "insufficient_user_quota" in response.read().decode("utf-8", "ignore"):
+                            _quota_probe.update(at=time.time(), ok=False)
+                            raise AgentError(QUOTA_MESSAGE)
                         response.raise_for_status()
                         for line in response.iter_lines():
                             if not line.startswith("data:"):
@@ -193,8 +242,11 @@ def _ask_html(messages: list[dict], system: str) -> str:
                             choices = event.get("choices") or [{}]
                             parts.append((choices[0].get("delta") or {}).get("content") or "")
                             finish = choices[0].get("finish_reason") or finish
+                            if event.get("usage"):
+                                usage = event["usage"]
                             if event.get("error"):
                                 stray.append(str(event["error"])[:300])
+                _record_spend(model, usage)
                 if "".join(parts).strip():
                     return "".join(parts)
                 logger.warning("Video agent call to %s via %s returned no text (finish=%s, %s)", model, base_url, finish, stray[:2])
@@ -376,6 +428,8 @@ def build(scenario: dict, settings: dict, clips: list[Path], logo: Path | None, 
     """Write, review and render the video into work/final.mp4; returns validation info. work/comp/index.html keeps the composition for later edits."""
     work = work.resolve()
     work.mkdir(parents=True, exist_ok=True)
+    tally = {"usd": 0.0, "in": 0, "out": 0}
+    _spend.set(tally)
     size = vm.FORMATS[settings["format"]]
     if vm.STYLE_CATALOG[settings["style"]]["clips"] > len(clips):
         settings = {**settings, "style": "typography"}
@@ -442,6 +496,8 @@ def build(scenario: dict, settings: dict, clips: list[Path], logo: Path | None, 
     final = work / "final.mp4"
     _mux(comp, size, total, audio, final)
     result = vm.validate(final, total, size)
+    result["ai_cost_usd"] = round(tally["usd"], 3)
+    logger.info("Video agent spend for %s: $%.3f (%d in / %d out tokens)", work.name, tally["usd"], tally["in"], tally["out"])
     vm._run(["ffmpeg", "-y", "-ss", "0.8", "-i", str(final), "-frames:v", "1", "-q:v", "3", str(work / "poster.jpg")], timeout=60)
     if cover_file is not None and cover_file.exists():
         shutil.copy(cover_file, work / "cover.jpg")

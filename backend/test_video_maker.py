@@ -193,3 +193,31 @@ def test_agent_price_scales_with_length_and_stays_above_cost():
     long_cost = video_maker.estimate_cost({"settings": settings, "scenario": longer})
     assert long_cost["total"] > short_cost["total"]
     assert short_cost["total"] >= 2260
+
+
+def test_agent_spend_is_tallied_and_capped(monkeypatch):
+    from services import video_agent
+    video_agent._spend.set({"usd": 0.0, "in": 0, "out": 0})
+    video_agent._record_spend("claude-opus-5-5", {"prompt_tokens": 1_000_000, "completion_tokens": 100_000})
+    assert round(video_agent._spend.get()["usd"], 2) == 6.0
+    monkeypatch.setattr(video_agent, "MAX_RENDER_USD", 2.0)
+    try:
+        video_agent._check_budget()
+        raise AssertionError("cap not enforced")
+    except video_agent.AgentError:
+        pass
+
+
+def test_quota_probe_blocks_only_on_insufficient_quota(monkeypatch):
+    from services import video_agent
+
+    class Reply:
+        def __init__(self, status, text):
+            self.status_code, self.text = status, text
+
+    monkeypatch.setattr(video_agent, "_base_urls", lambda: ["https://gateway.test/v1"])
+    for status, text, expected in ((403, '{"error":{"code":"insufficient_user_quota"}}', False), (200, "{}", True), (500, "oops", True)):
+        video_agent._quota_probe.update(at=0.0, ok=True)
+        monkeypatch.setattr(video_agent.httpx, "post", lambda *a, _r=Reply(status, text), **k: _r)
+        assert video_agent.check_quota() is expected
+    video_agent._quota_probe.update(at=0.0, ok=True)
