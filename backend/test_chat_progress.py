@@ -89,7 +89,7 @@ class ModelIntegrationTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn(model, analysis.AVAILABLE_MODELS)
             self.assertEqual(analysis._model_order(model, []), [model])
             self.assertEqual(analysis._model_order(model, image), [model])
-        self.assertEqual(analysis._model_order(analysis.DEFAULT_MODEL, image), [analysis.VISION_MODEL])
+        self.assertEqual(analysis._model_order(analysis.DEFAULT_MODEL, image), [analysis.SONNET_MODEL])
         self.assertNotIn(analysis.STRUCTURED_MODEL, analysis.AVAILABLE_MODELS)
 
     def test_mode_specific_models_and_legacy_fallback(self):

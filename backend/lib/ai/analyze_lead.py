@@ -68,7 +68,7 @@ def _has_image_content(messages: list[dict]) -> bool:
 
 def _model_order(selected_model: str, messages: list[dict]) -> list[str]:
     if _has_image_content(messages) and selected_model not in (VISION_MODEL, SONNET_MODEL):
-        return [VISION_MODEL]
+        return [SONNET_MODEL]  # an image on a text-only model goes to Sonnet, not Opus
     return [selected_model or DEFAULT_MODEL]
 
 
