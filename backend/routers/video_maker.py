@@ -504,8 +504,11 @@ async def edit_settings(project_id: str, body: SettingsIn, customer: dict = Depe
 
 
 def _render_job(path: Path, number: int) -> None:
+    started = time.time()
+    logger.info("Render job v%d for project %s waiting for a slot", number, path.name[:8])
     try:
         with RENDER_SLOTS:
+            logger.info("Render job v%d started", number)
             project = _load(path)
             clips = [path / "clips" / c["file"] for c in project["clips"]]
             logo = path / project["logo"] if project.get("logo") else None
@@ -518,7 +521,9 @@ def _render_job(path: Path, number: int) -> None:
         project = _load(path)
         next(v for v in project["versions"] if v["n"] == number).update(status="done", info=info, finished_at=int(time.time()))
         project.update(status="ready", stage=None, error=None)
+        logger.info("Render job v%d finished in %.0fs", number, time.time() - started)
     except video_maker.VideoError as exc:
+        logger.warning("Render job v%d failed after %.0fs: %s", number, time.time() - started, exc)
         project = _fail(path, number, str(exc))
     except Exception:
         logger.exception("Video render crashed")

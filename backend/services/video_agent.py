@@ -299,6 +299,7 @@ def _ask_html(messages: list[dict], system: str, models: list[str] | None = None
                 # streamed: a full composition takes minutes and gateways drop silent long-running responses
                 parts: list[str] = []
                 finish, stray, usage = None, [], None
+                started = time.time()
                 with httpx.Client(timeout=httpx.Timeout(600, connect=20)) as client:
                     with client.stream("POST", f"{base_url}/chat/completions", headers={"Authorization": f"Bearer {api_key}"}, json=payload) as response:
                         if response.status_code == 403 and "insufficient_user_quota" in response.read().decode("utf-8", "ignore"):
@@ -321,6 +322,8 @@ def _ask_html(messages: list[dict], system: str, models: list[str] | None = None
                             if event.get("error"):
                                 stray.append(str(event["error"])[:300])
                 _record_spend(model, usage)
+                logger.info("AI call %s: %.0fs, %s in / %s out tokens, finish=%s, %d chars, ~$%.3f so far", model, time.time() - started,
+                            (usage or {}).get("prompt_tokens"), (usage or {}).get("completion_tokens"), finish, sum(len(x) for x in parts), (_spend.get() or {}).get("usd", 0))
                 if "".join(parts).strip():
                     return "".join(parts)
                 logger.warning("Video agent call to %s via %s returned no text (finish=%s, %s)", model, base_url, finish, stray[:2])
@@ -507,11 +510,14 @@ def build(scenario: dict, settings: dict, clips: list[Path], logo: Path | None, 
     work.mkdir(parents=True, exist_ok=True)
     tally = {"usd": 0.0, "in": 0, "out": 0}
     _spend.set(tally)
+    logger.info("Build start: %s, style=%s, format=%s, %d scenes, %d clips, logo=%s", "edit" if base_html else "new video", settings["style"], settings["format"],
+                len(scenario["scenes"]), len(clips), (logo.suffix.lower() if logo else "none"))
     size = vm.FORMATS[settings["format"]]
     if vm.STYLE_CATALOG[settings["style"]]["clips"] > len(clips):
         settings = {**settings, "style": "typography"}
     narrations = [narrate_fn(s["narration"], settings["voice"], settings["speed"], audio_cache.resolve()) if s["narration"] else None for s in scenario["scenes"]]
     scenes, total = _timeline(scenario, settings, narrations)
+    logger.info("Narration ready: %d/%d scenes voiced, timeline %.1fs", sum(1 for n in narrations if n), len(narrations), total)
     comp = work / "comp"
     data = _prepare(comp, scenario, settings, scenes, total, clips, logo, size)
     data["brand"], data["cta"] = (info or {}).get("brand") or "", (info or {}).get("cta") or ""
@@ -533,6 +539,7 @@ def build(scenario: dict, settings: dict, clips: list[Path], logo: Path | None, 
                 logger.warning("Sample render failed: %s", exc)
                 frames, errors = [], [f"render crashed: {exc}"]
             clean = bool(frames) and not errors
+            logger.info("Review round %d: %d frames sampled, %d render errors%s", round_no + 1, len(frames), len(errors), (" (" + "; ".join(errors[:2])[:200] + ")") if errors else "")
             if round_no == MAX_ROUNDS:
                 return html if clean else None
             text = (f"{brief}\n\nCurrent composition:\n```html\n{html}\n```\n\nFrames at t = " + ", ".join(f"{t}s" for t in times) + " (in order).\n"
@@ -544,13 +551,16 @@ def build(scenario: dict, settings: dict, clips: list[Path], logo: Path | None, 
             except AgentError:
                 return html if clean else None
             if reply.strip().upper().startswith("OK") and clean:
+                logger.info("Review round %d: approved as is", round_no + 1)
                 return html
             patched, applied = _apply_patches(html, reply)
+            logger.info("Review round %d: %d patch(es) applied of %d sent", round_no + 1, applied, len(_PATCH.findall(reply)))
             if applied:
                 html = patched
                 continue
             whole = _extract_html(reply)
             if whole:
+                logger.info("Review round %d: the model sent a whole new document (%d chars)", round_no + 1, len(whole))
                 html = whole
                 continue
             if clean:
@@ -593,6 +603,7 @@ def build(scenario: dict, settings: dict, clips: list[Path], logo: Path | None, 
         logger.info("Video agent reused a stored %s composition: %s", finger["style"], "kept" if html else "rejected")
     reused = html is not None
     if html is None:
+        logger.info("Drafting a new composition with %s" if not base_html else "Edit could not be patched; rewriting with the mid-tier model", vm.AI_MODELS[0] if not base_html else vm.REVIEW_MODELS[0])
         html = review(draft())
         if html is None:
             raise AgentError("طراحی ویدیو به نتیجه‌ی قابل‌قبول نرسید، دوباره تلاش کنید")
@@ -602,12 +613,15 @@ def build(scenario: dict, settings: dict, clips: list[Path], logo: Path | None, 
         except OSError:
             logger.warning("Could not store the composition in the library", exc_info=True)
 
+    logger.info("Composition accepted (%d chars); rendering %d frames at %dx%d", len(html), round(total * vm.FPS), size[0], size[1])
     audio = _audio_track(scenes, narrations, work)
     final = work / "final.mp4"
+    mux_started = time.time()
     _mux(comp, size, total, audio, final)
+    logger.info("Video encoded in %.0fs", time.time() - mux_started)
     result = vm.validate(final, total, size)
     result["ai_cost_usd"] = round(tally["usd"], 3)
-    logger.info("Video agent spend for %s: $%.3f (%d in / %d out tokens)", work.name, tally["usd"], tally["in"], tally["out"])
+    logger.info("Build done: Video agent spend for %s: $%.3f (%d in / %d out tokens)", work.name, tally["usd"], tally["in"], tally["out"])
     vm._run(["ffmpeg", "-y", "-ss", "0.8", "-i", str(final), "-frames:v", "1", "-q:v", "3", str(work / "poster.jpg")], timeout=60)
     if cover_file is not None and cover_file.exists():
         shutil.copy(cover_file, work / "cover.jpg")

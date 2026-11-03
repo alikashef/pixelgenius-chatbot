@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 import asyncio
+import logging
 import os
 from pathlib import Path
 from fastapi import FastAPI, Request
@@ -31,6 +32,10 @@ async def lifespan(app: FastAPI):
     cleanup_task.cancel()
     embed_task.cancel()
 
+
+logging.basicConfig(level=logging.WARNING, format="%(asctime)s %(levelname)s %(name)s: %(message)s", datefmt="%H:%M:%S")
+for _name in ("services.video_agent", "services.video_maker", "routers.video_maker"):
+    logging.getLogger(_name).setLevel(logging.INFO)
 
 app = FastAPI(title="Freelance Intake API", lifespan=lifespan)
 
