@@ -221,3 +221,26 @@ def test_quota_probe_blocks_only_on_insufficient_quota(monkeypatch):
         monkeypatch.setattr(video_agent.httpx, "post", lambda *a, _r=Reply(status, text), **k: _r)
         assert video_agent.check_quota() is expected
     video_agent._quota_probe.update(at=0.0, ok=True)
+
+
+def test_patches_apply_only_when_unique_and_keep_the_document_valid():
+    from services import video_agent
+    html = "<html><body><h1>One</h1><script>function seek(t){}</script></body></html>"
+    patched, applied = video_agent._apply_patches(html, "<<<<<<< SEARCH\n<h1>One</h1>\n=======\n<h1>Two</h1>\n>>>>>>> REPLACE")
+    assert applied == 1 and "<h1>Two</h1>" in patched
+    assert video_agent._apply_patches(html, "<<<<<<< SEARCH\nmissing\n=======\nx\n>>>>>>> REPLACE") == (html, 0)
+    assert video_agent._apply_patches(html, "<<<<<<< SEARCH\nfunction seek(t){}\n=======\nnothing\n>>>>>>> REPLACE")[1] == 0
+
+
+def test_library_keeps_designs_but_never_a_customers_own_words(tmp_path, monkeypatch):
+    from services import video_agent
+    monkeypatch.setattr(video_agent, "LIBRARY", tmp_path / "lib")
+    scenario = video_maker.normalize_scenario(SCENARIO, 1)
+    settings = video_maker.clean_settings({"style": "typography"})
+    finger = video_agent._fingerprint(scenario, settings, video_maker.FORMATS[settings["format"]], 0)
+    own_words = scenario["scenes"][0]["narration"]
+    video_agent._library_save(f"<html>{own_words} seek</html>", finger, scenario, {})
+    assert video_agent._library_pick(finger) is None
+    video_agent._library_save("<html>design only seek</html>", finger, scenario, {})
+    assert video_agent._library_pick(finger) == "<html>design only seek</html>"
+    assert video_agent._library_pick({**finger, "scenes": finger["scenes"] + 1}) is None

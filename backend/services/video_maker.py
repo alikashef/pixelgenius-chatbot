@@ -13,7 +13,9 @@ import httpx
 from lib.ai.analyze_lead import _base_urls, SONNET_MODEL
 
 # The scenario/revision agent is where video quality is decided, so it runs on the strongest model; Sonnet is the safety net.
-AI_MODELS = [m for m in (os.getenv("VIDEO_AI_MODEL") or "claude-opus-5-5", SONNET_MODEL) if m]
+AI_MODELS = [m for m in (os.getenv("VIDEO_AI_MODEL") or "claude-opus-5-5", SONNET_MODEL) if m]  # writes the composition from scratch (the only call that needs the expensive model)
+SCENARIO_MODELS = [m for m in (os.getenv("VIDEO_SCENARIO_MODEL") or SONNET_MODEL, "claude-opus-5-5") if m]  # chat and scenario writing: a mid-tier model is enough
+REVIEW_MODELS = [m for m in (os.getenv("VIDEO_REVIEW_MODEL") or SONNET_MODEL,) if m]  # looks at frames and sends small patches
 
 logger = logging.getLogger(__name__)
 
@@ -155,7 +157,7 @@ async def _ask_json(system: str, user: str | list[dict], history: list[dict] | N
     api_key = os.getenv("GAPGPT_API_KEY", "")
     if not api_key:
         raise VideoError("کلید هوش مصنوعی تنظیم نشده است")
-    for model in dict.fromkeys(AI_MODELS):
+    for model in dict.fromkeys(SCENARIO_MODELS):
         payload = {
             "model": model,
             "messages": [{"role": "system", "content": system}, *(history or []), {"role": "user", "content": user}],

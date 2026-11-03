@@ -26,7 +26,7 @@ from services import credits, video_maker as vm
 
 logger = logging.getLogger(__name__)
 
-MAX_ROUNDS = 3  # review rounds after the first draft
+MAX_ROUNDS = 2  # patch rounds after the first draft; each round costs a few hundred output tokens
 REVIEW_FRAMES = 6
 LEAD = 0.15  # seconds of silence before the narrator starts inside a scene
 TAIL = 0.5
@@ -116,6 +116,10 @@ class AgentError(vm.VideoError):
     pass
 
 
+class AgentStop(AgentError):
+    """Spending must stop now (budget or provider quota); never retried or recovered from."""
+
+
 _SAMPLE_LOOK = {  # (background css, headline css, decoration html) per agent-only style; static stand-ins for the picker
     "cinematic": ("radial-gradient(circle at 50% 40%, #3a2a0a 0%, #0b0907 65%)", "color:#f5d98a;text-shadow:0 0 40px #d4a017aa", '<i style="position:absolute;inset:0;background:radial-gradient(circle at 20% 30%,#ffd70033 0 2px,transparent 3px) 0 0/90px 90px"></i>'),
     "one_take": ("linear-gradient(120deg,#12202b 0%,#1e1b2e 55%,#241b3a 100%)", "color:#fff", '<i style="position:absolute;left:-10%;right:-10%;top:62%;height:6px;background:#7c3aed;transform:rotate(-8deg)"></i><i style="position:absolute;left:10%;top:18%;width:160px;height:160px;border:6px solid #f59e0b;border-radius:50%"></i>'),
@@ -183,7 +187,7 @@ def _check_budget() -> None:
     tally = _spend.get()
     if tally is not None and tally["usd"] >= MAX_RENDER_USD:
         logger.error("Video agent stopped: spent $%.2f (cap $%.2f)", tally["usd"], MAX_RENDER_USD)
-        raise AgentError("ساخت این ویدیو بیش از حد طول کشید و متوقف شد، کردیتت برگشت؛ دوباره تلاش کن")
+        raise AgentStop("ساخت این ویدیو بیش از حد طول کشید و متوقف شد، کردیتت برگشت؛ دوباره تلاش کن")
 
 
 def check_quota() -> bool:
@@ -211,13 +215,76 @@ def _extract_html(text: str) -> str | None:
     return html if "<html" in html.lower() and "seek" in html else None
 
 
-def _ask_html(messages: list[dict], system: str) -> str:
+# --- cheap review: patches instead of rewrites, and a library of finished compositions --------------
+
+REVIEW_SYSTEM = SYSTEM_PROMPT + """
+
+# Review and patch mode
+You receive the current composition and frames rendered from it. Do NOT rewrite the file.
+Reply `OK` alone if the video is excellent and there were no errors. Otherwise reply only with SEARCH/REPLACE blocks that fix what is wrong, in exactly this format:
+<<<<<<< SEARCH
+exact text copied from the file (unique in it, as short as possible)
+=======
+replacement text
+>>>>>>> REPLACE
+At most 8 blocks, no explanations, no other text."""
+
+_PATCH = re.compile(r"<<<<<<< SEARCH\r?\n(.*?)\r?\n=======\r?\n(.*?)\r?\n>>>>>>> REPLACE", re.S)
+REUSE = os.getenv("VIDEO_REUSE", "1") != "0"
+LIBRARY = Path(os.getenv("UPLOADS_DIR", "/app/uploads")) / "video" / "_library"
+
+
+def _apply_patches(html: str, reply: str) -> tuple[str, int]:
+    applied = 0
+    for old, new in _PATCH.findall(reply):
+        if old and html.count(old) == 1:
+            html, applied = html.replace(old, new, 1), applied + 1
+    return (html, applied) if "<html" in html.lower() and "seek" in html else (html, 0)
+
+
+def _fingerprint(scenario: dict, settings: dict, size: tuple[int, int], clips: int) -> dict:
+    return {"style": settings["style"], "format": settings["format"], "scenes": len(scenario["scenes"]), "clips": min(clips, 1), "size": list(size),
+            "seconds": round(sum(sc.get("duration", 0) for sc in scenario["scenes"]), 1)}
+
+
+def _library_pick(finger: dict) -> str | None:
+    """Nearest finished composition for the same style and format and the same scene structure; the vector is (scenes, clips, seconds)."""
+    best, best_score = None, None
+    for meta_file in LIBRARY.glob("*.json") if LIBRARY.exists() else []:
+        try:
+            meta = json.loads(meta_file.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        if any(meta.get(k) != finger[k] for k in ("style", "format", "scenes", "clips")):
+            continue
+        score = abs(meta.get("seconds", 0) - finger["seconds"])
+        if best_score is None or score < best_score:
+            html_file = meta_file.with_suffix(".html")
+            if html_file.exists():
+                best, best_score = html_file, score
+    return best.read_text(encoding="utf-8") if best else None
+
+
+def _library_save(html: str, finger: dict, scenario: dict, info: dict | None) -> None:
+    """Keep a finished design for later videos, unless it carries this customer's own words."""
+    words = [str(v) for sc in scenario["scenes"] for v in (sc.get("narration"), sc.get("text"), sc.get("title")) if v]
+    words += [str(v) for v in ((info or {}).get("brand"), (info or {}).get("cta"), scenario.get("title")) if v]
+    if any(len(w.strip()) >= 4 and w.strip() in html for w in words):
+        return
+    LIBRARY.mkdir(parents=True, exist_ok=True)
+    key = f"{finger['style']}_{finger['format'].replace(':', 'x')}_{finger['scenes']}_{finger['clips']}"
+    (LIBRARY / f"{key}.html").write_text(html, encoding="utf-8")
+    (LIBRARY / f"{key}.json").write_text(json.dumps(finger), encoding="utf-8")
+
+
+
+def _ask_html(messages: list[dict], system: str, models: list[str] | None = None) -> str:
     """One model turn; returns raw text. Falls through the configured models and gateways."""
     api_key = os.getenv("GAPGPT_API_KEY", "")
     if not api_key:
         raise AgentError("کلید هوش مصنوعی تنظیم نشده است")
-    for model in dict.fromkeys(vm.AI_MODELS):
-        payload = {"model": model, "messages": [{"role": "system", "content": system}, *messages], "temperature": 0.8, "max_tokens": 24000, "stream": True,
+    for model in dict.fromkeys(models or vm.AI_MODELS):
+        payload = {"model": model, "messages": [{"role": "system", "content": system}, *messages], "temperature": 0.8, "max_tokens": 24000 if not models else 6000, "stream": True,
                    "reasoning": {"effort": "low"}}  # hidden reasoning otherwise eats the whole token budget and leaves no HTML
         for base_url in _base_urls():
             _check_budget()
@@ -229,7 +296,7 @@ def _ask_html(messages: list[dict], system: str) -> str:
                     with client.stream("POST", f"{base_url}/chat/completions", headers={"Authorization": f"Bearer {api_key}"}, json=payload) as response:
                         if response.status_code == 403 and "insufficient_user_quota" in response.read().decode("utf-8", "ignore"):
                             _quota_probe.update(at=time.time(), ok=False)
-                            raise AgentError(QUOTA_MESSAGE)
+                            raise AgentStop(QUOTA_MESSAGE)
                         response.raise_for_status()
                         for line in response.iter_lines():
                             if not line.startswith("data:"):
@@ -441,56 +508,87 @@ def build(scenario: dict, settings: dict, clips: list[Path], logo: Path | None, 
     _write_data(comp, data)
 
     brief = _brief(scenario, settings, size, data)
-    if base_html:
-        first = [{"role": "user", "content": f"{brief}\n\nHere is the current composition of this video. Keep its design and apply this change request"
-                                             f" (the data may have changed, make sure everything still reads from VIDEO):\n\nRequest: {note or 'rebuild with the new script'}\n\n```html\n{base_html}\n```"}]
-    else:
-        first = [{"role": "user", "content": brief + "\n\nWrite the composition now."}]
-    messages = list(first)
-    html = _extract_html(ask(messages, SYSTEM_PROMPT))
-    for _ in range(2):
-        if html:
-            break
-        messages.append({"role": "user", "content": "The reply had no valid HTML document with window.seek. Send the complete ```html block."})
-        html = _extract_html(ask(messages, SYSTEM_PROMPT))
-    if not html:
-        raise AgentError("دستیار طراحی خروجی معتبر نداد، دوباره تلاش کنید")
-
     times = _review_times(scenes)
-    for round_no in range(MAX_ROUNDS + 1):
-        (comp / "index.html").write_text(html, encoding="utf-8")
-        try:
-            frames, errors = _sample(comp, size, times)
-        except AgentError:
-            frames, errors = [], ["The page did not define window.seek as a function."]
-        except Exception as exc:
-            logger.warning("Sample render failed: %s", exc)
-            frames, errors = [], [f"render crashed: {exc}"]
-        if round_no == MAX_ROUNDS and (frames and not errors):
-            break
-        if round_no == MAX_ROUNDS:
-            raise AgentError("طراحی ویدیو به نتیجه‌ی قابل‌قبول نرسید، دوباره تلاش کنید")
-        content = [{"type": "text", "text": ("Frames at t = " + ", ".join(f"{t}s" for t in times) + " (in order).\n"
-                                              + ("Errors captured while rendering:\n" + "\n".join(errors) + "\n" if errors else "No render errors.\n")
-                                              + "Review now. Reply `OK` if it is excellent, otherwise the full corrected ```html block.")}]
-        content += [_image_part(f) for f in frames]
-        messages += [{"role": "assistant", "content": "```html\n" + html + "\n```"}, {"role": "user", "content": content}]
-        try:
-            reply = ask(messages, SYSTEM_PROMPT)
-        except AgentError:
-            if frames and not errors:  # the draft already renders cleanly; ship it rather than lose the whole job
-                logger.warning("Review call failed, rendering the last good draft")
-                break
-            raise
-        if reply.strip().upper().startswith("OK") and not errors and frames:
-            break
-        fixed = _extract_html(reply)
-        if fixed:
-            html = fixed
-        elif errors or not frames:
-            raise AgentError("طراحی ویدیو به نتیجه‌ی قابل‌قبول نرسید، دوباره تلاش کنید")
+    finger = _fingerprint(scenario, settings, size, len(clips))
+
+    def review(html: str) -> str | None:
+        """Render frames, let the cheaper model send patches; None when the composition cannot be made to work."""
+        for round_no in range(MAX_ROUNDS + 1):
+            (comp / "index.html").write_text(html, encoding="utf-8")
+            try:
+                frames, errors = _sample(comp, size, times)
+            except AgentError:
+                frames, errors = [], ["The page did not define window.seek as a function."]
+            except Exception as exc:
+                logger.warning("Sample render failed: %s", exc)
+                frames, errors = [], [f"render crashed: {exc}"]
+            clean = bool(frames) and not errors
+            if round_no == MAX_ROUNDS:
+                return html if clean else None
+            text = (f"{brief}\n\nCurrent composition:\n```html\n{html}\n```\n\nFrames at t = " + ", ".join(f"{t}s" for t in times) + " (in order).\n"
+                    + ("Errors captured while rendering:\n" + "\n".join(errors) + "\n" if errors else "No render errors.\n"))
+            try:
+                reply = ask([{"role": "user", "content": [{"type": "text", "text": text}, *[_image_part(f) for f in frames]]}], REVIEW_SYSTEM, models=vm.REVIEW_MODELS)
+            except AgentStop:
+                raise
+            except AgentError:
+                return html if clean else None
+            if reply.strip().upper().startswith("OK") and clean:
+                return html
+            patched, applied = _apply_patches(html, reply)
+            if applied:
+                html = patched
+                continue
+            whole = _extract_html(reply)
+            if whole:
+                html = whole
+                continue
+            if clean:
+                return html
+            return None
+        return None
+
+    def draft() -> str:
+        if base_html:
+            first = [{"role": "user", "content": f"{brief}\n\nHere is the current composition of this video. Keep its design and apply this change request"
+                                                 f" (the data may have changed, make sure everything still reads from VIDEO):\n\nRequest: {note or 'rebuild with the new script'}\n\n```html\n{base_html}\n```"}]
         else:
-            break
+            first = [{"role": "user", "content": brief + "\n\nWrite the composition now."}]
+        messages = list(first)
+        html = _extract_html(ask(messages, SYSTEM_PROMPT))
+        for _ in range(2):
+            if html:
+                break
+            messages.append({"role": "user", "content": "The reply had no valid HTML document with window.seek. Send the complete ```html block."})
+            html = _extract_html(ask(messages, SYSTEM_PROMPT))
+        if not html:
+            raise AgentError("دستیار طراحی خروجی معتبر نداد، دوباره تلاش کنید")
+        return html
+
+    html = None
+    if base_html:  # an edit: the cheaper model tries to apply it as patches first
+        try:
+            reply = ask([{"role": "user", "content": f"{brief}\n\nCurrent composition:\n```html\n{base_html}\n```\n\nChange request (the data may have changed, everything must still read from VIDEO): {note or 'rebuild with the new script'}"}],
+                        REVIEW_SYSTEM.replace("Reply `OK` alone if the video is excellent and there were no errors.", "Reply `OK` alone if no change is needed."), models=vm.REVIEW_MODELS)
+            patched, applied = _apply_patches(base_html, reply)
+            html = review(patched if applied else base_html) if applied or reply.strip().upper().startswith("OK") else None
+        except AgentStop:
+            raise
+        except AgentError:
+            html = None
+    elif REUSE and (cached := _library_pick(finger)):
+        html = review(cached)
+        logger.info("Video agent reused a stored %s composition: %s", finger["style"], "kept" if html else "rejected")
+    reused = html is not None
+    if html is None:
+        html = review(draft())
+        if html is None:
+            raise AgentError("طراحی ویدیو به نتیجه‌ی قابل‌قبول نرسید، دوباره تلاش کنید")
+    if not base_html and not reused and REUSE:
+        try:
+            _library_save(html, finger, scenario, info)
+        except OSError:
+            logger.warning("Could not store the composition in the library", exc_info=True)
 
     audio = _audio_track(scenes, narrations, work)
     final = work / "final.mp4"
