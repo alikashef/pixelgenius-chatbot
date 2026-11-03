@@ -42,6 +42,22 @@ window.PG = {
     inOut: (k) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2),
     back: (k) => { const c = 1.70158; return 1 + (c + 1) * Math.pow(k - 1, 3) + c * Math.pow(k - 1, 2); },
   },
+  keys: (k, t, ease) => {
+    if (t <= k[0][0]) return k[0].slice(1);
+    for (let i = 1; i < k.length; i++) if (t <= k[i][0]) {
+      const a = k[i - 1], b = k[i], e = (ease || PG.ease.inOut)(PG.progress(t, a[0], b[0]));
+      return a.slice(1).map((v, j) => v + (b[j + 1] - v) * e);
+    }
+    return k[k.length - 1].slice(1);
+  },
+  camera: (el, keys, t, W, H) => {
+    const [cx, cy, z] = PG.keys(keys, t);
+    const x = Math.min(0, Math.max(W - W * z, W / 2 - cx * W * z)), y = Math.min(0, Math.max(H - H * z, H / 2 - cy * H * z));
+    el.style.transformOrigin = "0 0"; el.style.transform = "translate(" + x + "px," + y + "px) scale(" + z + ")";
+  },
+  rng: (seed) => { let s = (seed % 2147483647) || 1; return () => (s = (s * 16807) % 2147483647) / 2147483647; },
+  stagger: (i, t, start, gap, dur) => PG.progress(t, start + i * gap, start + i * gap + dur),
+  counter: (t, a, b, from, to) => Math.round(PG.lerp(from, to, PG.ease.out(PG.progress(t, a, b)))),
   sceneAt: (t) => { const s = VIDEO.scenes; for (let i = 0; i < s.length; i++) if (t < s[i].end) return s[i]; return s[s.length - 1]; },
   activeWord: (scene, t) => { let idx = -1; scene.words.forEach((w, i) => { if (t >= w.start) idx = i; }); return idx; },
   // Show frame of the user's clip i at time t (clips loop). Await it inside seek().
@@ -68,7 +84,7 @@ A headless Chromium renders it frame by frame, FFmpeg adds the narration. Your o
   All text and timing MUST be read from VIDEO so edits to the script never need a new design. Never hardcode the user's copy.
 - Define `window.seek = async (t) => {...}` : it must put the page in the exact visual state for time t seconds. The harness calls it once per frame (t = frame / fps), then screenshots.
   Everything is a pure function of t: no setTimeout/setInterval/requestAnimationFrame, no free-running CSS animations or transitions, no Math.random() without a fixed seed (use a seeded PRNG), no Date.now().
-- Helpers in `window.PG`: clamp, lerp, progress(t,a,b), ease.out/inOut/back(k), sceneAt(t), activeWord(scene,t), and `await PG.clip(imgEl, clipIndex, t)` which shows the user's clip frame (never use <video>: it cannot be seeked reliably). Use `object-fit: cover`.
+- Helpers in `window.PG`: clamp, lerp, progress(t,a,b), ease.out/inOut/back(k), sceneAt(t), activeWord(scene,t), keys(frames,t[,ease]) (frames = [[t,v1,v2..],...] eased between keyframes, returns the values), camera(el, [[t,cx,cy,zoom],...], t, W, H) (virtual camera on a stage element, cx/cy are 0..1 centres, clamped to the stage), rng(seed) (seeded random), stagger(i,t,start,gap,dur) (progress of the i-th item), counter(t,a,b,from,to), and `await PG.clip(imgEl, clipIndex, t)` which shows the user's clip frame (never use <video>: it cannot be seeked reliably). Use `object-fit: cover`.
 - The user's logo, if any, is at `VIDEO.logo` (an image path). When `VIDEO.logo_svg` is set, inline that markup (innerHTML) instead of using <img>: then you can recolour it (fill/stroke via CSS, `currentColor`), animate its paths (stroke-dashoffset draw-on, staggered reveal of parts) and fit it to the palette. Fonts are loaded for you in `fonts.css` ( `<link rel="stylesheet" href="fonts.css">` ): use `font-family: "Yekan Bakh FaNum"` (700) and `"Yekan Bakh FaNum Black"` (900) for ALL text. They contain Persian letters and digits.
 - No network access: no CDN, no external images or fonts, no libraries. Everything is plain HTML/CSS/SVG/canvas and your own JS.
 - Code economy (every token you write is billed): no code comments, no decorative whitespace or indentation, short identifiers, shared CSS classes and CSS variables instead of repeated inline styles, data-driven loops and small helper functions instead of copy-pasted blocks per scene or per word. Keep the whole file under about 450 lines; richness comes from motion and layering, not from volume of code.
@@ -451,26 +467,39 @@ def _sample(comp: Path, size: tuple[int, int], times: list[float]) -> tuple[list
         return frames, page.errors[:8]
 
 
+WORKERS = max(1, int(os.getenv("VIDEO_WORKERS", str(min(3, os.cpu_count() or 1)))))
+
+
+def _render_frames(comp: Path, size: tuple[int, int], frames_total: int, out_dir: Path) -> None:
+    """Screenshot every frame; the composition is a pure function of t, so contiguous chunks can be shot by separate Chromium pages at once."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    chunk = -(-frames_total // WORKERS)
+
+    def shoot(first: int, last: int) -> None:
+        with _Page(comp, size) as page:
+            for n in range(first, last):
+                page.shot(n / vm.FPS, out_dir / f"{n:06d}.jpg", quality=92)
+
+    ranges = [(i, min(i + chunk, frames_total)) for i in range(0, frames_total, chunk)]
+    with ThreadPoolExecutor(max_workers=len(ranges)) as pool:
+        for future in [pool.submit(shoot, a, b) for a, b in ranges]:
+            future.result()
+
+
 def _mux(comp: Path, size: tuple[int, int], total: float, audio: Path, out: Path) -> None:
     frames_total = round(total * vm.FPS)
-    cmd = ["ffmpeg", "-y", "-f", "image2pipe", "-framerate", str(vm.FPS), "-c:v", "mjpeg", "-i", "-", "-i", str(audio),
-           "-map", "0:v", "-map", "1:a", "-c:v", "libx264", "-preset", "fast", "-crf", "18", "-pix_fmt", "yuv420p", "-r", str(vm.FPS),
-           "-c:a", "aac", "-ar", "44100", "-b:a", "192k", "-t", f"{total:.3f}", "-movflags", "+faststart", str(out)]
-    ffmpeg = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+    frames_dir = out.parent / "frames"
     try:
-        with _Page(comp, size) as page:
-            for n in range(frames_total):
-                ffmpeg.stdin.write(page.shot(n / vm.FPS, quality=92))
-        ffmpeg.stdin.close()
-        error = ffmpeg.stderr.read().decode("utf-8", "replace")
-        if ffmpeg.wait() != 0:
-            logger.error("ffmpeg mux failed: %s", error[-2000:])
+        _render_frames(comp, size, frames_total, frames_dir)
+        cmd = ["ffmpeg", "-y", "-framerate", str(vm.FPS), "-i", str(frames_dir / "%06d.jpg"), "-i", str(audio),
+               "-map", "0:v", "-map", "1:a", "-c:v", "libx264", "-preset", "fast", "-crf", "18", "-pix_fmt", "yuv420p", "-r", str(vm.FPS),
+               "-c:a", "aac", "-ar", "44100", "-b:a", "192k", "-t", f"{total:.3f}", "-movflags", "+faststart", str(out)]
+        result = subprocess.run(cmd, capture_output=True, timeout=1200)
+        if result.returncode != 0:
+            logger.error("ffmpeg mux failed: %s", result.stderr.decode("utf-8", "replace")[-2000:])
             raise AgentError("ساخت فایل ویدیو ناموفق بود")
-    except BrokenPipeError as exc:
-        raise AgentError("ساخت فایل ویدیو ناموفق بود") from exc
     finally:
-        if ffmpeg.poll() is None:
-            ffmpeg.kill()
+        shutil.rmtree(frames_dir, ignore_errors=True)
 
 
 def _audio_track(scenes: list[dict], narrations: list[dict | None], work: Path) -> Path:
@@ -489,6 +518,53 @@ def _audio_track(scenes: list[dict], narrations: list[dict | None], work: Path) 
     track = work / "narration.m4a"
     vm._run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(listing), "-c", "copy", str(track)], timeout=120)
     return track
+
+
+# --- sound design ----------------------------------------------------------------------------------
+
+SOUND = os.getenv("VIDEO_SOUND", "1") != "0"
+CHORDS = [(220.00, 261.63, 329.63), (174.61, 220.00, 261.63), (261.63, 329.63, 392.00), (196.00, 246.94, 293.66)]  # Am, F, C, G pads
+
+
+def _sound_bed(scenes: list[dict], total: float, work: Path) -> Path:
+    """Music pad plus transition whooshes, a hook pop and a call-to-action chime, all synthesised by ffmpeg (no assets, no API)."""
+    inputs: list[str] = []
+    chains: list[str] = []
+    labels: list[str] = []
+
+    def source(spec: str, chain: str, delay: float) -> None:
+        index = len(labels)
+        inputs.extend(["-f", "lavfi", "-i", spec])
+        chains.append(f"[{index}:a]{chain},adelay={int(max(delay, 0) * 1000)}|{int(max(delay, 0) * 1000)}[s{index}]")
+        labels.append(f"[s{index}]")
+
+    for i, scene in enumerate(scenes):
+        length = scene["end"] - scene["start"] + 0.6
+        for hz in CHORDS[i % len(CHORDS)]:
+            source(f"sine=f={hz}:d={length:.2f}:r=44100", f"tremolo=f=0.35:d=0.35,lowpass=f=1400,volume=0.045,afade=t=in:d=0.5,afade=t=out:st={max(length - 0.6, 0.1):.2f}:d=0.6", scene["start"] - 0.2)
+        if i > 0:
+            source("anoisesrc=d=0.7:c=pink:r=44100", "highpass=f=350,lowpass=f=5000,afade=t=in:d=0.3,afade=t=out:st=0.3:d=0.4,volume=0.5", scene["start"] - 0.3)
+    source("sine=f=660:d=0.18:r=44100", "afade=t=out:st=0.04:d=0.14,volume=0.35", 0.1)
+    last = scenes[-1]
+    for hz, offset in ((1318.5, 0.25), (1760.0, 0.38)):
+        source(f"sine=f={hz}:d=0.9:r=44100", "afade=t=out:st=0.05:d=0.85,volume=0.18", last["start"] + offset)
+    graph = ";".join(chains) + ";" + "".join(labels) + f"amix=inputs={len(labels)}:normalize=0,atrim=0:{total:.3f},alimiter=limit=0.9[bed]"
+    out = work / "bed.wav"
+    vm._run(["ffmpeg", "-y", *inputs, "-filter_complex", graph, "-map", "[bed]", "-ar", "44100", "-ac", "2", str(out)], timeout=120)
+    return out
+
+
+def _final_audio(scenes: list[dict], narration: Path, total: float, work: Path) -> Path:
+    """Level the narration, tuck the music under it (sidechain) and add the effects."""
+    if not SOUND:
+        return narration
+    bed = _sound_bed(scenes, total, work)
+    out = work / "mix.m4a"
+    graph = ("[0:a]loudnorm=I=-15:TP=-1.5:LRA=9,asplit=2[vo][side];"
+             "[1:a]volume=1.0[bedin];[bedin][side]sidechaincompress=threshold=0.03:ratio=6:attack=20:release=300[ducked];"
+             f"[vo][ducked]amix=inputs=2:normalize=0,alimiter=limit=0.92,afade=t=out:st={max(total - 0.6, 0):.2f}:d=0.6[mix]")
+    vm._run(["ffmpeg", "-y", "-i", str(narration), "-i", str(bed), "-filter_complex", graph, "-map", "[mix]", "-ar", "44100", "-ac", "2", "-c:a", "aac", "-b:a", "192k", str(out)], timeout=180)
+    return out
 
 
 # --- orchestration ---------------------------------------------------------------------------------
@@ -622,7 +698,7 @@ def build(scenario: dict, settings: dict, clips: list[Path], logo: Path | None, 
             logger.warning("Could not store the composition in the library", exc_info=True)
 
     logger.info("Composition accepted (%d chars); rendering %d frames at %dx%d", len(html), round(total * vm.FPS), size[0], size[1])
-    audio = _audio_track(scenes, narrations, work)
+    audio = _final_audio(scenes, _audio_track(scenes, narrations, work), total, work)
     final = work / "final.mp4"
     mux_started = time.time()
     _mux(comp, size, total, audio, final)

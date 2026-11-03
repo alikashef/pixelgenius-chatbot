@@ -416,14 +416,15 @@ def probe(path: Path) -> dict:
 
 def narrate(text: str, voice: str, speed: str, cache: Path) -> dict:
     """Spoken audio for one scene: {path, duration, words:[(word,start,end)]}. Cached by content so unchanged scenes are never re-synthesised."""
-    key = hashlib.sha256(f"{voice}|{speed}|{text}".encode()).hexdigest()[:20]
+    key = hashlib.sha256(f"v2|{voice}|{speed}|{text}".encode()).hexdigest()[:20]
     audio, meta = cache / f"{key}.mp3", cache / f"{key}.json"
     if audio.exists() and meta.exists():
         return {"path": audio, **json.loads(meta.read_text())}
     cache.mkdir(parents=True, exist_ok=True)
     raw = cache / f"{key}.raw.mp3"
     raw.write_bytes(tts_bytes(text, voice))
-    _run(["ffmpeg", "-y", "-i", str(raw), "-filter:a", f"atempo={SPEEDS[speed]}", "-ar", "44100", "-ac", "2", "-b:a", "160k", str(audio)], timeout=60)
+    _run(["ffmpeg", "-y", "-i", str(raw), "-filter:a", f"atempo={SPEEDS[speed]},silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.04,highpass=f=80,"
+                                                  "acompressor=threshold=-20dB:ratio=3:attack=5:release=80", "-ar", "44100", "-ac", "2", "-b:a", "160k", str(audio)], timeout=60)
     raw.unlink(missing_ok=True)
     duration = probe(audio)["duration"]
     words = text.split()

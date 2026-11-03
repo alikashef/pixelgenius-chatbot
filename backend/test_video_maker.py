@@ -259,3 +259,29 @@ def test_svg_logo_is_sanitized_but_keeps_the_drawing():
             raise AssertionError(broken)
         except video_maker.VideoError:
             pass
+
+
+def test_sound_bed_and_final_mix_cover_the_whole_video(tmp_path):
+    from services import video_agent
+    scenes = [{"index": i, "start": i * 3.0, "end": (i + 1) * 3.0} for i in range(3)]
+    narration = tmp_path / "narration.m4a"
+    subprocess.run(["ffmpeg", "-y", "-f", "lavfi", "-i", "sine=f=200:d=9", "-c:a", "aac", str(narration)], check=True, capture_output=True)
+    mix = video_agent._final_audio(scenes, narration, 9.0, tmp_path)
+    assert (tmp_path / "bed.wav").exists() and mix.name == "mix.m4a"
+    assert abs(video_maker.probe(mix)["duration"] - 9.0) < 0.6
+
+
+def test_frames_are_shot_in_parallel_chunks_without_gaps(tmp_path, monkeypatch):
+    from services import video_agent
+    shot = []
+
+    class FakePage:
+        def __init__(self, *a, **k): pass
+        def __enter__(self): return self
+        def __exit__(self, *a): pass
+        def shot(self, t, path, quality=90): shot.append(path.name); path.write_bytes(b"x")
+
+    monkeypatch.setattr(video_agent, "_Page", FakePage)
+    monkeypatch.setattr(video_agent, "WORKERS", 3)
+    video_agent._render_frames(tmp_path, (10, 10), 100, tmp_path / "frames")
+    assert sorted(shot) == [f"{n:06d}.jpg" for n in range(100)]
