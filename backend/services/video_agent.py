@@ -493,13 +493,21 @@ def _audio_track(scenes: list[dict], narrations: list[dict | None], work: Path) 
 
 # --- orchestration ---------------------------------------------------------------------------------
 
+def _svg_summary(markup: str) -> str:
+    """The designer reads the full markup at runtime from VIDEO.logo_svg; the prompt only needs its shape (the full text can be tens of thousands of tokens)."""
+    view = re.search(r'viewBox="([^"]+)"', markup)
+    shapes = {tag: len(re.findall(rf"<{tag}[\s>/]", markup)) for tag in ("path", "circle", "rect", "ellipse", "polygon", "line", "text", "g", "linearGradient")}
+    colours = list(dict.fromkeys(re.findall(r"#[0-9a-fA-F]{3,8}\b", markup)))[:6]
+    return f"{len(markup)} chars of SVG markup (read it at runtime), viewBox={view.group(1) if view else 'n/a'}, elements={ {k: v for k, v in shapes.items() if v} }, colours={colours}"
+
+
 def _brief(scenario: dict, settings: dict, size: tuple[int, int], data: dict) -> str:
     style = vm.STYLE_CATALOG[settings["style"]]
     return (f"WIDTH={size[0]} HEIGHT={size[1]} ({settings['format']}), duration {data['duration']}s, {len(data['scenes'])} scenes.\n"
             f"Art direction ({settings['style']}): {STYLE_DIRECTION[settings['style']]}\n"
             f"Video title/hook: {scenario.get('title', '')}\nClips available: {len(data['clips'])}\n"
             f"Brand and CTA are in the last scene. Subtitles: mode={settings['subtitle_mode']}, position={settings['subtitle_pos']}.\n"
-            f"This is the data.js you will receive (design from it, read it at runtime):\n{json.dumps({k: v for k, v in data.items() if k != 'scenes'}, ensure_ascii=False)}\n"
+            f"This is the data.js you will receive (design from it, read it at runtime):\n{json.dumps({k: (_svg_summary(v) if k == 'logo_svg' and v else v) for k, v in data.items() if k != 'scenes'}, ensure_ascii=False)}\n"
             f"scenes:\n{json.dumps(data['scenes'], ensure_ascii=False)}")
 
 
