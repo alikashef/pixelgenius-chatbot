@@ -71,6 +71,7 @@ A headless Chromium renders it frame by frame, FFmpeg adds the narration. Your o
 - Helpers in `window.PG`: clamp, lerp, progress(t,a,b), ease.out/inOut/back(k), sceneAt(t), activeWord(scene,t), and `await PG.clip(imgEl, clipIndex, t)` which shows the user's clip frame (never use <video>: it cannot be seeked reliably). Use `object-fit: cover`.
 - The user's logo, if any, is at `VIDEO.logo` (an image path). Fonts are loaded for you in `fonts.css` ( `<link rel="stylesheet" href="fonts.css">` ): use `font-family: "Yekan Bakh FaNum"` (700) and `"Yekan Bakh FaNum Black"` (900) for ALL text. They contain Persian letters and digits.
 - No network access: no CDN, no external images or fonts, no libraries. Everything is plain HTML/CSS/SVG/canvas and your own JS.
+- Code economy (every token you write is billed): no code comments, no decorative whitespace or indentation, short identifiers, shared CSS classes and CSS variables instead of repeated inline styles, data-driven loops and small helper functions instead of copy-pasted blocks per scene or per word. Keep the whole file under about 450 lines; richness comes from motion and layering, not from volume of code.
 - Do not add audio. The narration is mixed in by the harness. Total duration = VIDEO.duration; the scene timings are authoritative, never invent your own.
 
 # Craft
@@ -207,6 +208,12 @@ def check_quota() -> bool:
     _quota_probe.update(at=time.time(), ok=ok)
     return ok
 
+
+
+def _compact(html: str) -> str:
+    """Lossless-enough shrink of what is sent back and forth: HTML comments, indentation and blank lines carry no meaning."""
+    html = re.sub(r"<!--(?!\[).*?-->", "", html, flags=re.S)
+    return "\n".join(line.strip() for line in html.splitlines() if line.strip())
 
 
 def _extract_html(text: str) -> str | None:
@@ -564,8 +571,9 @@ def build(scenario: dict, settings: dict, clips: list[Path], logo: Path | None, 
             html = _extract_html(ask(messages, SYSTEM_PROMPT, **extra))
         if not html:
             raise AgentError("دستیار طراحی خروجی معتبر نداد، دوباره تلاش کنید")
-        return html
+        return _compact(html)
 
+    base_html = _compact(base_html) if base_html else None
     html = None
     if base_html:  # an edit: the cheaper model tries to apply it as patches first
         try:
