@@ -278,13 +278,13 @@ def _library_save(html: str, finger: dict, scenario: dict, info: dict | None) ->
 
 
 
-def _ask_html(messages: list[dict], system: str, models: list[str] | None = None) -> str:
+def _ask_html(messages: list[dict], system: str, models: list[str] | None = None, max_tokens: int = 24000) -> str:
     """One model turn; returns raw text. Falls through the configured models and gateways."""
     api_key = os.getenv("GAPGPT_API_KEY", "")
     if not api_key:
         raise AgentError("کلید هوش مصنوعی تنظیم نشده است")
     for model in dict.fromkeys(models or vm.AI_MODELS):
-        payload = {"model": model, "messages": [{"role": "system", "content": system}, *messages], "temperature": 0.8, "max_tokens": 24000 if not models else 6000, "stream": True,
+        payload = {"model": model, "messages": [{"role": "system", "content": system}, *messages], "temperature": 0.8, "max_tokens": max_tokens, "stream": True,
                    "reasoning": {"effort": "low"}}  # hidden reasoning otherwise eats the whole token budget and leaves no HTML
         for base_url in _base_urls():
             _check_budget()
@@ -528,7 +528,7 @@ def build(scenario: dict, settings: dict, clips: list[Path], logo: Path | None, 
             text = (f"{brief}\n\nCurrent composition:\n```html\n{html}\n```\n\nFrames at t = " + ", ".join(f"{t}s" for t in times) + " (in order).\n"
                     + ("Errors captured while rendering:\n" + "\n".join(errors) + "\n" if errors else "No render errors.\n"))
             try:
-                reply = ask([{"role": "user", "content": [{"type": "text", "text": text}, *[_image_part(f) for f in frames]]}], REVIEW_SYSTEM, models=vm.REVIEW_MODELS)
+                reply = ask([{"role": "user", "content": [{"type": "text", "text": text}, *[_image_part(f) for f in frames]]}], REVIEW_SYSTEM, models=vm.REVIEW_MODELS, max_tokens=6000)
             except AgentStop:
                 raise
             except AgentError:
@@ -555,12 +555,13 @@ def build(scenario: dict, settings: dict, clips: list[Path], logo: Path | None, 
         else:
             first = [{"role": "user", "content": brief + "\n\nWrite the composition now."}]
         messages = list(first)
-        html = _extract_html(ask(messages, SYSTEM_PROMPT))
+        extra = {"models": vm.REVIEW_MODELS} if base_html else {}  # only a brand-new design is worth Opus; a failed edit patch is redone by the mid-tier model
+        html = _extract_html(ask(messages, SYSTEM_PROMPT, **extra))
         for _ in range(2):
             if html:
                 break
             messages.append({"role": "user", "content": "The reply had no valid HTML document with window.seek. Send the complete ```html block."})
-            html = _extract_html(ask(messages, SYSTEM_PROMPT))
+            html = _extract_html(ask(messages, SYSTEM_PROMPT, **extra))
         if not html:
             raise AgentError("دستیار طراحی خروجی معتبر نداد، دوباره تلاش کنید")
         return html
@@ -569,7 +570,7 @@ def build(scenario: dict, settings: dict, clips: list[Path], logo: Path | None, 
     if base_html:  # an edit: the cheaper model tries to apply it as patches first
         try:
             reply = ask([{"role": "user", "content": f"{brief}\n\nCurrent composition:\n```html\n{base_html}\n```\n\nChange request (the data may have changed, everything must still read from VIDEO): {note or 'rebuild with the new script'}"}],
-                        REVIEW_SYSTEM.replace("Reply `OK` alone if the video is excellent and there were no errors.", "Reply `OK` alone if no change is needed."), models=vm.REVIEW_MODELS)
+                        REVIEW_SYSTEM.replace("Reply `OK` alone if the video is excellent and there were no errors.", "Reply `OK` alone if no change is needed."), models=vm.REVIEW_MODELS, max_tokens=6000)
             patched, applied = _apply_patches(base_html, reply)
             html = review(patched if applied else base_html) if applied or reply.strip().upper().startswith("OK") else None
         except AgentStop:
