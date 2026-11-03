@@ -159,17 +159,41 @@ def _sign_file(customer_id: str, project_id: str, rel: str) -> str:
     return jwt.encode({"scope": "video-file", "sub": customer_id, "p": project_id, "f": rel, "exp": int(time.time()) + FILE_TTL}, JWT_SECRET, algorithm=ALGORITHM)
 
 
+def _attachment_file(path: Path, attachment: "AttachmentIn") -> Path:
+    return path / "files" / attachment.url.split("/")[-1].split("?")[0]
+
+
+async def _adopt_logo(path: Path, project: dict, attachment: "AttachmentIn") -> bool:
+    """Make an image the customer sent in the chat the project's logo, with the same checks as the upload endpoint."""
+    source = _attachment_file(path, attachment)
+    suffix = source.suffix.lower()
+    if suffix not in LOGO_SUFFIXES or not source.exists() or source.stat().st_size > MAX_LOGO_BYTES:
+        return False
+    target = path / f"logo{suffix}"
+    await asyncio.to_thread(shutil.copyfile, source, target)
+    try:
+        info = await asyncio.to_thread(video_maker.probe, target)
+    except video_maker.VideoError:
+        info = {"width": 0}
+    if not info["width"]:
+        target.unlink(missing_ok=True)
+        return False
+    if project.get("logo") and project["logo"] != target.name:
+        (path / project["logo"]).unlink(missing_ok=True)
+    project["logo"], project["logo_name"] = target.name, (attachment.name or "logo")[:80]
+    return True
+
+
 def _attachment_content(path: Path, message: str, attachments: list["AttachmentIn"]) -> str | list[dict]:
     """Plain text for the model, plus base64 image parts (OpenAI vision format) for any image attachment."""
     if not attachments:
         return message
     notes = []
     image_parts = []
-    for a in attachments[:6]:
-        notes.append(a.name)
+    for number, a in enumerate(attachments[:6], 1):
+        notes.append(f"{number}) {a.name}")
         if (a.content_type or "") in VISION_IMAGE_TYPES:
-            fname = a.url.split("/")[-1].split("?")[0]
-            fpath = path / "files" / fname
+            fpath = _attachment_file(path, a)
             if fpath.exists() and fpath.stat().st_size <= MAX_IMAGE_BYTES:
                 data = base64.b64encode(fpath.read_bytes()).decode("ascii")
                 image_parts.append({"type": "image_url", "image_url": {"url": f"data:{a.content_type};base64,{data}"}})
@@ -400,9 +424,16 @@ async def chat(project_id: str, body: ChatIn, customer: dict = Depends(video_cus
     user_msg = {"role": "user", "content": message}
     if body.attachments:
         user_msg["attachments"] = [a.model_dump() for a in body.attachments]
-    project["messages"] += [user_msg, {"role": "assistant", "content": turn["reply"]}]
-    project["quick_replies"] = turn["quick_replies"]
+    reply = turn["reply"]
     info = turn["info"]
+    images = [a for a in body.attachments[:6] if (a.content_type or "") in VISION_IMAGE_TYPES]
+    pick = info.get("logo_attachment")
+    if pick is None and len(images) == 1 and not project.get("logo") and re.search(r"لوگو|آرم|logo", message, re.I):
+        pick = body.attachments.index(images[0]) + 1  # the customer called it the logo even if the model did not mark it
+    if isinstance(pick, int) and 1 <= pick <= len(body.attachments[:6]) and not await _adopt_logo(path, project, body.attachments[pick - 1]):
+        reply += "\n\n(این فایل به‌عنوان لوگو خوانده نشد؛ لطفاً لوگو را به‌صورت PNG یا JPG زیر ۵ مگابایت بفرست.)"
+    project["messages"] += [user_msg, {"role": "assistant", "content": reply}]
+    project["quick_replies"] = turn["quick_replies"]
     for key in ("brand", "cta", "format_reason", "style_reason"):
         if key in info:
             project["info"][key] = info[key]

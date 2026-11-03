@@ -125,3 +125,29 @@ def test_access_is_limited_to_the_allowed_phone(monkeypatch):
     with pytest.raises(router_module.HTTPException) as denied:
         asyncio.run(router_module.video_customer({"sub": "yes"}, Db()))
     assert denied.value.status_code == 403
+
+
+def test_image_sent_in_chat_becomes_the_logo(client, tmp_path, monkeypatch):
+    import subprocess
+    png = tmp_path / "mark.png"
+    subprocess.run(["ffmpeg", "-y", "-f", "lavfi", "-i", "color=c=purple:s=120x120", "-frames:v", "1", str(png)], check=True, capture_output=True)
+    pid = client.post("/api/video/projects", json={}).json()["id"]
+    sent = client.post(f"/api/video/projects/{pid}/files", files={"file": ("mark.png", png.read_bytes(), "image/png")}).json()
+    attachment = {"name": sent["name"], "url": sent["url"], "content_type": "image/png"}
+    answers = iter([{"reply": "لوگو ثبت شد.", "quick_replies": [], "info": {"logo_attachment": 1}, "scenario": None},
+                    {"reply": "عکس محصول رو دیدم.", "quick_replies": [], "info": {}, "scenario": None},
+                    {"reply": "ممنون.", "quick_replies": [], "info": {}, "scenario": None}])
+
+    async def fake_turn(project, message):
+        return next(answers)
+
+    monkeypatch.setattr(video_maker, "chat_turn", fake_turn)
+    project = client.post(f"/api/video/projects/{pid}/chat", json={"message": "این لوگومه", "attachments": [attachment]}).json()
+    assert project["has_logo"] is True and "ثبت شد" in project["messages"][-1]["content"]
+    other = client.post(f"/api/video/projects/{pid}/files", files={"file": ("shot.png", png.read_bytes(), "image/png")}).json()
+    fresh = client.post("/api/video/projects", json={}).json()["id"]
+    sent2 = client.post(f"/api/video/projects/{fresh}/files", files={"file": ("shot.png", png.read_bytes(), "image/png")}).json()
+    p2 = client.post(f"/api/video/projects/{fresh}/chat", json={"message": "این عکس محصولمه", "attachments": [{"name": "shot.png", "url": sent2["url"], "content_type": "image/png"}]}).json()
+    assert p2["has_logo"] is False
+    p3 = client.post(f"/api/video/projects/{fresh}/chat", json={"message": "لوگوی ما اینه", "attachments": [{"name": "shot.png", "url": sent2["url"], "content_type": "image/png"}]}).json()
+    assert p3["has_logo"] is True  # the customer said logo, so it counts even when the model did not mark it
