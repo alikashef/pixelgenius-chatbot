@@ -151,3 +151,17 @@ def test_image_sent_in_chat_becomes_the_logo(client, tmp_path, monkeypatch):
     assert p2["has_logo"] is False
     p3 = client.post(f"/api/video/projects/{fresh}/chat", json={"message": "لوگوی ما اینه", "attachments": [{"name": "shot.png", "url": sent2["url"], "content_type": "image/png"}]}).json()
     assert p3["has_logo"] is True  # the customer said logo, so it counts even when the model did not mark it
+
+
+def test_svg_logo_upload_and_chat_adoption(client):
+    svg = b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><path d="M0 0L10 10" stroke="red"/><script>x()</script></svg>'
+    pid = client.post("/api/video/projects", json={}).json()["id"]
+    assert client.post(f"/api/video/projects/{pid}/logo", files={"file": ("l.svg", b"<html/>", "image/svg+xml")}).status_code == 400
+    ok = client.post(f"/api/video/projects/{pid}/logo", files={"file": ("l.svg", svg, "image/svg+xml")})
+    assert ok.status_code == 200 and ok.json()["has_logo"] is True
+    path = router_module.ROOT / ("a" * 32) / pid
+    assert b"script" not in (path / "logo.svg").read_bytes() and b"<path" in (path / "logo.svg").read_bytes()
+    chat_id = client.post("/api/video/projects", json={}).json()["id"]
+    sent = client.post(f"/api/video/projects/{chat_id}/files", files={"file": ("brand.svg", svg, "image/svg+xml")}).json()
+    stored = router_module.ROOT / ("a" * 32) / chat_id / "files" / sent["url"].split("/")[-1].split("?")[0]
+    assert b"script" not in stored.read_bytes()

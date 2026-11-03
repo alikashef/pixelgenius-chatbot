@@ -32,7 +32,7 @@ MAX_CLIP_BYTES = 200 * 1024 * 1024
 MAX_LOGO_BYTES = 5 * 1024 * 1024
 MAX_CLIPS = 8
 CLIP_SUFFIXES = {".mp4", ".mov", ".m4v"}
-LOGO_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
+LOGO_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".svg"}
 MEDIA_TTL = 3600
 MEDIA_FILES = {"final.mp4", "poster.jpg", "cover.jpg"}
 MAX_ATTACH_BYTES = 20 * 1024 * 1024
@@ -159,6 +159,14 @@ def _sign_file(customer_id: str, project_id: str, rel: str) -> str:
     return jwt.encode({"scope": "video-file", "sub": customer_id, "p": project_id, "f": rel, "exp": int(time.time()) + FILE_TTL}, JWT_SECRET, algorithm=ALGORITHM)
 
 
+async def _clean_svg(target: Path) -> None:
+    try:
+        target.write_bytes(video_maker.sanitize_svg(target.read_bytes()))
+    except video_maker.VideoError as exc:
+        target.unlink(missing_ok=True)
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
 def _attachment_file(path: Path, attachment: "AttachmentIn") -> Path:
     return path / "files" / attachment.url.split("/")[-1].split("?")[0]
 
@@ -171,10 +179,17 @@ async def _adopt_logo(path: Path, project: dict, attachment: "AttachmentIn") -> 
         return False
     target = path / f"logo{suffix}"
     await asyncio.to_thread(shutil.copyfile, source, target)
-    try:
-        info = await asyncio.to_thread(video_maker.probe, target)
-    except video_maker.VideoError:
-        info = {"width": 0}
+    if suffix == ".svg":
+        try:
+            target.write_bytes(video_maker.sanitize_svg(target.read_bytes()))
+            info = {"width": 1}
+        except video_maker.VideoError:
+            info = {"width": 0}
+    else:
+        try:
+            info = await asyncio.to_thread(video_maker.probe, target)
+        except video_maker.VideoError:
+            info = {"width": 0}
     if not info["width"]:
         target.unlink(missing_ok=True)
         return False
@@ -191,7 +206,7 @@ def _attachment_content(path: Path, message: str, attachments: list["AttachmentI
     notes = []
     image_parts = []
     for number, a in enumerate(attachments[:6], 1):
-        notes.append(f"{number}) {a.name}")
+        notes.append(f"{number}) {a.name}" + (" (فایل برداری SVG؛ دیده نمی‌شود ولی قابل استفاده به‌عنوان لوگو است)" if a.name.lower().endswith(".svg") else ""))
         if (a.content_type or "") in VISION_IMAGE_TYPES:
             fpath = _attachment_file(path, a)
             if fpath.exists() and fpath.stat().st_size <= MAX_IMAGE_BYTES:
@@ -356,13 +371,17 @@ async def upload_logo(project_id: str, file: UploadFile = File(...), customer: d
     project = _load(path)
     suffix = Path(file.filename or "").suffix.lower()
     if suffix not in LOGO_SUFFIXES:
-        raise HTTPException(status_code=400, detail="لوگو باید PNG یا JPG باشد")
+        raise HTTPException(status_code=400, detail="لوگو باید PNG، JPG یا SVG باشد")
     target = path / f"logo{suffix}"
     await _store(file, target, MAX_LOGO_BYTES, "حجم لوگو بیشتر از ۵ مگابایت است")
-    try:
-        info = await asyncio.to_thread(video_maker.probe, target)
-    except video_maker.VideoError:
-        info = {"width": 0}
+    if suffix == ".svg":
+        await _clean_svg(target)
+        info = {"width": 1}  # a vector has no pixel size to probe; the sanitizer already checked it parses
+    else:
+        try:
+            info = await asyncio.to_thread(video_maker.probe, target)
+        except video_maker.VideoError:
+            info = {"width": 0}
     if not info["width"]:
         target.unlink(missing_ok=True)
         raise HTTPException(status_code=400, detail="فایل لوگو قابل خواندن نیست")
@@ -383,6 +402,8 @@ async def upload_file(project_id: str, file: UploadFile = File(...), customer: d
     (path / "files").mkdir(exist_ok=True)
     target = path / "files" / f"{uuid.uuid4().hex}{suffix}"
     await _store(file, target, MAX_ATTACH_BYTES, "حجم فایل بیشتر از ۲۰ مگابایت است")
+    if suffix == ".svg":
+        await _clean_svg(target)
     rel = f"files/{target.name}"
     return {
         "name": (file.filename or "file")[:150],
@@ -426,7 +447,7 @@ async def chat(project_id: str, body: ChatIn, customer: dict = Depends(video_cus
         user_msg["attachments"] = [a.model_dump() for a in body.attachments]
     reply = turn["reply"]
     info = turn["info"]
-    images = [a for a in body.attachments[:6] if (a.content_type or "") in VISION_IMAGE_TYPES]
+    images = [a for a in body.attachments[:6] if (a.content_type or "") in VISION_IMAGE_TYPES or a.name.lower().endswith(".svg")]
     pick = info.get("logo_attachment")
     if pick is None and len(images) == 1 and not project.get("logo") and re.search(r"لوگو|آرم|logo", message, re.I):
         pick = body.attachments.index(images[0]) + 1  # the customer called it the logo even if the model did not mark it

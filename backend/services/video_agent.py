@@ -61,7 +61,7 @@ A headless Chromium renders it frame by frame, FFmpeg adds the narration. Your o
 - Reply with ONE complete HTML document in a ```html fenced block and nothing else important outside it.
 - The page is exactly WIDTH x HEIGHT px (given below). `html, body {margin:0; width:WIDTH; height:HEIGHT; overflow:hidden}`.
 - Include `<script src="data.js"></script>` and `<script src="pg.js"></script>` before your own script. `data.js` defines `window.VIDEO`:
-  {width, height, fps, duration, format, style, brand, cta, subtitle_mode, subtitle_pos, logo (path or null), cover_title,
+  {width, height, fps, duration, format, style, brand, cta, subtitle_mode, subtitle_pos, logo (path or null; PNG/JPG/WebP/SVG), logo_svg (sanitized SVG markup when the logo is an SVG, else null), cover_title,
    scenes: [{index, kind: hook|body|cta, title, text (headline, may contain \\n), highlight (word inside text), narration, visual (storyboard sentence from the scriptwriter: build exactly this image/motion for the scene), start, end, asset (clip index or null),
              words: [{w, start, end}] // absolute seconds of every narrated word}],
    clips: [{index, name, frames, loop, w, h}]}
@@ -69,7 +69,7 @@ A headless Chromium renders it frame by frame, FFmpeg adds the narration. Your o
 - Define `window.seek = async (t) => {...}` : it must put the page in the exact visual state for time t seconds. The harness calls it once per frame (t = frame / fps), then screenshots.
   Everything is a pure function of t: no setTimeout/setInterval/requestAnimationFrame, no free-running CSS animations or transitions, no Math.random() without a fixed seed (use a seeded PRNG), no Date.now().
 - Helpers in `window.PG`: clamp, lerp, progress(t,a,b), ease.out/inOut/back(k), sceneAt(t), activeWord(scene,t), and `await PG.clip(imgEl, clipIndex, t)` which shows the user's clip frame (never use <video>: it cannot be seeked reliably). Use `object-fit: cover`.
-- The user's logo, if any, is at `VIDEO.logo` (an image path). Fonts are loaded for you in `fonts.css` ( `<link rel="stylesheet" href="fonts.css">` ): use `font-family: "Yekan Bakh FaNum"` (700) and `"Yekan Bakh FaNum Black"` (900) for ALL text. They contain Persian letters and digits.
+- The user's logo, if any, is at `VIDEO.logo` (an image path). When `VIDEO.logo_svg` is set, inline that markup (innerHTML) instead of using <img>: then you can recolour it (fill/stroke via CSS, `currentColor`), animate its paths (stroke-dashoffset draw-on, staggered reveal of parts) and fit it to the palette. Fonts are loaded for you in `fonts.css` ( `<link rel="stylesheet" href="fonts.css">` ): use `font-family: "Yekan Bakh FaNum"` (700) and `"Yekan Bakh FaNum Black"` (900) for ALL text. They contain Persian letters and digits.
 - No network access: no CDN, no external images or fonts, no libraries. Everything is plain HTML/CSS/SVG/canvas and your own JS.
 - Code economy (every token you write is billed): no code comments, no decorative whitespace or indentation, short identifiers, shared CSS classes and CSS variables instead of repeated inline styles, data-driven loops and small helper functions instead of copy-pasted blocks per scene or per word. Keep the whole file under about 450 lines; richness comes from motion and layering, not from volume of code.
 - Do not add audio. The narration is mixed in by the harness. Total duration = VIDEO.duration; the scene timings are authoritative, never invent your own.
@@ -371,13 +371,16 @@ def _prepare(comp: Path, scenario: dict, settings: dict, scenes: list[dict], tot
         css += f'@font-face{{font-family:"{family}";src:url("fonts/{file}") format("truetype");font-weight:{weight};}}\n'
     (comp / "fonts.css").write_text(css)
     (comp / "pg.js").write_text(RUNTIME_JS)
-    logo_rel = None
+    logo_rel, logo_svg = None, None
     if logo is not None:
         logo_rel = "logo" + logo.suffix.lower()
         shutil.copy(logo, comp / logo_rel)
+        if logo.suffix.lower() == ".svg":
+            markup = logo.read_text(encoding="utf-8", errors="ignore")
+            logo_svg = markup if len(markup) <= 40_000 else None
     data = {
         "width": size[0], "height": size[1], "fps": vm.FPS, "duration": total, "format": settings["format"], "style": settings["style"],
-        "brand": "", "cta": "", "subtitle_mode": settings["subtitle_mode"], "subtitle_pos": settings["subtitle_pos"], "logo": logo_rel,
+        "brand": "", "cta": "", "subtitle_mode": settings["subtitle_mode"], "subtitle_pos": settings["subtitle_pos"], "logo": logo_rel, "logo_svg": logo_svg,
         "cover_title": settings.get("cover_title") or scenario.get("title", ""), "scenes": scenes,
         "clips": _extract_clip_frames(clips, comp, total, size),
     }

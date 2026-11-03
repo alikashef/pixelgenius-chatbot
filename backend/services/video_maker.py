@@ -248,6 +248,49 @@ def estimate_cost(project: dict) -> dict:
             "included_edits": INCLUDED_EDITS, "extra_edit": prices["extra_edit"]}
 
 
+# --- svg logos -------------------------------------------------------------------------------------
+
+_SVG_NS = "http://www.w3.org/2000/svg"
+_SVG_BLOCKED = {"script", "foreignobject", "iframe", "object", "embed", "audio", "video", "canvas", "animate", "set", "animatemotion", "animatetransform"}
+
+
+def sanitize_svg(raw: bytes) -> bytes:
+    """A customer's SVG is rendered by our Chromium and served back to them: keep the drawing, drop anything that can run code or load files."""
+    import xml.etree.ElementTree as ET
+    if len(raw) > 512 * 1024:
+        raise VideoError("حجم فایل SVG بیشتر از ۵۱۲ کیلوبایت است")
+    head = raw[:4096].lower()
+    if b"<!entity" in raw.lower() or b"<!doctype" in head and b"[" in head:
+        raise VideoError("این فایل SVG پشتیبانی نمی‌شود")
+    ET.register_namespace("", _SVG_NS)
+    ET.register_namespace("xlink", "http://www.w3.org/1999/xlink")
+    try:
+        root = ET.fromstring(raw)
+    except ET.ParseError as exc:
+        raise VideoError("فایل SVG قابل خواندن نیست") from exc
+    if root.tag.rsplit("}", 1)[-1].lower() != "svg":
+        raise VideoError("فایل SVG قابل خواندن نیست")
+    if not root.get("viewBox") and not (root.get("width") and root.get("height")):
+        raise VideoError("SVG ابعاد ندارد (viewBox یا width و height لازم است)")
+
+    def clean(node) -> None:
+        for child in list(node):
+            if child.tag.rsplit("}", 1)[-1].lower() in _SVG_BLOCKED:
+                node.remove(child)
+            else:
+                clean(child)
+        for key in list(node.attrib):
+            value = node.attrib[key].strip().lower()
+            name = key.rsplit("}", 1)[-1].lower()
+            if name.startswith("on") or "javascript:" in value or (name == "href" and not (value.startswith("#") or value.startswith("data:image/"))):
+                del node.attrib[key]
+        if node.tag.rsplit("}", 1)[-1].lower() == "style" and node.text:
+            node.text = re.sub(r"@import[^;]*;?|url\((?!\s*['\"]?#)[^)]*\)", "", node.text)
+
+    clean(root)
+    return ET.tostring(root, encoding="utf-8", xml_declaration=True)
+
+
 # --- narration ---------------------------------------------------------------------------------
 
 def _post_audio(path: str, **kwargs) -> httpx.Response:

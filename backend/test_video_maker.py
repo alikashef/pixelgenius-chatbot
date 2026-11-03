@@ -244,3 +244,18 @@ def test_library_keeps_designs_but_never_a_customers_own_words(tmp_path, monkeyp
     video_agent._library_save("<html>design only seek</html>", finger, scenario, {})
     assert video_agent._library_pick(finger) == "<html>design only seek</html>"
     assert video_agent._library_pick({**finger, "scenes": finger["scenes"] + 1}) is None
+
+
+def test_svg_logo_is_sanitized_but_keeps_the_drawing():
+    clean = video_maker.sanitize_svg(b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" onload="x()"><script>alert(1)</script>'
+                                     b'<foreignObject><div/></foreignObject><a href="javascript:alert(1)"><path d="M0 0L10 10" fill="#7c3aed"/></a>'
+                                     b'<image href="https://evil.test/x.png"/><style>@import url(http://evil.test/a.css); .a{fill:red}</style></svg>').decode()
+    assert "<path" in clean and "#7c3aed" in clean and ".a{fill:red}" in clean
+    for bad in ("script", "foreignObject", "onload", "javascript:", "evil.test"):
+        assert bad not in clean
+    for broken in (b"<html></html>", b"not xml", b'<svg xmlns="http://www.w3.org/2000/svg"></svg>', b'<!DOCTYPE svg [<!ENTITY a "b">]><svg viewBox="0 0 1 1"/>'):
+        try:
+            video_maker.sanitize_svg(broken)
+            raise AssertionError(broken)
+        except video_maker.VideoError:
+            pass
