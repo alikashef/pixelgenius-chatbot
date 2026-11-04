@@ -444,3 +444,81 @@ def test_a_patch_that_breaks_the_design_is_rolled_back(tmp_path):
     work = tmp_path / "customer" / "project" / "v1"
     result = video_agent.build(scenario, video_maker.clean_settings({"style": "typography"}), [], None, work, tmp_path / "audio", narrate_fn=lambda *a, **k: None, ask=ask)
     assert result["has_audio"] and "{{{" not in (work / "comp" / "index.html").read_text() and calls == [False, True]
+
+
+def _plain_scenario(narration="مسیر خرید تو گم شده است", text="مشکل از مسیر است"):
+    return {"title": "x", "grammar": "", "scenes": [_scene("hook", "چرا نمی‌خرند", "چرا کسی از سایتت نمی‌خرد", 5), _scene("body", text, narration, 10), _scene("cta", "همین الان", "همین الان مشاوره بگیر", 15)]}
+
+
+def test_numbers_the_customer_never_gave_are_flagged():
+    said = "فروشم سی درصد بالا رفت و ۵ میلیون تومان درآمد داشتم، ۱۲۰۰ مشتری دارم"
+    ok = _plain_scenario("فروش سی درصد بالا رفت و پنج میلیون تومان درآمد آمد", "۱۲۰۰ مشتری، ۳۰٪ رشد")
+    assert video_maker.lint_scenario(ok, 30, said) == []
+    bad = " | ".join(video_maker.lint_scenario(_plain_scenario("فروش هفتاد درصد بالا رفت و ده هزار نفر خریدند", "۹۰٪ رشد"), 30, said))
+    assert "70" in bad and "90" in bad and "not given" in bad
+    assert video_maker.lint_scenario(_plain_scenario("سه دلیل دارد و یک روز خوب می‌آید", "۳ دلیل"), 30, said) == []
+    assert video_maker.lint_scenario(_plain_scenario("فروش هفتاد درصد بالا رفت"), 30, None) == []  # files were attached: numbers may come from them
+
+
+def test_written_prose_in_narration_is_flagged():
+    assert "written prose" in " ".join(video_maker.lint_scenario(_plain_scenario("همچنین مسیر خرید مهم است"), 30))
+
+
+def _turn(scenario, brand="برند", cta="تماس"):
+    return {"reply": "باشه", "quick_replies": [], "info": {"brand": brand, "cta": cta}, "scenario": scenario, "ready": True}
+
+
+def _project():
+    return {"clips": [], "logo": None, "info": {}, "messages": [], "scenario": None, "settings": video_maker.clean_settings({})}
+
+
+def test_weak_scorecard_triggers_one_rewrite_and_strong_one_none(monkeypatch):
+    import asyncio
+    better = _plain_scenario("حالا مسیر خرید را کوتاه کن")
+    for card, expected_calls, expected in (
+        ({"hook": 4, "payoff": 8, "spoken": 8, "cta": 8, "fixes": ["hook را تیزتر کن"]}, 3, "حالا مسیر خرید را کوتاه کن"),
+        ({"hook": 8, "payoff": 8, "spoken": 8, "cta": 8, "fixes": []}, 2, "مسیر خرید تو گم شده است"),
+    ):
+        calls = []
+
+        async def ask(system, user, history=None, temperature=0.7):
+            calls.append(system)
+            if system == video_maker.SCORE_PROMPT:
+                assert temperature == 0.2
+                return card
+            return _turn(better if len(calls) > 1 else _plain_scenario())
+
+        monkeypatch.setattr(video_maker, "_ask_json", ask)
+        result = asyncio.run(video_maker.chat_turn(_project(), "طراحی سایت دارم"))
+        assert len(calls) == expected_calls and result["scenario"]["scenes"][1]["narration"] == expected
+
+
+def test_no_scorecard_until_brand_and_cta_are_known(monkeypatch):
+    import asyncio
+    calls = []
+
+    async def ask(system, user, history=None, temperature=0.7):
+        calls.append(system)
+        return {"reply": "برندت چیه؟", "quick_replies": [], "info": {}, "scenario": _plain_scenario()}
+
+    monkeypatch.setattr(video_maker, "_ask_json", ask)
+    asyncio.run(video_maker.chat_turn(_project(), "طراحی سایت دارم"))
+    assert video_maker.SCORE_PROMPT not in calls and len(calls) == 1
+
+
+def test_invented_claims_are_removed_and_the_reply_is_not_about_the_rewrite(monkeypatch):
+    import asyncio
+    prompts = []
+
+    async def ask(system, user, history=None, temperature=0.7):
+        prompts.append(user)
+        if system == video_maker.SCORE_PROMPT:
+            assert "طراحی سایت دارم" in user
+            return {"hook": 9, "payoff": 9, "spoken": 9, "cta": 9, "invented": ["عطر کارامل"], "fixes": []}
+        if len(prompts) == 1:
+            return _turn(_plain_scenario("عطر کارامل دارد"))
+        return {**_turn(_plain_scenario("مسیر را کوتاه کن")), "reply": "طبق نکاتت اصلاح کردم"}
+
+    monkeypatch.setattr(video_maker, "_ask_json", ask)
+    result = asyncio.run(video_maker.chat_turn(_project(), "طراحی سایت دارم"))
+    assert "remove this claim" in prompts[2] and result["reply"] == "باشه" and result["scenario"]["scenes"][1]["narration"] == "مسیر را کوتاه کن"

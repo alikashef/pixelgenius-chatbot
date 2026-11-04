@@ -89,8 +89,14 @@ As soon as you know the goal, write the full scenario (3-6 scenes, total close t
 Narration length must fit the scene: at most 2.3 words per second of the scene duration, and the scene durations must add up to the requested duration. Narration must be natural, standard spoken Persian that a text-to-speech voice can read correctly: full words, no slang contractions, numbers as words.
 Pick style from the situation: "typography" (big word-by-word text), "shapes" (floating geometric shapes, modern brand feel), "particles" (soft rising particles, calm professional feel), "waveform" (live voice waveform, educational/audio content), "steps" (step indicator, good for "three reasons"/how-to), "cinematic" (dark gold, luxury/brand film), "one_take" (one continuous camera move through the scenes, storytelling), "collage" (paper-collage media look, culture/news/explainer), "cartoon" (animated illustration, explaining ideas to a wide audience), "poster" (bold halftone print poster look, sales/launch), all needing no footage; "clips" (narration over the user's uploaded clips) and "phone" (a clip inside a phone frame, good for showing a website or app) need 1+ uploaded clips; "before_after" (split screen) needs 2+ clips. Never pick a style whose clips are missing. Explain the choice in style_reason in one sentence without claiming research you did not do.
 Work like a scriptwriter with a beat sheet: first pick the grammar that fits the goal (problem_solution = pain, why it happens, fix, action; listicle = promise a number, deliver each item in one beat; storytime = situation, complication, turn, lesson; myth_vs_truth = a common belief then the correction; explainer = one question answered step by step; before_after = the cost of the old way against the new; kinetic = a punchy manifesto of short lines). Then write each scene as a beat with a narration line and a "visual" storyboard sentence the motion designer will build, so the video shows the idea, it does not just read it.
-Scenario craft (this decides whether the video is good): the hook (first 2 seconds) must be a concrete tension, a surprising number the user gave, or a question the viewer feels personally, never a greeting or the brand name. One idea per scene and one concrete image or example per idea; build curiosity so each scene makes the next one necessary. Short punchy on-screen headlines (max 7 words) that add to the narration instead of repeating it word for word. The last scene closes the loop of the hook and gives exactly one clear action. Vary scene rhythm (a fast 3s beat after a 6s one), and write like a person talks, not like an ad.
+Scenario craft (this decides whether the video is good): the hook (first 2 seconds) must be a concrete tension, a surprising number the user gave, or a question the viewer feels personally, never a greeting or the brand name. One idea per scene and one concrete image or example per idea. Every scene must pay something off on its own (a point, an example, a small surprise) and also pull the viewer into the next one; a scene that only sets up the next is where people scroll away. Short punchy on-screen headlines (max 7 words) that add to the narration instead of repeating it word for word. The last scene closes the loop of the hook and gives exactly one clear action. Vary scene rhythm (a fast 3s beat after a 6s one), and write like a person talks, not like an ad. Write the narration for the ear: read it aloud in your head, keep sentences short, and avoid written-prose constructions such as «علاوه بر این», «همچنین», «لذا», «بدین ترتیب», «می‌باشد», «جهت», «در نتیجه».
 Never invent facts, prices, results or customer claims the user did not give. Never claim you analysed trending videos."""
+
+SCORE_PROMPT = """You are a demanding short-video script editor. Score this Persian scenario from 1 to 10 on each dimension. Reply ONLY with one JSON object, no markdown:
+{"hook": n, "payoff": n, "spoken": n, "cta": n, "invented": ["every factual claim in the scenario that the customer did not say"], "fixes": ["one specific instruction per weak point, naming the scene"]}
+hook: would a stranger scrolling past stop in the first two seconds? payoff: does every scene deliver something on its own instead of only setting up the next? spoken: does the narration sound natural when heard, not written? cta: is there exactly one specific action that closes the loop of the hook?
+invented: compare with the customer's own words given to you. Numbers, durations, tastes, ingredients, results, comparisons with competitors and anything else presented as fact about the business must come from them; general truths everyone knows are fine.
+Be strict: 7 means genuinely good. Leave fixes empty if nothing is below 7. A fix must never ask for a fact, number or claim the customer did not give; strengthen with framing, contrast, a question or a visual instead."""
 
 REVISE_PROMPT = """You edit an existing Persian short-video scenario for a user. Reply ONLY with one JSON object, no markdown:
 {"reply": "one short Persian sentence saying what you changed",
@@ -175,7 +181,7 @@ def _parse_json_object(text: str) -> dict:
     return value
 
 
-async def _ask_json(system: str, user: str | list[dict], history: list[dict] | None = None) -> dict:
+async def _ask_json(system: str, user: str | list[dict], history: list[dict] | None = None, temperature: float = 0.7) -> dict:
     api_key = os.getenv("GAPGPT_API_KEY", "")
     if not api_key:
         raise VideoError("کلید هوش مصنوعی تنظیم نشده است")
@@ -183,7 +189,7 @@ async def _ask_json(system: str, user: str | list[dict], history: list[dict] | N
         payload = {
             "model": model,
             "messages": [{"role": "system", "content": system}, *(history or []), {"role": "user", "content": user}],
-            "temperature": 0.7,
+            "temperature": temperature,
             "max_tokens": 3000,
         }
         for base_url in _base_urls():
@@ -214,7 +220,41 @@ _GREETING = re.compile(r"^\s*(سلام|درود|خوش\s*آمد|به\s+.*\s+خو
 _SCREEN_ONLY = re.compile(r"^(متن|تایپ|text)\b.*(روی صفحه|on screen)|^text on screen", re.I)
 
 
-def lint_scenario(scenario: dict, requested_seconds: float) -> list[str]:
+_FA_DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
+_NUMBER_WORDS = {"یک": 1, "دو": 2, "سه": 3, "چهار": 4, "پنج": 5, "شش": 6, "هفت": 7, "هشت": 8, "نه": 9, "ده": 10, "یازده": 11, "دوازده": 12, "سیزده": 13, "چهارده": 14,
+                 "پانزده": 15, "پونزده": 15, "شانزده": 16, "شونزده": 16, "هفده": 17, "هجده": 18, "نوزده": 19, "بیست": 20, "سی": 30, "چهل": 40, "پنجاه": 50, "شصت": 60,
+                 "هفتاد": 70, "هشتاد": 80, "نود": 90, "صد": 100, "دویست": 200, "سیصد": 300, "چهارصد": 400, "پانصد": 500, "ششصد": 600, "هفتصد": 700, "هشتصد": 800, "نهصد": 900}
+_SCALES = {"هزار": 1_000, "میلیون": 1_000_000, "میلیارد": 1_000_000_000}
+_CLAIM_UNITS = "درصد|برابر|میلیون|میلیارد|هزار|تومان|دلار|نفر|مشتری|فروش|سال|ماه|هفته|روز|ساعت|دقیقه"
+_NOT_LETTER = r"(?<![\u0600-\u06FF\u200c])"
+_WORDS = "|".join(sorted(_NUMBER_WORDS, key=len, reverse=True))
+_WORD_NUMBER = re.compile(rf"{_NOT_LETTER}((?:{_WORDS})(?:\s+و\s+(?:{_WORDS}))*)\s+({_CLAIM_UNITS})")
+_DIGIT_NUMBER = re.compile(rf"(\d+(?:[,٬]\d{{3}})*(?:[.٫]\d+)?)\s*(٪|%|{_CLAIM_UNITS})?")
+_WRITTEN_PROSE = re.compile(r"علاوه بر این|همچنین|لذا|بدین ترتیب|می‌باشد|می باشد|در نتیجه|از این رو")
+
+
+def _numbers_in(text: str) -> list[tuple[float, str]]:
+    """Every number in a text with the word after it, whether written in digits or as Persian words."""
+    text = text.translate(_FA_DIGITS)
+    found = [(float(raw.replace(",", "").replace("٬", "").replace("٫", ".")), unit) for raw, unit in _DIGIT_NUMBER.findall(text)]
+    found += [(float(sum(_NUMBER_WORDS[w] for w in re.split(r"\s+و\s+", words))), unit) for words, unit in _WORD_NUMBER.findall(text)]
+    return found
+
+
+def _unsupported_numbers(scenario: dict, user_text: str) -> list[str]:
+    """Numbers on screen or in the narration that the customer never gave. A count such as «۳ دلیل» is structure, not a claim."""
+    known = set()
+    for value, unit in _numbers_in(user_text):
+        known.update({value, value * _SCALES.get(unit, 1)})
+    issues = []
+    for i, scene in enumerate(scenario["scenes"]):
+        for value, unit in _numbers_in(f"{scene['text']} {scene['narration']}"):
+            if (unit or value > 10) and value != 1 and value not in known and value * _SCALES.get(unit, 1) not in known:
+                issues.append(f"scene {i}: the number {value:g} {unit} was not given by the user; remove it or replace it with something they said")
+    return list(dict.fromkeys(issues))
+
+
+def lint_scenario(scenario: dict, requested_seconds: float, user_text: str | None = None) -> list[str]:
     """Deterministic checks of what the scriptwriting prompt promises; the model gets one chance to repair what this finds."""
     scenes, issues = scenario["scenes"], []
     if not 3 <= len(scenes) <= 6:
@@ -240,11 +280,65 @@ def lint_scenario(scenario: dict, requested_seconds: float) -> list[str]:
             issues.append(f"scene {i}: visual must describe a concrete image or motion, not text on a screen")
     if scenes and _GREETING.search(scenes[0]["narration"]):
         issues.append("the hook must start with a concrete tension or question, never a greeting")
+    for i, sc in enumerate(scenes):
+        found = _WRITTEN_PROSE.search(sc["narration"])
+        if found:
+            issues.append(f"scene {i}: «{found.group(0)}» is written prose; rewrite the line as it would be spoken")
+    if user_text is not None:
+        issues += _unsupported_numbers(scenario, user_text)
     return issues
 
 
 def _user_text(message: str | list[dict]) -> str:
     return message if isinstance(message, str) else " ".join(part.get("text", "") for part in message if isinstance(part, dict) and part.get("type") == "text")
+
+
+def _customer_words(project: dict, message: str | list[dict]) -> str | None:
+    """Everything the customer said, or None when they sent files the numbers could have come from."""
+    if not isinstance(message, str) or "فایل‌های پیوست‌شده" in message or any(m.get("attachments") for m in project["messages"]):
+        return None
+    return " ".join([*(m["content"] for m in project["messages"] if m["role"] == "user"), message, *(str(v) for v in project["info"].values())])
+
+
+async def _improve_scenario(project: dict, system: str, message: str | list[dict], history: list[dict], data: dict) -> dict:
+    """Code checks, then an editor's scorecard once the video is defined; each may trigger one rewrite, and a rewrite is kept only if the code checks do not get worse."""
+    clips, seconds = len(project["clips"]), project["settings"]["duration"]
+    words = _customer_words(project, message)
+
+    def problems(candidate: dict) -> list[str]:
+        try:
+            return lint_scenario(normalize_scenario(candidate["scenario"], clips), seconds, words)
+        except (VideoError, KeyError, TypeError):
+            return ["the scenario is malformed"]
+
+    async def rewrite(current: dict, instructions: list[str], why: str) -> dict:
+        logger.info("Scenario rewrite (%s): %s", why, "; ".join(instructions[:3]))
+        try:
+            fixed = await _ask_json(system, "Fix exactly these problems without adding any fact, number or claim the customer did not give, keep everything else, and return the complete JSON object again in the same shape:\n- " + "\n- ".join(instructions),
+                                    [*history, {"role": "user", "content": _user_text(message)}, {"role": "assistant", "content": json.dumps(current, ensure_ascii=False)}])
+        except (VideoError, ValueError):
+            return current
+        if not isinstance(fixed.get("scenario"), dict) or len(problems(fixed)) > len(problems(current)):
+            return current
+        return {**current, "scenario": fixed["scenario"]}  # only the script changes: the customer never asked for these fixes, so the reply stays
+
+    issues = problems(data)
+    if issues:
+        data = await rewrite(data, issues, "checks")
+    info = data.get("info") if isinstance(data.get("info"), dict) else {}
+    if (info.get("brand") or project["info"].get("brand")) and (info.get("cta") or project["info"].get("cta")):
+        try:
+            said = words if words is not None else _user_text(message) + " " + " ".join(m["content"] for m in project["messages"] if m["role"] == "user")
+            card = await _ask_json(SCORE_PROMPT, f"Customer's own words:\n{said}\n\nScenario:\n{json.dumps(data['scenario'], ensure_ascii=False)}", temperature=0.2)
+            scores = [float(card[k]) for k in ("hook", "payoff", "spoken", "cta")]
+        except (VideoError, ValueError, KeyError, TypeError):
+            return data
+        logger.info("Scenario scorecard: %s", scores)
+        fixes = [str(x) for x in card.get("fixes", []) if str(x).strip()] if isinstance(card.get("fixes"), list) else []
+        invented = [f"remove this claim, the customer did not say it: {x}" for x in card.get("invented", []) if str(x).strip()] if isinstance(card.get("invented"), list) else []
+        if invented or ((sum(scores) / 4 < 7 or min(scores) < 6) and fixes):
+            data = await rewrite(data, [*invented, *fixes][:8], f"scorecard {scores}, {len(invented)} invented")
+    return data
 
 
 async def chat_turn(project: dict, message: str | list[dict]) -> dict:
@@ -253,19 +347,7 @@ async def chat_turn(project: dict, message: str | list[dict]) -> dict:
     system = AGENT_PROMPT + "\n\nCurrent state:\n" + _state_for_prompt(project)
     data = await _ask_json(system, message, history)
     if isinstance(data.get("scenario"), dict):
-        try:
-            issues = lint_scenario(normalize_scenario(data["scenario"], len(project["clips"])), project["settings"]["duration"])
-        except VideoError:
-            issues = ["the scenario is malformed"]
-        if issues:
-            logger.info("Scenario failed %d checks, asking for one repair: %s", len(issues), "; ".join(issues[:3]))
-            try:
-                fixed = await _ask_json(system, "Your last scenario broke these rules. Fix exactly these problems, keep everything else, and return the complete JSON object again in the same shape:\n- "
-                                        + "\n- ".join(issues), [*history, {"role": "user", "content": _user_text(message)}, {"role": "assistant", "content": json.dumps(data, ensure_ascii=False)}])
-                if isinstance(fixed.get("scenario"), dict) and len(lint_scenario(normalize_scenario(fixed["scenario"], len(project["clips"])), project["settings"]["duration"])) < len(issues):
-                    data = fixed
-            except (VideoError, ValueError):
-                pass
+        data = await _improve_scenario(project, system, message, history, data)
     reply = str(data.get("reply", "")).strip()
     if not reply:
         raise VideoError("پاسخ دستیار خالی بود، دوباره تلاش کنید")
