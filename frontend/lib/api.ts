@@ -1158,6 +1158,7 @@ export interface VideoProject {
   edits: { used: number; included: number };
   status: "draft" | "rendering" | "ready" | "failed";
   stage: string | null;
+  progress: { percent: number; label: string; eta: number | null } | null;
   error: string | null;
   last_failure: string | null;
   versions: VideoVersion[];

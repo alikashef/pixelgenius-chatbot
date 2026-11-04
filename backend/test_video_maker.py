@@ -394,3 +394,24 @@ def test_embedding_failure_never_breaks_the_build(monkeypatch):
     monkeypatch.setattr(video_agent.httpx, "post", boom)
     assert video_agent._embed("text") is None
     assert abs(video_agent._cosine([1, 0], [1, 0]) - 1) < 1e-9 and video_agent._cosine([0, 0], [1, 0]) == 0.0
+
+
+def test_progress_is_monotonic_reaches_the_end_and_learns_durations(tmp_path, monkeypatch):
+    from services import video_agent
+    monkeypatch.setattr(video_agent, "STATS_FILE", tmp_path / "stats.json")
+    events = []
+    tracker = video_agent._Progress(lambda percent, label, eta: events.append((percent, label, eta)))
+    with tracker.stage("voice"):
+        for i in range(3):
+            tracker.fraction(i + 1, 3)
+    tracker.skip("design")
+    with tracker.stage("review"):
+        pass
+    with tracker.stage("frames"):
+        tracker.fraction(0.5, 1)
+        tracker.fraction(1, 1)
+    tracker.finish()
+    percents = [e[0] for e in events]
+    assert percents == sorted(percents) and percents[-1] == 100 and max(p for p in percents[:-1]) <= 99
+    assert events[-1][2] == 0 and all(e[2] >= 5 for e in events[:-1])
+    assert "design" not in tracker.plan and (tmp_path / "stats.json").exists()

@@ -759,6 +759,30 @@ function aspectOf(format: VideoSettings["format"]) {
   return { "9:16": "9 / 16", "4:5": "4 / 5", "1:1": "1 / 1", "16:9": "16 / 9" }[format];
 }
 
+function etaText(seconds: number | null | undefined): string {
+  if (seconds == null) return "در حال برآورد زمان";
+  if (seconds < 60) return "کمتر از یک دقیقه مانده";
+  return `حدود ${Math.ceil(seconds / 60).toLocaleString("fa-IR")} دقیقه مانده`;
+}
+
+function RenderProgress({ progress }: { progress: VideoProject["progress"] }) {
+  const percent = progress?.percent ?? 1;
+  return (
+    <div role="status" className="space-y-3 rounded-xl border border-border bg-surface p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="font-bold text-foreground">{progress?.label ?? "ساخت ویدیو شروع شد"}</p>
+          <p className="mt-0.5 text-sm text-muted-foreground">{etaText(progress?.eta)}. می‌تونی از صفحه خارج بشی و بعداً برگردی.</p>
+        </div>
+        <span className="shrink-0 text-lg font-black tabular-nums text-foreground">{percent.toLocaleString("fa-IR")}٪</span>
+      </div>
+      <div role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} aria-label="پیشرفت ساخت ویدیو" className="h-2.5 w-full overflow-hidden rounded-full bg-surface-2">
+        <div className="h-full rounded-full bg-brand-solid transition-[width] duration-700 ease-out motion-reduce:transition-none" style={{ width: `${percent}%` }} />
+      </div>
+    </div>
+  );
+}
+
 function Workspace({ token, id, onError }: { token: string; id: string; onError: Fail }) {
   const [project, setProject] = useState<VideoProject | null>(null);
   const [missing, setMissing] = useState(false);
@@ -794,13 +818,7 @@ function Workspace({ token, id, onError }: { token: string; id: string; onError:
       {step === 3 && (
         <>
           {rendering && (
-            <div role="status" className="flex items-center gap-4 rounded-xl border border-border bg-surface p-5">
-              <span className="h-6 w-6 shrink-0 rounded-full border-[3px] border-foreground/15 border-t-brand-solid motion-safe:animate-spin" />
-              <div>
-                <p className="font-bold text-foreground">گوینده در حال خواندن و ویدیو در حال ساخت است</p>
-                <p className="text-sm text-muted-foreground">معمولاً یک تا دو دقیقه طول می‌کشد. می‌تونی از صفحه خارج بشی و بعداً برگردی.</p>
-              </div>
-            </div>
+            <RenderProgress progress={project.progress} />
           )}
           {project.status === "failed" && <div role="alert" className="rounded-xl border border-danger/30 bg-danger/10 p-4 text-sm text-danger">{project.error ?? "ساخت ویدیو ناموفق بود"}<span className="mt-1 block text-foreground/70">به تنظیمات برگرد و دوباره بساز.</span></div>}
           {!rendering && project.versions.length > 0 && <ResultStep token={token} project={project} onChange={setProject} onError={onError} />}

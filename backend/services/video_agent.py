@@ -537,15 +537,22 @@ def _sample(comp: Path, size: tuple[int, int], times: list[float]) -> tuple[list
 WORKERS = max(1, int(os.getenv("VIDEO_WORKERS", str(min(3, os.cpu_count() or 1)))))
 
 
-def _render_frames(comp: Path, size: tuple[int, int], frames_total: int, out_dir: Path) -> None:
+def _render_frames(comp: Path, size: tuple[int, int], frames_total: int, out_dir: Path, on_frame: Callable | None = None) -> None:
     """Screenshot every frame; the composition is a pure function of t, so contiguous chunks can be shot by separate Chromium pages at once."""
     out_dir.mkdir(parents=True, exist_ok=True)
     chunk = -(-frames_total // WORKERS)
+
+    shot, lock = [0], threading.Lock()
 
     def shoot(first: int, last: int) -> None:
         with _Page(comp, size) as page:
             for n in range(first, last):
                 page.shot(n / vm.FPS, out_dir / f"{n:06d}.jpg", quality=92)
+                if on_frame:
+                    with lock:
+                        shot[0] += 1
+                        if shot[0] % 10 == 0:
+                            on_frame(shot[0] / frames_total * 0.92)
 
     ranges = [(i, min(i + chunk, frames_total)) for i in range(0, frames_total, chunk)]
     with ThreadPoolExecutor(max_workers=len(ranges)) as pool:
@@ -553,11 +560,11 @@ def _render_frames(comp: Path, size: tuple[int, int], frames_total: int, out_dir
             future.result()
 
 
-def _mux(comp: Path, size: tuple[int, int], total: float, audio: Path, out: Path) -> None:
+def _mux(comp: Path, size: tuple[int, int], total: float, audio: Path, out: Path, on_progress: Callable | None = None) -> None:
     frames_total = round(total * vm.FPS)
     frames_dir = out.parent / "frames"
     try:
-        _render_frames(comp, size, frames_total, frames_dir)
+        _render_frames(comp, size, frames_total, frames_dir, on_progress)
         cmd = ["ffmpeg", "-y", "-framerate", str(vm.FPS), "-i", str(frames_dir / "%06d.jpg"), "-i", str(audio),
                "-map", "0:v", "-map", "1:a", "-c:v", "libx264", "-preset", "fast", "-crf", "18", "-pix_fmt", "yuv420p", "-r", str(vm.FPS),
                "-c:a", "aac", "-ar", "44100", "-b:a", "192k", "-t", f"{total:.3f}", "-movflags", "+faststart", str(out)]
@@ -688,6 +695,106 @@ def _split_draft(brief: str, scenes: list[dict], ask: Callable) -> str:
     return shell.replace("/*SCENES*/", "\n".join(codes))
 
 
+# --- progress ----------------------------------------------------------------------------------------
+
+STATS_FILE = LIBRARY.parent / "_stats.json"
+
+
+class _Progress:
+    """Percent and time left for the customer. Stage durations are learned (moving average) from earlier builds; time-based stages creep towards 95% so the bar never lies about finishing."""
+
+    LABELS = {"voice": "گوینده در حال خواندن متن", "design": "طراح هوش مصنوعی در حال ساخت طراحی ویدیو", "patch": "اعمال تغییرات روی طراحی",
+              "review": "بررسی فریم‌ها و اصلاح جزئیات", "frames": "رندر تصویر و ترکیب با صدا"}
+    DEFAULTS = {"voice": 8.0, "design": 240.0, "patch": 45.0, "review": 70.0, "frames": 45.0}
+
+    def __init__(self, callback: Callable | None):
+        self.callback = callback
+        try:
+            learned = json.loads(STATS_FILE.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            learned = {}
+        self.expected = {**self.DEFAULTS, **{k: v for k, v in learned.items() if k in self.DEFAULTS and isinstance(v, (int, float)) and v > 0}}
+        self.plan = ["voice", "design", "review", "frames"]
+        self.done: list[str] = []
+        self.measured: dict[str, float] = {}
+        self.current: str | None = None
+        self.started = 0.0
+        self.fraction_now = 0.0
+        self.timed = True
+        self.best = 0
+        self._ticker: threading.Thread | None = None
+        self._stop = threading.Event()
+
+    def skip(self, name: str) -> None:
+        if name in self.plan and name not in self.done and name != self.current:
+            self.plan.remove(name)
+
+    def fraction(self, done: float, total: float) -> None:
+        self.timed, self.fraction_now = False, min(max(done / max(total, 1), 0.0), 1.0)
+        self._emit()
+
+    def _emit(self) -> None:
+        if not self.callback or self.current is None:
+            return
+        if self.timed:
+            elapsed = time.time() - self.started
+            self.fraction_now = min(0.95, 1 - 2.718281828 ** (-elapsed / max(self.expected[self.current], 1.0)))
+        total = sum(self.expected[n] for n in self.plan) or 1.0
+        before = sum(self.expected[n] for n in self.plan if n in self.done)
+        percent = min(99, int(100 * (before + self.fraction_now * self.expected[self.current]) / total))
+        self.best = max(self.best, percent)
+        later = sum(self.expected[n] for n in self.plan[self.plan.index(self.current) + 1:]) if self.current in self.plan else 0.0
+        eta = int(max(5.0, self.expected[self.current] * (1 - self.fraction_now) + later))
+        try:
+            self.callback(self.best, self.LABELS[self.current], eta)
+        except Exception:  # pragma: no cover
+            logger.warning("Progress callback failed", exc_info=True)
+
+    def stage(self, name: str):
+        tracker = self
+
+        class _Ctx:
+            def __enter__(ctx):
+                if name not in tracker.plan:
+                    tracker.plan.insert(max(len(tracker.plan) - 2, 0), name)
+                tracker.current, tracker.started, tracker.fraction_now, tracker.timed = name, time.time(), 0.0, True
+                tracker._stop = threading.Event()
+                stop = tracker._stop
+
+                def tick() -> None:
+                    while not stop.wait(2.0):
+                        tracker._emit()
+                tracker._ticker = threading.Thread(target=tick, daemon=True)
+                tracker._ticker.start()
+                tracker._emit()
+
+            def __exit__(ctx, exc_type, *rest):
+                tracker._stop.set()
+                if exc_type is None:
+                    tracker.done.append(name)
+                    tracker.measured[name] = tracker.measured.get(name, 0.0) + time.time() - tracker.started
+                tracker.current = None
+        return _Ctx()
+
+    def finish(self) -> None:
+        if self.callback:
+            self.callback(100, "ویدیو آماده است", 0)
+        learned = {}
+        try:
+            learned = json.loads(STATS_FILE.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            pass
+        for name, seconds in self.measured.items():
+            if name == "voice" and seconds < 1:
+                continue
+            learned[name] = round(0.6 * learned.get(name, self.DEFAULTS[name]) + 0.4 * max(seconds, 1.0), 1)
+        try:
+            STATS_FILE.parent.mkdir(parents=True, exist_ok=True)
+            STATS_FILE.write_text(json.dumps(learned), encoding="utf-8")
+        except OSError:
+            logger.warning("Could not store stage timings", exc_info=True)
+
+
 # --- orchestration ---------------------------------------------------------------------------------
 
 def _svg_summary(markup: str) -> str:
@@ -709,18 +816,23 @@ def _brief(scenario: dict, settings: dict, size: tuple[int, int], data: dict) ->
 
 
 def build(scenario: dict, settings: dict, clips: list[Path], logo: Path | None, work: Path, audio_cache: Path,
-          note: str = "", base_html: str | None = None, info: dict | None = None, cover_file: Path | None = None, narrate_fn: Callable = vm.narrate, ask: Callable = _ask_html) -> dict:
+          note: str = "", base_html: str | None = None, info: dict | None = None, cover_file: Path | None = None, narrate_fn: Callable = vm.narrate, ask: Callable = _ask_html, progress: Callable | None = None) -> dict:
     """Write, review and render the video into work/final.mp4; returns validation info. work/comp/index.html keeps the composition for later edits."""
     work = work.resolve()
     work.mkdir(parents=True, exist_ok=True)
     tally = {"usd": 0.0, "in": 0, "out": 0}
     _spend.set(tally)
+    tracker = _Progress(progress)
     logger.info("Build start: %s, style=%s, format=%s, %d scenes, %d clips, logo=%s", "edit" if base_html else "new video", settings["style"], settings["format"],
                 len(scenario["scenes"]), len(clips), (logo.suffix.lower() if logo else "none"))
     size = vm.FORMATS[settings["format"]]
     if vm.STYLE_CATALOG[settings["style"]]["clips"] > len(clips):
         settings = {**settings, "style": "typography"}
-    narrations = [narrate_fn(s["narration"], settings["voice"], settings["speed"], audio_cache.resolve()) if s["narration"] else None for s in scenario["scenes"]]
+    narrations = []
+    with tracker.stage("voice"):
+        for i, scene in enumerate(scenario["scenes"]):
+            narrations.append(narrate_fn(scene["narration"], settings["voice"], settings["speed"], audio_cache.resolve()) if scene["narration"] else None)
+            tracker.fraction(i + 1, len(scenario["scenes"]))
     scenes, total = _timeline(scenario, settings, narrations)
     logger.info("Narration ready: %d/%d scenes voiced, timeline %.1fs", sum(1 for n in narrations if n), len(narrations), total)
     comp = work / "comp"
@@ -735,6 +847,10 @@ def build(scenario: dict, settings: dict, clips: list[Path], logo: Path | None, 
         finger["vec"] = _embed(finger["text"])
 
     def review(html: str) -> str | None:
+        with tracker.stage("review"):
+            return review_loop(html)
+
+    def review_loop(html: str) -> str | None:
         """Render frames, let the cheaper model send patches; None when the composition cannot be made to work."""
         for round_no in range(MAX_ROUNDS + 1):
             (comp / "index.html").write_text(html, encoding="utf-8")
@@ -805,9 +921,11 @@ def build(scenario: dict, settings: dict, clips: list[Path], logo: Path | None, 
     base_html = _compact(base_html) if base_html else None
     html = None
     if base_html:  # an edit: the cheaper model tries to apply it as patches first
+        tracker.skip("design")
         try:
-            reply = ask([{"role": "user", "content": f"{brief}\n\nCurrent composition:\n```html\n{base_html}\n```\n\nChange request (the data may have changed, everything must still read from VIDEO): {note or 'rebuild with the new script'}"}],
-                        REVIEW_SYSTEM.replace("Reply `OK` alone if the video is excellent and there were no errors.", "Reply `OK` alone if no change is needed."), models=vm.REVIEW_MODELS, max_tokens=6000)
+            with tracker.stage("patch"):
+                reply = ask([{"role": "user", "content": f"{brief}\n\nCurrent composition:\n```html\n{base_html}\n```\n\nChange request (the data may have changed, everything must still read from VIDEO): {note or 'rebuild with the new script'}"}],
+                            REVIEW_SYSTEM.replace("Reply `OK` alone if the video is excellent and there were no errors.", "Reply `OK` alone if no change is needed."), models=vm.REVIEW_MODELS, max_tokens=6000)
             patched, applied = _apply_patches(base_html, reply)
             html = review(patched if applied else base_html) if applied or reply.strip().upper().startswith("OK") else None
         except AgentStop:
@@ -815,12 +933,15 @@ def build(scenario: dict, settings: dict, clips: list[Path], logo: Path | None, 
         except AgentError:
             html = None
     elif REUSE and (cached := _library_pick(finger)):
+        tracker.skip("design")
         html = review(cached)
         logger.info("Video agent reused a stored %s composition: %s", finger["style"], "kept" if html else "rejected")
     reused = html is not None
     if html is None:
         logger.info("Drafting a new composition with %s" if not base_html else "Edit could not be patched; rewriting with the mid-tier model", vm.AI_MODELS[0] if not base_html else vm.REVIEW_MODELS[0])
-        html = review(draft())
+        with tracker.stage("design"):
+            drafted = draft()
+        html = review(drafted)
         if html is None:
             raise AgentError("طراحی ویدیو به نتیجه‌ی قابل‌قبول نرسید، دوباره تلاش کنید")
     if not base_html and not reused and REUSE:
@@ -833,10 +954,12 @@ def build(scenario: dict, settings: dict, clips: list[Path], logo: Path | None, 
     audio = _final_audio(scenes, _audio_track(scenes, narrations, work), total, work)
     final = work / "final.mp4"
     mux_started = time.time()
-    _mux(comp, size, total, audio, final)
+    with tracker.stage("frames"):
+        _mux(comp, size, total, audio, final, on_progress=lambda fraction: tracker.fraction(fraction, 1))
     logger.info("Video encoded in %.0fs", time.time() - mux_started)
     result = vm.validate(final, total, size)
     result["ai_cost_usd"] = round(tally["usd"], 3)
+    tracker.finish()
     logger.info("Build done: Video agent spend for %s: $%.3f (%d in / %d out tokens)", work.name, tally["usd"], tally["in"], tally["out"])
     vm._run(["ffmpeg", "-y", "-ss", "0.8", "-i", str(final), "-frames:v", "1", "-q:v", "3", str(work / "poster.jpg")], timeout=60)
     if cover_file is not None and cover_file.exists():

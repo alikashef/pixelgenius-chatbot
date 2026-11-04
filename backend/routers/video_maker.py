@@ -258,6 +258,7 @@ def _public(customer: dict, project: dict) -> dict:
     return {
         **{k: project[k] for k in keys},
         "has_logo": bool(project.get("logo")),
+        "progress": project.get("progress") if project["status"] == "rendering" else None,
         "covers": {"title": (project.get("covers") or {}).get("title", ""), "chosen": (project.get("covers") or {}).get("chosen"), "price": video_maker.CREDIT_PRICES["cover_ai_ref" if has_reference else "cover_ai"], "has_reference": has_reference,
                    "options": [{"file": o["file"], "label": o["label"], "url": media(f"covers/{o['file']}")} for o in (project.get("covers") or {}).get("options", [])]},
         "styles": [{"value": key, **{k: v[k] for k in ("label", "hint", "credits", "clips", "category")}} for key, v in video_maker.STYLE_CATALOG.items()],
@@ -503,6 +504,19 @@ async def edit_settings(project_id: str, body: SettingsIn, customer: dict = Depe
     return _public(customer, project)
 
 
+def _progress_writer(path: Path):
+    last = {"percent": -1, "at": 0.0}
+
+    def write(percent: int, label: str, eta: int | None) -> None:
+        if percent == last["percent"] and time.time() - last["at"] < 6:
+            return
+        last.update(percent=percent, at=time.time())
+        project = _load(path)
+        project["progress"] = {"percent": percent, "label": label, "eta": eta}
+        _save(path, project)
+    return write
+
+
 def _render_job(path: Path, number: int) -> None:
     started = time.time()
     logger.info("Render job v%d for project %s waiting for a slot", number, path.name[:8])
@@ -517,10 +531,10 @@ def _render_job(path: Path, number: int) -> None:
                              and (path / f"v{v['n']}" / "comp" / "index.html").exists()), None)
             info = video_agent.build(project["scenario"], project["settings"], clips, logo, path / f"v{number}", path / "audio",
                                      note=version["note"] if version["kind"] == "edit" else "", base_html=previous.read_text(encoding="utf-8") if previous else None,
-                                     info=project.get("info"), cover_file=(path / "covers" / chosen) if (chosen := (project.get("covers") or {}).get("chosen")) else None)
+                                     info=project.get("info"), progress=_progress_writer(path), cover_file=(path / "covers" / chosen) if (chosen := (project.get("covers") or {}).get("chosen")) else None)
         project = _load(path)
         next(v for v in project["versions"] if v["n"] == number).update(status="done", info=info, finished_at=int(time.time()))
-        project.update(status="ready", stage=None, error=None)
+        project.update(status="ready", stage=None, error=None, progress=None)
         logger.info("Render job v%d finished in %.0fs", number, time.time() - started)
     except video_maker.VideoError as exc:
         logger.warning("Render job v%d failed after %.0fs: %s", number, time.time() - started, exc)
@@ -541,7 +555,7 @@ def _fail(path: Path, number: int, message: str) -> dict:
             version["refunded"] = True
         except Exception:
             logger.exception("Video credit refund failed")
-    project.update(status="failed", stage=None, error=message)
+    project.update(status="failed", stage=None, error=message, progress=None)
     return project
 
 
@@ -549,7 +563,7 @@ def _begin_render(path: Path, project: dict, kind: str, note: str = "", charged:
     number = len(project["versions"]) + 1
     project["versions"].append({"n": number, "kind": kind, "note": note, "status": "rendering", "scenario": project["scenario"],
                                 "settings": project["settings"], "created_at": int(time.time()), "charged": charged, "customer": customer_id})
-    project.update(status="rendering", stage="rendering", error=None)
+    project.update(status="rendering", stage="rendering", error=None, progress={"percent": 1, "label": "در صف ساخت", "eta": None})
     _save(path, project)
     threading.Thread(target=_render_job, args=(path, number), daemon=True).start()
 
