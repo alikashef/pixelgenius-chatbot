@@ -13,8 +13,9 @@ import re
 import shutil
 import subprocess
 import tempfile
+import threading
 import time
-from contextvars import ContextVar
+from contextvars import ContextVar, copy_context
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from typing import Callable
@@ -187,6 +188,7 @@ MAX_RENDER_USD = float(os.getenv("VIDEO_MAX_USD", "2.0"))  # hard cap on provide
 QUOTA_MESSAGE = "سرویس هوش مصنوعی موقتاً در دسترس نیست، کمی بعد دوباره تلاش کنید"
 _spend: ContextVar[dict | None] = ContextVar("video_agent_spend", default=None)
 _quota_probe = {"at": 0.0, "ok": True}
+_tally_lock = threading.Lock()
 
 
 def _record_spend(model: str, usage: dict | None) -> None:
@@ -195,9 +197,10 @@ def _record_spend(model: str, usage: dict | None) -> None:
         return
     tokens_in, tokens_out = usage.get("prompt_tokens") or 0, usage.get("completion_tokens") or 0
     price_in, price_out = next((v for k, v in credits.MODEL_USD_PER_MTOK.items() if k in model.lower()), credits.DEFAULT_USD_PER_MTOK)
-    tally["usd"] += (tokens_in * price_in + tokens_out * price_out) / 1_000_000
-    tally["in"] += tokens_in
-    tally["out"] += tokens_out
+    with _tally_lock:
+        tally["usd"] += (tokens_in * price_in + tokens_out * price_out) / 1_000_000
+        tally["in"] += tokens_in
+        tally["out"] += tokens_out
 
 
 def _check_budget() -> None:
@@ -567,6 +570,60 @@ def _final_audio(scenes: list[dict], narration: Path, total: float, work: Path) 
     return out
 
 
+# --- split build: a director (Opus) writes the shell, scene agents (Sonnet) write the scenes in parallel -------
+
+SPLIT = os.getenv("VIDEO_SPLIT", "0") != "0"
+
+DIRECTOR_SYSTEM = SYSTEM_PROMPT + """
+
+# Director mode (split build)
+Other agents will write the scenes. You write ONLY the shell, which decides the look and holds everything together. Do not write any scene content.
+- Define `const STYLE = {...}` at the top of your script: palette, type sizes in px, safe-area numbers and easing choices; scene agents read it.
+- Build the persistent layers (animated background, a camera layer, a transition overlay, the subtitle layer) and one `<div class="scene" id="sc0">`, `sc1`... per entry of VIDEO.scenes, created at runtime.
+- Declare `window.SCENES = {};` Scene agents will later assign `SCENES[i] = function(t, k) {...}` (t = global seconds, k = 0..1 progress inside the scene) that builds and updates its own container. Your `window.seek` shows the active scene container (and the next one during the transition overlap), calls SCENES[i](t, k), then drives the transition, the camera and the subtitles.
+- Put the exact marker `/*SCENES*/` on its own line inside your script, before `window.seek` runs (the agents' code replaces it).
+- Keep the shell under about 250 lines.
+After the html block add `<scenes>["note for scene 0", "note for scene 1", ...]</scenes>`: one note per scene (max 50 words) saying the hero element, the concrete image to build from its `visual` sentence, and how it hands off to the next scene (what carries over)."""
+
+SCENE_SYSTEM = """You write ONE scene module of a short Persian social video. A director already wrote the HTML shell (shown to you); it owns the stage, background, camera, transitions between scenes and subtitles. You only draw your scene.
+- Reply with one ```js fenced block and nothing else of substance: `SCENES[i] = function(t, k) { ... };` where t = global seconds and k = 0..1 progress inside the scene. The shell calls it every frame while the scene is visible, including the short transition overlaps.
+- Build the DOM once inside `document.getElementById("sc" + i)` (guard with a flag), then only update styles from t and k. Everything is a pure function of t: no timers, no requestAnimationFrame, no CSS animations or transitions, no Math.random (use PG.rng(seed)), no Date.
+- Read all text and timing from `VIDEO.scenes[i]` (title, text with newlines, highlight word, narration, visual, start, end, words[{w,start,end}]). Never hardcode the copy. The `visual` sentence says exactly which image or motion to build.
+- Use the shell's STYLE tokens and the fonts "Yekan Bakh FaNum" (700) and "Yekan Bakh FaNum Black" (900). Persian is RTL. Headlines are at least 8% of the short side and keep key text inside the safe area. Helpers: window.PG (clamp, lerp, progress, ease.out/inOut/back, keys, rng, stagger, counter, activeWord, clip). Words enter in sync with words[].start; the highlight word gets its own emphasis moment.
+- Compact code: no comments, short names, loops instead of repeated blocks, under about 120 lines. Inline SVG for icons and diagrams; no external assets."""
+
+
+def _split_draft(brief: str, scenes: list[dict], ask: Callable) -> str:
+    reply = ask([{"role": "user", "content": brief + "\n\nWrite the shell now."}], DIRECTOR_SYSTEM, max_tokens=9000)
+    shell = _extract_html(reply)
+    if not shell or "/*SCENES*/" not in shell:
+        raise AgentError("the director did not return a usable shell")
+    shell = _compact(shell)
+    found = re.search(r"<scenes>\s*(\[.*?\])\s*</scenes>", reply, re.S)
+    try:
+        notes = [str(x) for x in json.loads(found.group(1))] if found else []
+    except ValueError:
+        notes = []
+    notes += [""] * (len(scenes) - len(notes))
+
+    def write_scene(i: int) -> str:
+        scene = scenes[i]
+        facts = {k: scene.get(k) for k in ("kind", "title", "text", "highlight", "narration", "visual", "start", "end", "asset")}
+        content = (f"Shell written by the director:\n```html\n{shell}\n```\n\nYou write scene {i} of {len(scenes)}.\nScene facts (read them from VIDEO.scenes[{i}] at runtime, never hardcode): "
+                   f"{json.dumps(facts, ensure_ascii=False)}\nDirector's note: {notes[i] or 'none'}\nReply with the js block for SCENES[{i}].")
+        text = ask([{"role": "user", "content": content}], SCENE_SYSTEM, models=vm.REVIEW_MODELS, max_tokens=6000)
+        match = re.search(r"```(?:js|javascript)\s*(.*?)```", text, re.S)
+        code = match.group(1).strip() if match else ""
+        if f"SCENES[{i}]" not in code:
+            raise AgentError(f"scene {i} had no usable code")
+        return code
+
+    with ThreadPoolExecutor(max_workers=min(4, len(scenes))) as pool:
+        futures = [pool.submit(copy_context().run, write_scene, i) for i in range(len(scenes))]
+        codes = [f.result() for f in futures]
+    return shell.replace("/*SCENES*/", "\n".join(codes))
+
+
 # --- orchestration ---------------------------------------------------------------------------------
 
 def _svg_summary(markup: str) -> str:
@@ -657,6 +714,13 @@ def build(scenario: dict, settings: dict, clips: list[Path], logo: Path | None, 
             first = [{"role": "user", "content": f"{brief}\n\nHere is the current composition of this video. Keep its design and apply this change request"
                                                  f" (the data may have changed, make sure everything still reads from VIDEO):\n\nRequest: {note or 'rebuild with the new script'}\n\n```html\n{base_html}\n```"}]
         else:
+            if SPLIT:
+                try:
+                    return _compact(_split_draft(brief, scenes, ask))
+                except AgentStop:
+                    raise
+                except AgentError as exc:
+                    logger.warning("Split build failed (%s); writing the whole composition in one call", exc)
             first = [{"role": "user", "content": brief + "\n\nWrite the composition now."}]
         messages = list(first)
         extra = {"models": vm.REVIEW_MODELS} if base_html else {}  # only a brand-new design is worth Opus; a failed edit patch is redone by the mid-tier model

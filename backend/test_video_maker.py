@@ -285,3 +285,42 @@ def test_frames_are_shot_in_parallel_chunks_without_gaps(tmp_path, monkeypatch):
     monkeypatch.setattr(video_agent, "WORKERS", 3)
     video_agent._render_frames(tmp_path, (10, 10), 100, tmp_path / "frames")
     assert sorted(shot) == [f"{n:06d}.jpg" for n in range(100)]
+
+
+def test_split_draft_assembles_director_shell_and_parallel_scenes():
+    from services import video_agent
+    scenes = [{"kind": "hook", "title": "a", "text": "t0", "visual": "v0", "start": 0, "end": 3}, {"kind": "cta", "title": "b", "text": "t1", "visual": "v1", "start": 3, "end": 6}]
+    shell = "<html><body><script>window.SCENES={};\n/*SCENES*/\nwindow.seek=function(t){SCENES[0](t,0)}</script></body></html>"
+    seen = []
+
+    def ask(messages, system, models=None, max_tokens=24000):
+        if system is video_agent.DIRECTOR_SYSTEM:
+            seen.append(("director", models))
+            return f"```html\n{shell}\n```\n<scenes>[\"note zero\", \"note one\"]</scenes>"
+        seen.append(("scene", models))
+        i = 0 if "scene 0 of" in messages[0]["content"] else 1
+        assert ("note zero" if i == 0 else "note one") in messages[0]["content"]
+        return f"```js\nSCENES[{i}] = function(t, k) {{ /* scene {i} */ }};\n```"
+
+    html = video_agent._split_draft("brief", scenes, ask)
+    assert "SCENES[0] =" in html and "SCENES[1] =" in html and "/*SCENES*/" not in html
+    assert seen[0] == ("director", None) and all(models == video_agent.vm.REVIEW_MODELS for kind, models in seen[1:])
+
+    def broken(messages, system, models=None, max_tokens=24000):
+        return "```html\n<html>seek</html>\n```" if system is video_agent.DIRECTOR_SYSTEM else "no code"
+    try:
+        video_agent._split_draft("brief", scenes, broken)
+        raise AssertionError("a shell without the marker must be refused")
+    except video_agent.AgentError:
+        pass
+
+
+def test_spend_is_counted_across_worker_threads():
+    from concurrent.futures import ThreadPoolExecutor
+    from contextvars import copy_context
+    from services import video_agent
+    video_agent._spend.set({"usd": 0.0, "in": 0, "out": 0})
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        for future in [pool.submit(copy_context().run, video_agent._record_spend, "claude-sonnet-5-5", {"prompt_tokens": 1000, "completion_tokens": 1000}) for _ in range(8)]:
+            future.result()
+    assert video_agent._spend.get()["in"] == 8000
