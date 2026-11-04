@@ -181,3 +181,22 @@ def test_render_interrupted_by_a_restart_is_failed_and_refunded(client, monkeypa
     assert after["status"] == "failed" and after["progress"] is None and "کردیت" in after["error"]
     assert len(refunds) == 1 and refunds[0][1] == 5650
     assert router_module.recover_interrupted_renders() == 0 and len(refunds) == 1
+
+
+def test_three_concepts_are_tied_to_the_script_and_reach_the_director(client, monkeypatch):
+    async def fake_concepts(project, recent):
+        return [{"title": f"ایده {i}", "idea": f"شرح {i}", "look": "گرم"} for i in range(3)]
+
+    monkeypatch.setattr(video_maker, "make_concepts", fake_concepts)
+    pid = client.post("/api/video/projects", json={}).json()["id"]
+    assert client.post(f"/api/video/projects/{pid}/concepts").status_code == 400  # no script yet
+    client.post(f"/api/video/projects/{pid}/chat", json={"message": "ریل می‌خوام"})
+    project = client.post(f"/api/video/projects/{pid}/concepts").json()
+    assert len(project["concepts"]["options"]) == 3 and project["concepts"]["chosen"] is None
+    assert client.post(f"/api/video/projects/{pid}/concepts/choose", json={"index": 9}).status_code == 404
+    assert client.post(f"/api/video/projects/{pid}/concepts/choose", json={"index": 1}).json()["concepts"]["chosen"] == 1
+    path = router_module.ROOT / ("a" * 32) / pid
+    assert router_module._concept_text(router_module._load(path)) == "ایده 1: شرح 1 (گرم)"
+    client.put(f"/api/video/projects/{pid}/settings", json={"style": "poster"})
+    after = client.get(f"/api/video/projects/{pid}").json()
+    assert after["concepts"] == {"options": [], "chosen": None} and router_module._concept_text(router_module._load(path)) == ""

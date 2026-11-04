@@ -84,6 +84,7 @@ A headless Chromium renders it frame by frame, FFmpeg adds the narration. Your o
              words: [{w, start, end}] // absolute seconds of every narrated word}],
    clips: [{index, name, frames, loop, w, h}]}
   All text and timing MUST be read from VIDEO so edits to the script never need a new design. Never hardcode the user's copy.
+- Wrap your script in an IIFE and never declare a global named `seek`: a top-level `function seek` IS window.seek, so calling it from window.seek recurses forever.
 - Define `window.seek = async (t) => {...}` : it must put the page in the exact visual state for time t seconds. The harness calls it once per frame (t = frame / fps), then screenshots.
   Everything is a pure function of t: no setTimeout/setInterval/requestAnimationFrame, no free-running CSS animations or transitions, no Math.random() without a fixed seed (use a seeded PRNG), no Date.now().
 - Helpers in `window.PG`: clamp, lerp, progress(t,a,b), ease.out/inOut/back(k), sceneAt(t), activeWord(scene,t), keys(frames,t[,ease]) (frames = [[t,v1,v2..],...] eased between keyframes, returns the values), camera(el, [[t,cx,cy,zoom],...], t, W, H) (virtual camera on a stage element, cx/cy are 0..1 centres, clamped to the stage), rng(seed) (seeded random), stagger(i,t,start,gap,dur) (progress of the i-th item), counter(t,a,b,from,to), and `await PG.clip(imgEl, clipIndex, t)` which shows the user's clip frame (never use <video>: it cannot be seeked reliably). Use `object-fit: cover`.
@@ -260,6 +261,7 @@ exact text copied from the file (unique in it, as short as possible)
 =======
 replacement text
 >>>>>>> REPLACE
+Fix every instance of a problem, not just the first one you notice. Only change what you can point to in a frame or a measured problem; do not guess. Before sending a patch, check that it keeps the JavaScript valid.
 At most 8 blocks, no explanations, no other text."""
 
 _PATCH = re.compile(r"<<<<<<< SEARCH\r?\n(.*?)\r?\n=======\r?\n(.*?)\r?\n>>>>>>> REPLACE", re.S)
@@ -525,7 +527,37 @@ AUDIT_JS = r"""
 """
 
 
-def _sample(comp: Path, size: tuple[int, int], times: list[float]) -> tuple[list[Path], list[str], list[str]]:
+MIN_SCENE_MOTION = 0.02  # measured on real renders: good scenes change 4-20% of the frame between samples, slideshow-like ones 0-1%
+MIN_SCENE_CHANGE = 0.12  # consecutive scenes that differ less than this read as the same slide
+
+
+def _gray(jpeg: bytes) -> bytes:
+    result = subprocess.run(["ffmpeg", "-loglevel", "error", "-f", "image2pipe", "-c:v", "mjpeg", "-i", "-", "-vf", "scale=64:114,format=gray", "-f", "rawvideo", "-"], input=jpeg, capture_output=True, timeout=30)
+    return result.stdout
+
+
+def _changed(a: bytes, b: bytes) -> float:
+    return sum(abs(x - y) > 12 for x, y in zip(a, b)) / max(len(a), 1)
+
+
+def _slideshow_problems(page: "_Page", scenes: list[dict]) -> list[str]:
+    """Is this an animated slide deck? Measures how much of the frame moves inside each scene and how different neighbouring scenes are."""
+    problems, middles = [], []
+    for scene in scenes:
+        length = scene["end"] - scene["start"]
+        frames = [_gray(page.shot(scene["start"] + length * at, quality=70)) for at in (0.3, 0.5, 0.7, 0.9)]
+        middles.append(frames[1])
+        motion = sum(_changed(frames[i], frames[i + 1]) for i in range(3)) / 3
+        if motion < MIN_SCENE_MOTION:
+            problems.append(f"scene {scene['index']} is nearly static ({motion:.1%} of the frame changes while it plays; good scenes change at least 4%): animate the illustration itself and keep something moving until the scene ends")
+    for i in range(len(middles) - 1):
+        difference = _changed(middles[i], middles[i + 1])
+        if difference < MIN_SCENE_CHANGE:
+            problems.append(f"scenes {i} and {i + 1} look almost the same ({difference:.1%} of the frame differs): give scene {i + 1} a different composition")
+    return problems
+
+
+def _sample(comp: Path, size: tuple[int, int], times: list[float], scenes: list[dict] | None = None) -> tuple[list[Path], list[str], list[str]]:
     """Frames for the reviewer, JS errors, and layout problems found by measuring the page itself (cheaper and more reliable than asking a model to spot them)."""
     frames, layout = [], []
     with _Page(comp, size, scale=0.4) as page:
@@ -542,6 +574,11 @@ def _sample(comp: Path, size: tuple[int, int], times: list[float]) -> tuple[list
             layout.append("at least one sampled frame is almost empty (nothing visible)")
         if len(frames) > 1 and len({f.read_bytes() for f in frames}) == 1:
             layout.append("every sampled frame is identical, so nothing changes over time")
+        if scenes:
+            try:
+                layout += _slideshow_problems(page, scenes)
+            except Exception:  # pragma: no cover
+                logger.warning("Slideshow check failed", exc_info=True)
         return frames, page.errors[:8], list(dict.fromkeys(layout))[:10]
 
 
@@ -585,6 +622,23 @@ def _mux(comp: Path, size: tuple[int, int], total: float, audio: Path, out: Path
             raise AgentError("ساخت فایل ویدیو ناموفق بود")
     finally:
         shutil.rmtree(frames_dir, ignore_errors=True)
+
+
+def _post_render_problems(final: Path, total: float, narrated: bool) -> tuple[list[str], list[str]]:
+    """Looks at the finished file: (reasons it cannot be delivered, smaller issues to log)."""
+    probe = subprocess.run(["ffmpeg", "-hide_banner", "-i", str(final), "-vf", "blackdetect=d=1:pix_th=0.08", "-af", "volumedetect", "-f", "null", "-"], capture_output=True, text=True, timeout=300).stderr
+    black = sum(float(x) for x in re.findall(r"black_duration:([\d.]+)", probe))
+    mean, peak = re.search(r"mean_volume: (-?[\d.]+) dB", probe), re.search(r"max_volume: (-?[\d.]+) dB", probe)
+    fatal, minor = [], []
+    if black > total * 0.3:
+        fatal.append(f"{black:.1f}s of {total:.1f}s is black")
+    elif black:
+        minor.append(f"{black:.1f}s of black frames")
+    if narrated and mean and float(mean.group(1)) < -45:
+        fatal.append(f"the narration is silent (mean {mean.group(1)} dB)")
+    if peak and float(peak.group(1)) >= -0.05:
+        minor.append("the audio peaks at full scale")
+    return fatal, minor
 
 
 def _audio_track(scenes: list[dict], narrations: list[dict | None], work: Path) -> Path:
@@ -844,7 +898,7 @@ def _brief(scenario: dict, settings: dict, size: tuple[int, int], data: dict) ->
 
 
 def build(scenario: dict, settings: dict, clips: list[Path], logo: Path | None, work: Path, audio_cache: Path,
-          note: str = "", base_html: str | None = None, info: dict | None = None, cover_file: Path | None = None, narrate_fn: Callable = vm.narrate, ask: Callable = _ask_html, progress: Callable | None = None) -> dict:
+          note: str = "", base_html: str | None = None, info: dict | None = None, cover_file: Path | None = None, narrate_fn: Callable = vm.narrate, ask: Callable = _ask_html, progress: Callable | None = None, concept: str = "") -> dict:
     """Write, review and render the video into work/final.mp4; returns validation info. work/comp/index.html keeps the composition for later edits."""
     work = work.resolve()
     work.mkdir(parents=True, exist_ok=True)
@@ -885,7 +939,7 @@ def build(scenario: dict, settings: dict, clips: list[Path], logo: Path | None, 
         for round_no in range(MAX_ROUNDS + 1):
             (comp / "index.html").write_text(html, encoding="utf-8")
             try:
-                frames, errors, layout = _sample(comp, size, times)
+                frames, errors, layout = _sample(comp, size, times, scenes)
             except AgentError:
                 frames, errors, layout = [], ["The page did not define window.seek as a function."], []
             except Exception as exc:
@@ -904,6 +958,7 @@ def build(scenario: dict, settings: dict, clips: list[Path], logo: Path | None, 
                 return html if clean else None
             text = (f"{brief}\n\nCurrent composition:\n```html\n{html}\n```\n\nFrames at t = " + ", ".join(f"{t}s" for t in times) + " (in order).\n"
                     + ("Errors captured while rendering:\n" + "\n".join(errors) + "\n" if errors else "No render errors.\n")
+                    + ("A stack overflow usually means a function calls itself; look first for a top-level `function seek` next to `window.seek` and rename it.\n" if any("call stack" in e for e in errors) else "")
                     + ("Measured layout problems (fix these first, they are facts, not opinions):\n" + "\n".join(layout) + "\n" if layout else "Measured layout: no problems found.\n"))
             try:
                 reply = ask([{"role": "user", "content": [{"type": "text", "text": text}, *[_image_part(f) for f in frames]]}], REVIEW_SYSTEM, models=vm.REVIEW_MODELS, max_tokens=6000)
@@ -947,7 +1002,8 @@ def build(scenario: dict, settings: dict, clips: list[Path], logo: Path | None, 
                     logger.warning("Split build failed (%s); writing the whole composition in one call", exc)
             recent = _recent_concepts(concepts_file)
             avoid = ("\n\nThis customer's recent videos used the concepts below. Do something clearly different in concept, palette, layout and motion:\n- " + "\n- ".join(recent)) if recent else ""
-            first = [{"role": "user", "content": brief + avoid + "\n\nWrite the composition now."}]
+            chosen = f"\n\nThe customer chose this concept. Build it and develop it further:\n{concept}" if concept else ""
+            first = [{"role": "user", "content": brief + avoid + chosen + "\n\nWrite the composition now."}]
         messages = list(first)
         extra = {"models": vm.REVIEW_MODELS} if base_html else {}  # only a brand-new design is worth Opus; a failed edit patch is redone by the mid-tier model
         reply = ask(messages, SYSTEM_PROMPT, **extra)
@@ -1005,6 +1061,12 @@ def build(scenario: dict, settings: dict, clips: list[Path], logo: Path | None, 
     logger.info("Video encoded in %.0fs", time.time() - mux_started)
     result = vm.validate(final, total, size)
     result["ai_cost_usd"] = round(tally["usd"], 3)
+    fatal, minor = _post_render_problems(final, total, any(narrations))
+    if minor:
+        logger.warning("Post-render review: %s", "; ".join(minor))
+    if fatal:
+        logger.error("Post-render review failed: %s", "; ".join(fatal))
+        raise AgentError("ویدیوی ساخته‌شده ایراد فنی داشت و تحویل داده نشد، کردیتت برگشت؛ دوباره تلاش کن")
     tracker.finish()
     logger.info("Build done: Video agent spend for %s: $%.3f (%d in / %d out tokens)", work.name, tally["usd"], tally["in"], tally["out"])
     vm._run(["ffmpeg", "-y", "-ss", "0.8", "-i", str(final), "-frames:v", "1", "-q:v", "3", str(work / "poster.jpg")], timeout=60)

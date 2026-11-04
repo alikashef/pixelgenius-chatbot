@@ -92,6 +92,10 @@ Work like a scriptwriter with a beat sheet: first pick the grammar that fits the
 Scenario craft (this decides whether the video is good): the hook (first 2 seconds) must be a concrete tension, a surprising number the user gave, or a question the viewer feels personally, never a greeting or the brand name. One idea per scene and one concrete image or example per idea. Every scene must pay something off on its own (a point, an example, a small surprise) and also pull the viewer into the next one; a scene that only sets up the next is where people scroll away. Short punchy on-screen headlines (max 7 words) that add to the narration instead of repeating it word for word. The last scene closes the loop of the hook and gives exactly one clear action. Vary scene rhythm (a fast 3s beat after a 6s one), and write like a person talks, not like an ad. Write the narration for the ear: read it aloud in your head, keep sentences short, and avoid written-prose constructions such as «علاوه بر این», «همچنین», «لذا», «بدین ترتیب», «می‌باشد», «جهت», «در نتیجه».
 Never invent facts, prices, results or customer claims the user did not give. Never claim you analysed trending videos."""
 
+CONCEPT_PROMPT = """You are the creative director of a motion studio. For this Persian short-video script and style genre, propose three visual concepts that are truly different from each other: a different central metaphor, palette and way of moving. Each must grow out of this script, could not be reused for another business, and must be buildable as animated HTML, SVG and CSS with no footage. Never add facts the customer did not give.
+Reply ONLY with one JSON object, no markdown:
+{"concepts": [{"title": "2 to 4 Persian words", "idea": "one Persian sentence: the central visual idea, what the viewer sees happen", "look": "one short Persian phrase: palette and mood"}]}"""
+
 SCORE_PROMPT = """You are a demanding short-video script editor. Score this Persian scenario from 1 to 10 on each dimension. Reply ONLY with one JSON object, no markdown:
 {"hook": n, "payoff": n, "spoken": n, "cta": n, "invented": ["every factual claim in the scenario that the customer did not say"], "fixes": ["one specific instruction per weak point, naming the scene"]}
 hook: would a stranger scrolling past stop in the first two seconds? payoff: does every scene deliver something on its own instead of only setting up the next? spoken: does the narration sound natural when heard, not written? cta: is there exactly one specific action that closes the loop of the hook?
@@ -291,6 +295,22 @@ def lint_scenario(scenario: dict, requested_seconds: float, user_text: str | Non
 
 def _user_text(message: str | list[dict]) -> str:
     return message if isinstance(message, str) else " ".join(part.get("text", "") for part in message if isinstance(part, dict) and part.get("type") == "text")
+
+
+def concepts_key(project: dict) -> str:
+    """Concepts belong to one script and one style; changing either makes them stale."""
+    return hashlib.sha256(json.dumps([project["scenario"], project["settings"]["style"]], ensure_ascii=False, sort_keys=True).encode()).hexdigest()[:16]
+
+
+async def make_concepts(project: dict, recent: list[str]) -> list[dict]:
+    style = project["settings"]["style"]
+    avoid = "\n\nThis customer's recent videos used these concepts, go elsewhere:\n- " + "\n- ".join(recent) if recent else ""
+    data = await _ask_json(CONCEPT_PROMPT, f"Style genre: {STYLE_CATALOG[style]['label']} ({style})\nBrand: {project['info'].get('brand', '')}\nScript:\n{json.dumps(project['scenario'], ensure_ascii=False)}{avoid}", temperature=0.9)
+    found = data.get("concepts") if isinstance(data.get("concepts"), list) else []
+    concepts = [{k: str(c.get(k, "")).strip()[:300] for k in ("title", "idea", "look")} for c in found if isinstance(c, dict) and str(c.get("idea", "")).strip()][:3]
+    if len(concepts) < 2:
+        raise VideoError("پیشنهاد ایده ناموفق بود، دوباره تلاش کنید")
+    return concepts
 
 
 def _customer_words(project: dict, message: str | list[dict]) -> str | None:

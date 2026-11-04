@@ -522,3 +522,30 @@ def test_invented_claims_are_removed_and_the_reply_is_not_about_the_rewrite(monk
     monkeypatch.setattr(video_maker, "_ask_json", ask)
     result = asyncio.run(video_maker.chat_turn(_project(), "طراحی سایت دارم"))
     assert "remove this claim" in prompts[2] and result["reply"] == "باشه" and result["scenario"]["scenes"][1]["narration"] == "مسیر را کوتاه کن"
+
+
+def test_slideshow_check_flags_static_and_repeated_scenes_but_not_moving_ones(tmp_path):
+    import os
+    if not os.getenv("CHROMIUM_PATH"):
+        return
+    from services import video_agent
+    comp = tmp_path / "comp"
+    comp.mkdir()
+    (comp / "index.html").write_text('<!doctype html><html><body style="margin:0;background:#123;width:540px;height:960px;overflow:hidden">'
+                                     '<div id="a" style="position:absolute;width:300px;height:300px;background:#fc0"></div>'
+                                     '<script>window.seek=function(t){const a=document.getElementById("a");a.style.left=(t<2?100:40+(t-2)*90)+"px";a.style.top=(t<2?100:300+(t-2)*60)+"px"}</script></body></html>')
+    scenes = [{"index": 0, "start": 0.0, "end": 2.0}, {"index": 1, "start": 2.0, "end": 6.0}]
+    with video_agent._Page(comp, (540, 960), scale=0.4) as page:
+        found = " | ".join(video_agent._slideshow_problems(page, scenes))
+    assert "scene 0 is nearly static" in found and "scene 1 is nearly static" not in found
+
+
+def test_post_render_review_refuses_black_or_silent_files(tmp_path):
+    from services import video_agent
+    good, black = tmp_path / "good.mp4", tmp_path / "black.mp4"
+    subprocess.run(["ffmpeg", "-y", "-f", "lavfi", "-i", "testsrc2=s=320x568:r=30:d=4", "-f", "lavfi", "-i", "sine=f=300:d=4", "-c:a", "aac", "-shortest", str(good)], check=True, capture_output=True)
+    subprocess.run(["ffmpeg", "-y", "-f", "lavfi", "-i", "color=c=black:s=320x568:r=30:d=4", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo", "-c:a", "aac", "-shortest", str(black)], check=True, capture_output=True)
+    assert video_agent._post_render_problems(good, 4.0, True)[0] == []
+    fatal = " ".join(video_agent._post_render_problems(black, 4.0, True)[0])
+    assert "black" in fatal and "silent" in fatal
+    assert "silent" not in " ".join(video_agent._post_render_problems(black, 4.0, False)[0])  # no narration planned, silence is fine

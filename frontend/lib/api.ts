@@ -1159,6 +1159,7 @@ export interface VideoProject {
   status: "draft" | "rendering" | "ready" | "failed";
   stage: string | null;
   progress: { percent: number; label: string; eta: number | null } | null;
+  concepts: { options: { title: string; idea: string; look: string }[]; chosen: number | null };
   error: string | null;
   last_failure: string | null;
   versions: VideoVersion[];
@@ -1204,6 +1205,8 @@ export const uploadVideoClip = (token: string, id: string, file: File) => videoR
 export const uploadVideoLogo = (token: string, id: string, file: File) => videoRequest<VideoProject>(token, `/projects/${id}/logo`, upload(file));
 export const saveVideoScenario = (token: string, id: string, scenario: VideoScenario) => videoRequest<VideoProject>(token, `/projects/${id}/scenario`, send("PUT", scenario));
 export const makeVideoCovers = (token: string, id: string, title: string, ai: boolean) => videoRequest<VideoProject>(token, `/projects/${id}/covers`, send("POST", { title, ai }));
+export const makeVideoConcepts = (token: string, id: string) => videoRequest<VideoProject>(token, `/projects/${id}/concepts`, send("POST"));
+export const chooseVideoConcept = (token: string, id: string, index: number | null) => videoRequest<VideoProject>(token, `/projects/${id}/concepts/choose`, send("POST", { index }));
 export const chooseVideoCover = (token: string, id: string, file: string) => videoRequest<VideoProject>(token, `/projects/${id}/covers/choose`, send("POST", { file }));
 export const saveVideoSettings = (token: string, id: string, patch: Partial<VideoSettings>) => videoRequest<VideoProject>(token, `/projects/${id}/settings`, send("PUT", patch));
 export const renderVideo = (token: string, id: string) => videoRequest<VideoProject>(token, `/projects/${id}/render`, send("POST"));

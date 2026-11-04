@@ -3,14 +3,14 @@
 import { FormEvent, ReactNode, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { IconArrowUp, IconCheck, IconDownload, IconFileText, IconDeviceMobile, IconGauge, IconMicrophone, IconMovie, IconPalette, IconPencil, IconPhoto, IconTextCaption, IconPlayerPause, IconPlayerPlay, IconPlus, IconTrash, IconVideo, IconX } from "@tabler/icons-react";
+import { IconArrowUp, IconBulb, IconCheck, IconDownload, IconFileText, IconDeviceMobile, IconGauge, IconMicrophone, IconMovie, IconPalette, IconPencil, IconPhoto, IconTextCaption, IconPlayerPause, IconPlayerPlay, IconPlus, IconTrash, IconVideo, IconX } from "@tabler/icons-react";
 import AppShell, { NewProjectLink, ShellLoading, useAccountNav } from "@/components/AppShell";
 import { BrandMark } from "@/components/Brand";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   chatVideo, clearSession, createVideoProject, fetchVideoAccess, deleteVideoProject, fetchVideoProject, fetchVideoProjects, renderVideo, reviseVideo, rollbackVideo,
-  fetchVoicePreview, saveVideoScenario, saveVideoSettings, makeVideoCovers, chooseVideoCover, uploadVideoFile, VideoAttachment, VideoProject, VideoScenario, VideoSettings,
+  fetchVoicePreview, saveVideoScenario, saveVideoSettings, makeVideoConcepts, chooseVideoConcept, makeVideoCovers, chooseVideoCover, uploadVideoFile, VideoAttachment, VideoProject, VideoScenario, VideoSettings,
 } from "@/lib/api";
 
 const ATTACH_ACCEPT = "image/*,.svg,video/*,audio/*,.pdf,.doc,.docx,.txt,.csv,.zip,.rar,.ppt,.pptx,.xls,.xlsx";
@@ -541,6 +541,7 @@ function SettingsStep({ token, project, onChange, onError, onBack, onRendered }:
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [coverBusy, setCoverBusy] = useState<"free" | "ai" | null>(null);
+  const [conceptBusy, setConceptBusy] = useState(false);
   const [cover, setCover] = useState(project.settings.cover_title || project.scenario?.title || "");
   const s = project.settings;
 
@@ -551,6 +552,29 @@ function SettingsStep({ token, project, onChange, onError, onBack, onRendered }:
     } catch (err) {
       onError(err);
       setError(err instanceof Error ? err.message : "ذخیره ناموفق بود");
+    }
+  }
+
+  async function suggestConcepts() {
+    setConceptBusy(true);
+    setError("");
+    try {
+      onChange(await makeVideoConcepts(token, project.id));
+    } catch (err) {
+      onError(err);
+      setError(err instanceof Error ? err.message : "پیشنهاد ایده ناموفق بود");
+    } finally {
+      setConceptBusy(false);
+    }
+  }
+
+  async function pickConcept(index: number | null) {
+    setError("");
+    try {
+      onChange(await chooseVideoConcept(token, project.id, index));
+    } catch (err) {
+      onError(err);
+      setError(err instanceof Error ? err.message : "انتخاب ایده ناموفق بود");
     }
   }
 
@@ -599,6 +623,26 @@ function SettingsStep({ token, project, onChange, onError, onBack, onRendered }:
         </Section>
         <Section icon={IconPalette} title="سبک ویدیو" hint="حال‌وهوای بصری ویدیو؛ طراح هوش مصنوعی ویدیو را با همین سبک می‌سازد.">
           <StylePicker project={project} onChange={(v) => patch({ style: v })} />
+        </Section>
+        <Section icon={IconBulb} title="ایده‌ی طراحی" hint="کارگردان خودش ایده می‌سازد. اگر می‌خواهی خودت انتخاب کنی، سه ایده‌ی متفاوت بگیر؛ کردیتی ندارد.">
+          <Button type="button" variant="outline" onClick={suggestConcepts} disabled={conceptBusy}>
+            <IconBulb size={17} aria-hidden="true" />{conceptBusy ? "در حال فکر کردن…" : project.concepts.options.length ? "سه ایده‌ی دیگر" : "پیشنهاد سه ایده"}
+          </Button>
+          {project.concepts.options.length > 0 && (
+            <fieldset className="mt-4 grid gap-3">
+              <legend className="sr-only">ایده‌ی طراحی</legend>
+              {[...project.concepts.options.map((c, i) => ({ key: i as number | null, title: c.title, body: c.idea, note: c.look })), { key: null as number | null, title: "به انتخاب کارگردان", body: "کارگردان خودش بهترین ایده را می‌سازد.", note: "" }].map((o) => (
+                <label key={String(o.key)} className="block cursor-pointer">
+                  <input type="radio" name="concept" className="peer sr-only" checked={project.concepts.chosen === o.key} onChange={() => pickConcept(o.key)} />
+                  <span className="block rounded-xl border border-border bg-surface p-3 transition-colors peer-checked:border-foreground peer-checked:bg-surface-2 peer-focus-visible:ring-2 peer-focus-visible:ring-ring">
+                    <span className="flex items-center justify-between gap-2 text-sm font-bold text-foreground">{o.title}{project.concepts.chosen === o.key && <IconCheck size={15} aria-hidden="true" />}</span>
+                    <span className="mt-1 block text-sm text-secondary-foreground">{o.body}</span>
+                    {o.note && <span className="mt-1 block text-xs text-muted-foreground">{o.note}</span>}
+                  </span>
+                </label>
+              ))}
+            </fieldset>
+          )}
         </Section>
         <Section icon={IconMicrophone} title="صدا و دوبله">
           <VoicePicker token={token} value={s.voice} onChange={(v) => patch({ voice: v })} onError={onError} />

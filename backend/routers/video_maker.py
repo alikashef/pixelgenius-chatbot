@@ -244,6 +244,13 @@ def _reference_frame(path: Path, project: dict) -> Path | None:
     return out if out.exists() else None
 
 
+def _live_concepts(project: dict) -> dict:
+    saved = project.get("concepts") or {}
+    if not project.get("scenario") or saved.get("key") != video_maker.concepts_key(project):
+        return {"options": [], "chosen": None}
+    return {"options": saved.get("options", []), "chosen": saved.get("chosen")}
+
+
 def _public(customer: dict, project: dict) -> dict:
     def media(rel: str) -> str:
         return f"/api/video/media/{project['id']}/{rel}?t={_sign(customer['sub'], project['id'], rel)}"
@@ -259,6 +266,7 @@ def _public(customer: dict, project: dict) -> dict:
         **{k: project[k] for k in keys},
         "has_logo": bool(project.get("logo")),
         "progress": project.get("progress") if project["status"] == "rendering" else None,
+        "concepts": _live_concepts(project),
         "covers": {"title": (project.get("covers") or {}).get("title", ""), "chosen": (project.get("covers") or {}).get("chosen"), "price": video_maker.CREDIT_PRICES["cover_ai_ref" if has_reference else "cover_ai"], "has_reference": has_reference,
                    "options": [{"file": o["file"], "label": o["label"], "url": media(f"covers/{o['file']}")} for o in (project.get("covers") or {}).get("options", [])]},
         "styles": [{"value": key, **{k: v[k] for k in ("label", "hint", "credits", "clips", "category")}} for key, v in video_maker.STYLE_CATALOG.items()],
@@ -504,6 +512,14 @@ async def edit_settings(project_id: str, body: SettingsIn, customer: dict = Depe
     return _public(customer, project)
 
 
+def _concept_text(project: dict) -> str:
+    live = _live_concepts(project)
+    if live["chosen"] is None or live["chosen"] >= len(live["options"]):
+        return ""
+    chosen = live["options"][live["chosen"]]
+    return f"{chosen['title']}: {chosen['idea']} ({chosen['look']})"
+
+
 def _progress_writer(path: Path):
     last = {"percent": -1, "at": 0.0}
 
@@ -531,7 +547,7 @@ def _render_job(path: Path, number: int) -> None:
                              and (path / f"v{v['n']}" / "comp" / "index.html").exists()), None)
             info = video_agent.build(project["scenario"], project["settings"], clips, logo, path / f"v{number}", path / "audio",
                                      note=version["note"] if version["kind"] == "edit" else "", base_html=previous.read_text(encoding="utf-8") if previous else None,
-                                     info=project.get("info"), progress=_progress_writer(path), cover_file=(path / "covers" / chosen) if (chosen := (project.get("covers") or {}).get("chosen")) else None)
+                                     info=project.get("info"), progress=_progress_writer(path), concept=_concept_text(project) if version["kind"] != "edit" else "", cover_file=(path / "covers" / chosen) if (chosen := (project.get("covers") or {}).get("chosen")) else None)
         project = _load(path)
         next(v for v in project["versions"] if v["n"] == number).update(status="done", info=info, finished_at=int(time.time()))
         project.update(status="ready", stage=None, error=None, progress=None)
@@ -673,6 +689,39 @@ async def make_covers(project_id: str, body: CoverIn, customer: dict = Depends(v
     merged = [*keep, *options]
     project["covers"] = {"title": title, "options": merged, "chosen": chosen if chosen in [o["file"] for o in merged] else None}
     project["settings"] = video_maker.clean_settings({"cover_title": title}, project["settings"])
+    _save(path, project)
+    return _public(customer, project)
+
+
+class ConceptChoiceIn(BaseModel):
+    index: int | None = None
+
+
+@router.post("/projects/{project_id}/concepts")
+async def make_concepts(project_id: str, customer: dict = Depends(video_customer)):
+    path = _dir(customer, project_id)
+    project = _load(path)
+    _busy(project)
+    if not project.get("scenario"):
+        raise HTTPException(status_code=400, detail="اول سناریو را کامل کن")
+    try:
+        options = await video_maker.make_concepts(project, video_agent._recent_concepts(path.parent / "_recent_concepts.json"))
+    except video_maker.VideoError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    project = _load(path)
+    project["concepts"] = {"key": video_maker.concepts_key(project), "options": options, "chosen": None}
+    _save(path, project)
+    return _public(customer, project)
+
+
+@router.post("/projects/{project_id}/concepts/choose")
+async def choose_concept(project_id: str, body: ConceptChoiceIn, customer: dict = Depends(video_customer)):
+    path = _dir(customer, project_id)
+    project = _load(path)
+    options = _live_concepts(project)["options"]
+    if body.index is not None and not 0 <= body.index < len(options):
+        raise HTTPException(status_code=404, detail="این ایده پیدا نشد")
+    project.setdefault("concepts", {})["chosen"] = body.index
     _save(path, project)
     return _public(customer, project)
 
