@@ -415,3 +415,32 @@ def test_progress_is_monotonic_reaches_the_end_and_learns_durations(tmp_path, mo
     assert percents == sorted(percents) and percents[-1] == 100 and max(p for p in percents[:-1]) <= 99
     assert events[-1][2] == 0 and all(e[2] >= 5 for e in events[:-1])
     assert "design" not in tracker.plan and (tmp_path / "stats.json").exists()
+
+
+def test_new_videos_are_designed_from_scratch_and_avoid_recent_concepts(tmp_path):
+    from services import video_agent
+    assert video_agent.REUSE is False and "#7c3aed" not in video_agent.SYSTEM_PROMPT
+    file = tmp_path / "_recent_concepts.json"
+    for n in range(5):
+        video_agent._remember_concept(file, f"<brief>concept {n}</brief>```html```")
+    video_agent._remember_concept(file, "a reply without a brief")
+    assert video_agent._recent_concepts(file) == ["concept 2", "concept 3", "concept 4"]
+    assert video_agent._recent_concepts(tmp_path / "missing.json") == []
+
+
+def test_a_patch_that_breaks_the_design_is_rolled_back(tmp_path):
+    import os
+    if not os.getenv("CHROMIUM_PATH"):
+        return
+    from services import video_agent
+    html = '<!doctype html><html><body style="background:#123;color:#fff"><h1 id="a">x</h1><script>window.seek=function(t){document.getElementById("a").style.opacity=t}</script></body></html>'
+    calls = []
+
+    def ask(messages, system, models=None, max_tokens=48000):
+        calls.append(bool(models))
+        return "<<<<<<< SEARCH\nwindow.seek=function(t){\n=======\nwindow.seek=function(t){{{\n>>>>>>> REPLACE" if models else f"```html\n{html}\n```"
+
+    scenario = video_maker.normalize_scenario(SCENARIO, 1)
+    work = tmp_path / "customer" / "project" / "v1"
+    result = video_agent.build(scenario, video_maker.clean_settings({"style": "typography"}), [], None, work, tmp_path / "audio", narrate_fn=lambda *a, **k: None, ask=ask)
+    assert result["has_audio"] and "{{{" not in (work / "comp" / "index.html").read_text() and calls == [False, True]

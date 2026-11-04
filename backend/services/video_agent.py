@@ -89,17 +89,23 @@ A headless Chromium renders it frame by frame, FFmpeg adds the narration. Your o
 - Helpers in `window.PG`: clamp, lerp, progress(t,a,b), ease.out/inOut/back(k), sceneAt(t), activeWord(scene,t), keys(frames,t[,ease]) (frames = [[t,v1,v2..],...] eased between keyframes, returns the values), camera(el, [[t,cx,cy,zoom],...], t, W, H) (virtual camera on a stage element, cx/cy are 0..1 centres, clamped to the stage), rng(seed) (seeded random), stagger(i,t,start,gap,dur) (progress of the i-th item), counter(t,a,b,from,to), and `await PG.clip(imgEl, clipIndex, t)` which shows the user's clip frame (never use <video>: it cannot be seeked reliably). Use `object-fit: cover`.
 - The user's logo, if any, is at `VIDEO.logo` (an image path). When `VIDEO.logo_svg` is set, inline that markup (innerHTML) instead of using <img>: then you can recolour it (fill/stroke via CSS, `currentColor`), animate its paths (stroke-dashoffset draw-on, staggered reveal of parts) and fit it to the palette. Fonts are loaded for you in `fonts.css` ( `<link rel="stylesheet" href="fonts.css">` ): use `font-family: "Yekan Bakh FaNum"` (700) and `"Yekan Bakh FaNum Black"` (900) for ALL text. They contain Persian letters and digits.
 - No network access: no CDN, no external images or fonts, no libraries. Everything is plain HTML/CSS/SVG/canvas and your own JS.
-- Code economy (every token you write is billed): no code comments, no decorative whitespace or indentation, short identifiers, shared CSS classes and CSS variables instead of repeated inline styles, data-driven loops and small helper functions instead of copy-pasted blocks per scene or per word. Keep the whole file under about 450 lines; richness comes from motion and layering, not from volume of code.
+- No code comments.
 - Do not add audio. The narration is mixed in by the harness. Total duration = VIDEO.duration; the scene timings are authoritative, never invent your own.
 
 # Craft
 - Text is Persian: `direction: rtl`, right-aligned or centred, never letter-spacing. Keep every headline inside the safe area (10% margins; for 9:16 keep the lowest 14% and top 8% free of key text, they are covered by app UI).
-- Headlines are huge and legible (at least ~8% of the short side), strong contrast, maximum two accents colours, consistent palette across scenes. Use a dark, premium base unless the art direction says otherwise. Brand purple is #7c3aed, accent amber #f59e0b, ink #1e1b2e.
+- Headlines are huge and legible (at least ~8% of the short side), strong contrast, maximum two accent colours, consistent palette across scenes. There are no house colours: derive the palette from this video's subject and the customer's brand (the logo's colours when there is one).
 - Motion: every element enters and exits with eased motion (staggered words, masks, scale/slide, line draws, counters). Scenes connect with a transition (wipe, push, zoom, shape morph) instead of hard cuts. Something is always gently moving (slow zoom, parallax, floating shapes), but never distracts from the headline.
-- Subtitles: follow `subtitle_mode`: "word" = the spoken words appear/highlight one by one in sync with `words[].start/end`; "sentence" = whole narration line at once. Position by `subtitle_pos` (top|middle|bottom). The `highlight` word is emphasised in the amber accent.
+- Subtitles: follow `subtitle_mode`: "word" = the spoken words appear/highlight one by one in sync with `words[].start/end`; "sentence" = whole narration line at once. Position by `subtitle_pos` (top|middle|bottom). The `highlight` word is emphasised in your accent colour.
 - The hook scene must grab attention in the first second. The cta scene shows the brand and the call to action large, with the logo if available.
-- Follow the requested art direction (style). Clip styles use the user's clip frames as full-bleed or framed media with the animated overlay above them.
+- Clip styles use the user's clip frames as full-bleed or framed media with the animated overlay above them.
 - Make it rich: backgrounds with depth (gradients are fine in videos, soft shapes, grids, grain made with SVG), icons drawn with inline SVG. Avoid empty, flat, or template-looking slides.
+
+# Creative direction (you are the director)
+- The style is only a genre. Everything else is your decision: concept, visual metaphor, layout system, palette, type treatment, pacing, transitions. The genre notes describe a mood, not a recipe; do not execute them literally.
+- Start from this script: find the one visual idea that belongs to this business and this message and could not be reused for another video. Two videos in the same style must not look related.
+- Illustration is the craft that shows: draw detailed, layered, hand-built SVG scenes with real objects, depth, shading and small details that animate. Bare geometric placeholders, stock-looking icons and a few rectangles standing in for an idea are not acceptable. Take as much code as the idea needs.
+- Finish cleanly: consistent spacing and alignment, nothing accidental, every frame could be a still from a studio's reel.
 
 # Motion-design rules (the difference between a template and a studio piece)
 - Before any code, write a short director's brief inside <brief>...</brief> (max 150 words): reference style, palette (3 colours max + neutrals), type scale, per-scene layers, and how every scene hands off to the next. Then the HTML.
@@ -248,7 +254,7 @@ REVIEW_SYSTEM = SYSTEM_PROMPT + """
 
 # Review and patch mode
 You receive the current composition and frames rendered from it. Do NOT rewrite the file.
-Reply `OK` alone if the video is excellent and there were no errors. Otherwise reply only with SEARCH/REPLACE blocks that fix what is wrong, in exactly this format:
+Be a demanding art director: weak illustration, generic layout, empty areas and sloppy alignment are problems too. Reply `OK` alone if the video is excellent and there were no errors. Otherwise reply only with SEARCH/REPLACE blocks that fix what is wrong, in exactly this format:
 <<<<<<< SEARCH
 exact text copied from the file (unique in it, as short as possible)
 =======
@@ -257,7 +263,7 @@ replacement text
 At most 8 blocks, no explanations, no other text."""
 
 _PATCH = re.compile(r"<<<<<<< SEARCH\r?\n(.*?)\r?\n=======\r?\n(.*?)\r?\n>>>>>>> REPLACE", re.S)
-REUSE = os.getenv("VIDEO_REUSE", "1") != "0"
+REUSE = os.getenv("VIDEO_REUSE", "0") != "0"  # off: reusing a stored design makes every video of a style look the same
 LIBRARY = Path(os.getenv("UPLOADS_DIR", "/app/uploads")) / "video" / "_library"
 
 
@@ -336,14 +342,14 @@ def _library_save(html: str, finger: dict, scenario: dict, info: dict | None) ->
 
 
 
-def _ask_html(messages: list[dict], system: str, models: list[str] | None = None, max_tokens: int = 24000) -> str:
+def _ask_html(messages: list[dict], system: str, models: list[str] | None = None, max_tokens: int = 48000) -> str:
     """One model turn; returns raw text. Falls through the configured models and gateways."""
     api_key = os.getenv("GAPGPT_API_KEY", "")
     if not api_key:
         raise AgentError("کلید هوش مصنوعی تنظیم نشده است")
     for model in dict.fromkeys(models or vm.AI_MODELS):
         payload = {"model": model, "messages": [{"role": "system", "content": system}, *messages], "temperature": 0.8, "max_tokens": max_tokens, "stream": True,
-                   "reasoning": {"effort": "low"}}  # hidden reasoning otherwise eats the whole token budget and leaves no HTML
+                   "reasoning": {"effort": "low" if models else "medium"}}  # measured: high thinks through 45k tokens at about $1.6 and 14 minutes per design
         for base_url in _base_urls():
             _check_budget()
             try:
@@ -375,11 +381,12 @@ def _ask_html(messages: list[dict], system: str, models: list[str] | None = None
                 _record_spend(model, usage)
                 logger.info("AI call %s: %.0fs, %s in / %s out tokens, finish=%s, %d chars, ~$%.3f so far", model, time.time() - started,
                             (usage or {}).get("prompt_tokens"), (usage or {}).get("completion_tokens"), finish, sum(len(x) for x in parts), (_spend.get() or {}).get("usd", 0))
+                if finish == "length":  # cut off: thinking ate the budget or the file did not fit; another attempt would pay for the same
+                    logger.warning("Video agent call to %s via %s hit the %d token limit with %d chars of text", model, base_url, max_tokens, sum(len(x) for x in parts))
+                    raise AgentError("طراحی ویدیو زمان زیادی برد و ناتمام ماند، دوباره تلاش کنید")
                 if "".join(parts).strip():
                     return "".join(parts)
                 logger.warning("Video agent call to %s via %s returned no text (finish=%s, %s)", model, base_url, finish, stray[:2])
-                if finish == "length":  # the whole budget went to hidden reasoning; another gateway would burn the same
-                    raise AgentError("طراحی ویدیو زمان زیادی برد و ناتمام ماند، دوباره تلاش کنید")
             except (httpx.HTTPError, KeyError, IndexError, ValueError) as exc:
                 logger.warning("Video agent call to %s failed via %s: %s", model, base_url, exc)
     raise AgentError("ارتباط با دستیار طراحی برقرار نشد، دوباره تلاش کنید")
@@ -464,10 +471,14 @@ class _Page:
         self.page.on("pageerror", lambda exc: self.errors.append(f"JS error: {exc}"))
         self.page.on("console", lambda msg: self.errors.append(f"console.{msg.type}: {msg.text}") if msg.type == "error" else None)
         self.page.on("requestfailed", lambda req: self.errors.append(f"failed to load {req.url.replace(root, '')}") if req.url.startswith(root) else None)
-        self.page.goto((self.comp / "index.html").as_uri(), wait_until="load")
-        self.page.evaluate("document.fonts.ready.then(() => true)")
-        if not self.page.evaluate("typeof window.seek === 'function'"):
-            raise AgentError("composition has no window.seek")
+        try:
+            self.page.goto((self.comp / "index.html").as_uri(), wait_until="load")
+            self.page.evaluate("document.fonts.ready.then(() => true)")
+            if not self.page.evaluate("typeof window.seek === 'function'"):
+                raise AgentError("composition has no window.seek")
+        except Exception:  # __exit__ does not run when __enter__ raises; a leaked driver blocks every later page on this thread
+            self.__exit__()
+            raise
         return self
 
     def __exit__(self, *exc):
@@ -797,6 +808,23 @@ class _Progress:
 
 # --- orchestration ---------------------------------------------------------------------------------
 
+def _recent_concepts(file: Path) -> list[str]:
+    try:
+        return [str(c) for c in json.loads(file.read_text(encoding="utf-8"))][-3:]
+    except (OSError, ValueError, TypeError):
+        return []
+
+
+def _remember_concept(file: Path, reply: str) -> None:
+    found = re.search(r"<brief>(.*?)</brief>", reply, re.S)
+    if not found:
+        return
+    try:
+        file.write_text(json.dumps([*_recent_concepts(file), found.group(1).strip()[:1200]], ensure_ascii=False), encoding="utf-8")
+    except OSError:
+        logger.warning("Could not store the design concept", exc_info=True)
+
+
 def _svg_summary(markup: str) -> str:
     """The designer reads the full markup at runtime from VIDEO.logo_svg; the prompt only needs its shape (the full text can be tens of thousands of tokens)."""
     view = re.search(r'viewBox="([^"]+)"', markup)
@@ -808,7 +836,7 @@ def _svg_summary(markup: str) -> str:
 def _brief(scenario: dict, settings: dict, size: tuple[int, int], data: dict) -> str:
     style = vm.STYLE_CATALOG[settings["style"]]
     return (f"WIDTH={size[0]} HEIGHT={size[1]} ({settings['format']}), duration {data['duration']}s, {len(data['scenes'])} scenes.\n"
-            f"Art direction ({settings['style']}): {STYLE_DIRECTION[settings['style']]}\n"
+            f"Style genre ({settings['style']}), a mood to interpret freely: {STYLE_DIRECTION[settings['style']]}\n"
             f"Video title/hook: {scenario.get('title', '')}\nClips available: {len(data['clips'])}\n"
             f"Brand and CTA are in the last scene. Subtitles: mode={settings['subtitle_mode']}, position={settings['subtitle_pos']}.\n"
             f"This is the data.js you will receive (design from it, read it at runtime):\n{json.dumps({k: (_svg_summary(v) if k == 'logo_svg' and v else v) for k, v in data.items() if k != 'scenes'}, ensure_ascii=False)}\n"
@@ -823,6 +851,7 @@ def build(scenario: dict, settings: dict, clips: list[Path], logo: Path | None, 
     tally = {"usd": 0.0, "in": 0, "out": 0}
     _spend.set(tally)
     tracker = _Progress(progress)
+    concepts_file = work.parent.parent / "_recent_concepts.json"  # next to this customer's projects
     logger.info("Build start: %s, style=%s, format=%s, %d scenes, %d clips, logo=%s", "edit" if base_html else "new video", settings["style"], settings["format"],
                 len(scenario["scenes"]), len(clips), (logo.suffix.lower() if logo else "none"))
     size = vm.FORMATS[settings["format"]]
@@ -852,6 +881,7 @@ def build(scenario: dict, settings: dict, clips: list[Path], logo: Path | None, 
 
     def review_loop(html: str) -> str | None:
         """Render frames, let the cheaper model send patches; None when the composition cannot be made to work."""
+        good, previous_reply = None, None
         for round_no in range(MAX_ROUNDS + 1):
             (comp / "index.html").write_text(html, encoding="utf-8")
             try:
@@ -864,6 +894,12 @@ def build(scenario: dict, settings: dict, clips: list[Path], logo: Path | None, 
             clean = bool(frames) and not errors
             logger.info("Review round %d: %d frames sampled, %d render errors, %d layout problems%s", round_no + 1, len(frames), len(errors), len(layout),
                         (" (" + "; ".join([*errors, *layout][:2])[:240] + ")") if errors or layout else "")
+            if clean:
+                good = html
+            elif good is not None:  # a patch broke a design that worked: the design matters more than the patch
+                logger.warning("Review round %d broke the composition; going back to the last good version", round_no + 1)
+                (comp / "index.html").write_text(good, encoding="utf-8")
+                return good
             if round_no == MAX_ROUNDS:
                 return html if clean else None
             text = (f"{brief}\n\nCurrent composition:\n```html\n{html}\n```\n\nFrames at t = " + ", ".join(f"{t}s" for t in times) + " (in order).\n"
@@ -878,6 +914,10 @@ def build(scenario: dict, settings: dict, clips: list[Path], logo: Path | None, 
             if reply.strip().upper().startswith("OK") and clean and not layout:
                 logger.info("Review round %d: approved as is", round_no + 1)
                 return html
+            if clean and reply.strip() == previous_reply:  # the same fix again did not help; do not pay for another round
+                logger.info("Review round %d: same patch as before, stopping", round_no + 1)
+                return html
+            previous_reply = reply.strip()
             patched, applied = _apply_patches(html, reply)
             logger.info("Review round %d: %d patch(es) applied of %d sent", round_no + 1, applied, len(_PATCH.findall(reply)))
             if applied:
@@ -905,15 +945,21 @@ def build(scenario: dict, settings: dict, clips: list[Path], logo: Path | None, 
                     raise
                 except AgentError as exc:
                     logger.warning("Split build failed (%s); writing the whole composition in one call", exc)
-            first = [{"role": "user", "content": brief + "\n\nWrite the composition now."}]
+            recent = _recent_concepts(concepts_file)
+            avoid = ("\n\nThis customer's recent videos used the concepts below. Do something clearly different in concept, palette, layout and motion:\n- " + "\n- ".join(recent)) if recent else ""
+            first = [{"role": "user", "content": brief + avoid + "\n\nWrite the composition now."}]
         messages = list(first)
         extra = {"models": vm.REVIEW_MODELS} if base_html else {}  # only a brand-new design is worth Opus; a failed edit patch is redone by the mid-tier model
-        html = _extract_html(ask(messages, SYSTEM_PROMPT, **extra))
+        reply = ask(messages, SYSTEM_PROMPT, **extra)
+        html = _extract_html(reply)
         for _ in range(2):
             if html:
                 break
             messages.append({"role": "user", "content": "The reply had no valid HTML document with window.seek. Send the complete ```html block."})
-            html = _extract_html(ask(messages, SYSTEM_PROMPT, **extra))
+            reply = ask(messages, SYSTEM_PROMPT, **extra)
+            html = _extract_html(reply)
+        if html and not base_html:
+            _remember_concept(concepts_file, reply)
         if not html:
             raise AgentError("دستیار طراحی خروجی معتبر نداد، دوباره تلاش کنید")
         return _compact(html)
@@ -925,7 +971,7 @@ def build(scenario: dict, settings: dict, clips: list[Path], logo: Path | None, 
         try:
             with tracker.stage("patch"):
                 reply = ask([{"role": "user", "content": f"{brief}\n\nCurrent composition:\n```html\n{base_html}\n```\n\nChange request (the data may have changed, everything must still read from VIDEO): {note or 'rebuild with the new script'}"}],
-                            REVIEW_SYSTEM.replace("Reply `OK` alone if the video is excellent and there were no errors.", "Reply `OK` alone if no change is needed."), models=vm.REVIEW_MODELS, max_tokens=6000)
+                            REVIEW_SYSTEM.replace("Be a demanding art director: weak illustration, generic layout, empty areas and sloppy alignment are problems too. Reply `OK` alone if the video is excellent and there were no errors.", "Reply `OK` alone if no change is needed."), models=vm.REVIEW_MODELS, max_tokens=6000)
             patched, applied = _apply_patches(base_html, reply)
             html = review(patched if applied else base_html) if applied or reply.strip().upper().startswith("OK") else None
         except AgentStop:

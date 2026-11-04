@@ -165,3 +165,19 @@ def test_svg_logo_upload_and_chat_adoption(client):
     sent = client.post(f"/api/video/projects/{chat_id}/files", files={"file": ("brand.svg", svg, "image/svg+xml")}).json()
     stored = router_module.ROOT / ("a" * 32) / chat_id / "files" / sent["url"].split("/")[-1].split("?")[0]
     assert b"script" not in stored.read_bytes()
+
+
+def test_render_interrupted_by_a_restart_is_failed_and_refunded(client, monkeypatch):
+    refunds = []
+    monkeypatch.setattr(router_module.credits, "refund_in_thread", lambda *a, **k: refunds.append(a))
+    pid = client.post("/api/video/projects", json={}).json()["id"]
+    path = router_module.ROOT / ("a" * 32) / pid
+    project = router_module._load(path)
+    project["versions"].append({"n": 1, "kind": "initial", "note": "", "status": "rendering", "charged": 5650, "customer": "a" * 32})
+    project.update(status="rendering", stage="rendering", progress={"percent": 40, "label": "x", "eta": 10})
+    router_module._save(path, project)
+    assert router_module.recover_interrupted_renders() == 1
+    after = client.get(f"/api/video/projects/{pid}").json()
+    assert after["status"] == "failed" and after["progress"] is None and "کردیت" in after["error"]
+    assert len(refunds) == 1 and refunds[0][1] == 5650
+    assert router_module.recover_interrupted_renders() == 0 and len(refunds) == 1

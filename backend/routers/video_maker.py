@@ -559,6 +559,28 @@ def _fail(path: Path, number: int, message: str) -> dict:
     return project
 
 
+def recover_interrupted_renders() -> int:
+    """Render threads die with the process, so at startup anything still marked rendering was interrupted: fail it and refund it, or it stays stuck and paid for."""
+    recovered = 0
+    for file in ROOT.glob("*/*/project.json"):
+        try:
+            project = json.loads(file.read_text(encoding="utf-8"))
+            if project.get("status") != "rendering":
+                continue
+            running = [v["n"] for v in project["versions"] if v["status"] == "rendering"]
+            if running:
+                _save(file.parent, _fail(file.parent, running[-1], "ساخت ویدیو به‌خاطر راه‌اندازی مجدد سرور قطع شد. کردیتت برگشت، دوباره بساز."))
+            else:
+                project.update(status="failed", stage=None, progress=None, error="ساخت ویدیو قطع شد، دوباره بساز.")
+                _save(file.parent, project)
+            recovered += 1
+        except Exception:
+            logger.exception("Could not recover the interrupted render in %s", file.parent.name)
+    if recovered:
+        logger.warning("Recovered %d interrupted video renders", recovered)
+    return recovered
+
+
 def _begin_render(path: Path, project: dict, kind: str, note: str = "", charged: int = 0, customer_id: str = "") -> None:
     number = len(project["versions"]) + 1
     project["versions"].append({"n": number, "kind": kind, "note": note, "status": "rendering", "scenario": project["scenario"],

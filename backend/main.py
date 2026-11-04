@@ -25,6 +25,7 @@ async def lifespan(app: FastAPI):
         skills_service.embed_missing(_base_urls(), os.getenv("GAPGPT_API_KEY", ""))
     )
     site_mcp.cleanup_expired_sites()
+    await asyncio.to_thread(video_maker.recover_interrupted_renders)
     async with SessionLocal() as db:
         await hosting.load_custom_domains(db)
     cleanup_task = asyncio.create_task(liara.cleanup_loop())
