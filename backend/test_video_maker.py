@@ -324,3 +324,73 @@ def test_spend_is_counted_across_worker_threads():
         for future in [pool.submit(copy_context().run, video_agent._record_spend, "claude-sonnet-5-5", {"prompt_tokens": 1000, "completion_tokens": 1000}) for _ in range(8)]:
             future.result()
     assert video_agent._spend.get()["in"] == 8000
+
+
+def test_json_reply_is_parsed_even_with_fences_and_prose():
+    assert video_maker._parse_json_object('Sure!\n```json\n{"reply": "ok", "n": {"a": 1}}\n```\nbye') == {"reply": "ok", "n": {"a": 1}}
+    for bad in ("no object here", "[1, 2]"):
+        try:
+            video_maker._parse_json_object(bad)
+            raise AssertionError(bad)
+        except ValueError:
+            pass
+
+
+def test_trim_keeps_whole_sentences():
+    text = "جمله‌ی اول کوتاه است. جمله‌ی دوم خیلی بلندتر از حد مجاز است و باید بریده شود"
+    assert video_maker._trim(text, 40).endswith(".") and video_maker._trim("کوتاه", 40) == "کوتاه"
+
+
+def _scene(kind, text, narration, duration, visual="نمودار یک قیف که بازدیدها را می‌ریزد"):
+    return {"kind": kind, "title": "t", "text": text, "highlight": "", "narration": narration, "duration": duration, "asset": None, "visual": visual}
+
+
+def test_scenario_linter_flags_what_the_prompt_promises():
+    good = {"title": "x", "grammar": "", "scenes": [_scene("hook", "چرا نمی‌خرند", "چرا سایتت بازدید دارد ولی کسی نمی‌خرد", 5), _scene("body", "مشکل از مسیر است", "مشکل معمولاً از مسیر خرید است", 10), _scene("cta", "همین الان", "همین الان مشاوره بگیر", 15)]}
+    assert video_maker.lint_scenario(good, 30) == []
+    bad = {"title": "x", "grammar": "", "scenes": [_scene("body", "یک دو سه چهار پنج شش هفت هشت نه ده یازده", "سلام " + "کلمه " * 30 + "۱۲۳ 45", 3, "متن روی صفحه"), _scene("body", "ب", "ب", 3)]}
+    found = " | ".join(video_maker.lint_scenario(bad, 30))
+    for expect in ("3 to 6 scenes", "first scene must have kind hook", "last scene must have kind cta", "add up to", "narration words", "digits", "more than 10 words", "concrete image", "greeting"):
+        assert expect in found, expect
+
+
+def test_layout_audit_measures_clipped_and_off_frame_text(tmp_path):
+    import os
+    if not os.getenv("CHROMIUM_PATH"):
+        return
+    from services import video_agent
+    comp = tmp_path / "comp"
+    comp.mkdir()
+    (comp / "index.html").write_text('<!doctype html><html><body style="margin:0;width:540px;height:960px;overflow:hidden">'
+                                     '<h1 id="a" style="position:absolute;left:700px;top:100px;font-size:60px">خارج از کادر</h1>'
+                                     '<h1 id="b" style="position:absolute;left:20px;top:450px;font-size:40px">داخل کادر</h1>'
+                                     '<h1 id="c" style="position:absolute;left:20px;top:870px;font-size:40px;margin:0">زیر منوی برنامه</h1>'
+                                     '<script>window.seek=function(t){}</script></body></html>')
+    frames, errors, layout = video_agent._sample(comp, (540, 960), [0.0, 1.0])
+    joined = " | ".join(layout)
+    assert "outside the frame" in joined and "خارج از کادر" in joined and "covered by the app UI" in joined
+    assert "داخل کادر" not in joined and "identical" in joined  # a static page is flagged as not changing over time
+
+
+def test_library_prefers_the_script_with_the_closest_meaning(tmp_path, monkeypatch):
+    from services import video_agent
+    monkeypatch.setattr(video_agent, "LIBRARY", tmp_path / "lib")
+    scenario = video_maker.normalize_scenario(SCENARIO, 1)
+    settings = video_maker.clean_settings({"style": "typography"})
+    base = video_agent._fingerprint(scenario, settings, video_maker.FORMATS[settings["format"]], 0)
+    video_agent._library_save("<html>about shops seek</html>", {**base, "text": "shop", "vec": [1.0, 0.0]}, scenario, {})
+    video_agent._library_save("<html>about cooking seek</html>", {**base, "text": "cook", "vec": [0.0, 1.0]}, scenario, {})
+    assert video_agent._library_pick({**base, "vec": [0.9, 0.1]}) == "<html>about shops seek</html>"
+    assert video_agent._library_pick({**base, "vec": [0.1, 0.9]}) == "<html>about cooking seek</html>"
+    assert video_agent._library_pick(base) in ("<html>about shops seek</html>", "<html>about cooking seek</html>")  # no vector: structure only
+
+
+def test_embedding_failure_never_breaks_the_build(monkeypatch):
+    from services import video_agent
+    monkeypatch.setattr(video_agent, "_base_urls", lambda: ["https://gateway.test/v1"])
+
+    def boom(*a, **k):
+        raise video_agent.httpx.ConnectError("down")
+    monkeypatch.setattr(video_agent.httpx, "post", boom)
+    assert video_agent._embed("text") is None
+    assert abs(video_agent._cosine([1, 0], [1, 0]) - 1) < 1e-9 and video_agent._cosine([0, 0], [1, 0]) == 0.0

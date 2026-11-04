@@ -5,6 +5,7 @@ A headless Chromium captures it frame by frame, the model looks at sample frames
 and FFmpeg muxes the final frames with the narration.
 """
 import base64
+import hashlib
 import html as htmllib
 import json
 import logging
@@ -269,12 +270,35 @@ def _apply_patches(html: str, reply: str) -> tuple[str, int]:
 
 
 def _fingerprint(scenario: dict, settings: dict, size: tuple[int, int], clips: int) -> dict:
+    text = " ".join([scenario.get("title", ""), *[f"{sc.get('text', '')} {sc.get('visual', '')}" for sc in scenario["scenes"]]])[:1500]
     return {"style": settings["style"], "format": settings["format"], "scenes": len(scenario["scenes"]), "clips": min(clips, 1), "size": list(size),
-            "seconds": round(sum(sc.get("duration", 0) for sc in scenario["scenes"]), 1)}
+            "seconds": round(sum(sc.get("duration", 0) for sc in scenario["scenes"]), 1), "text": text}
+
+
+EMBED_MODEL = os.getenv("VIDEO_EMBED_MODEL", "text-embedding-3-small")
+
+
+def _embed(text: str) -> list[float] | None:
+    """Meaning of the script as a vector (a fraction of a cent); None when the provider cannot be reached, then matching falls back to the structure."""
+    api_key = os.getenv("GAPGPT_API_KEY", "")
+    for base_url in _base_urls():
+        try:
+            response = httpx.post(f"{base_url}/embeddings", headers={"Authorization": f"Bearer {api_key}"}, json={"model": EMBED_MODEL, "input": text}, timeout=20)
+            response.raise_for_status()
+            return [round(x, 5) for x in response.json()["data"][0]["embedding"]]
+        except (httpx.HTTPError, KeyError, IndexError, ValueError):
+            continue
+    return None
+
+
+def _cosine(a: list[float], b: list[float]) -> float:
+    dot = sum(x * y for x, y in zip(a, b))
+    norm = (sum(x * x for x in a) ** 0.5) * (sum(y * y for y in b) ** 0.5)
+    return dot / norm if norm else 0.0
 
 
 def _library_pick(finger: dict) -> str | None:
-    """Nearest finished composition for the same style and format and the same scene structure; the vector is (scenes, clips, seconds)."""
+    """Closest finished composition with the same style, format and scene structure: by the meaning of the script when both have vectors, else by length."""
     best, best_score = None, None
     for meta_file in LIBRARY.glob("*.json") if LIBRARY.exists() else []:
         try:
@@ -283,11 +307,15 @@ def _library_pick(finger: dict) -> str | None:
             continue
         if any(meta.get(k) != finger[k] for k in ("style", "format", "scenes", "clips")):
             continue
-        score = abs(meta.get("seconds", 0) - finger["seconds"])
-        if best_score is None or score < best_score:
-            html_file = meta_file.with_suffix(".html")
-            if html_file.exists():
-                best, best_score = html_file, score
+        html_file = meta_file.with_suffix(".html")
+        if not html_file.exists():
+            continue
+        if finger.get("vec") and meta.get("vec"):
+            score = _cosine(finger["vec"], meta["vec"])
+        else:
+            score = -abs(meta.get("seconds", 0) - finger["seconds"]) - 10  # a vector match always outranks a structural one
+        if best_score is None or score > best_score:
+            best, best_score = html_file, score
     return best.read_text(encoding="utf-8") if best else None
 
 
@@ -298,9 +326,13 @@ def _library_save(html: str, finger: dict, scenario: dict, info: dict | None) ->
     if any(len(w.strip()) >= 4 and w.strip() in html for w in words):
         return
     LIBRARY.mkdir(parents=True, exist_ok=True)
-    key = f"{finger['style']}_{finger['format'].replace(':', 'x')}_{finger['scenes']}_{finger['clips']}"
+    group = f"{finger['style']}_{finger['format'].replace(':', 'x')}_{finger['scenes']}_{finger['clips']}"
+    key = f"{group}_{hashlib.sha1(finger.get('text', '').encode()).hexdigest()[:8]}"
+    for stale in sorted(LIBRARY.glob(f"{group}_*.json"), key=lambda f: f.stat().st_mtime)[:-11]:  # keep the 12 newest designs per structure
+        stale.unlink(missing_ok=True)
+        stale.with_suffix(".html").unlink(missing_ok=True)
     (LIBRARY / f"{key}.html").write_text(html, encoding="utf-8")
-    (LIBRARY / f"{key}.json").write_text(json.dumps(finger), encoding="utf-8")
+    (LIBRARY / f"{key}.json").write_text(json.dumps({k: v for k, v in finger.items() if k != "text"}), encoding="utf-8")
 
 
 
@@ -460,14 +492,46 @@ def _review_times(scenes: list[dict]) -> list[float]:
     return [round(t, 2) for t in picks]
 
 
-def _sample(comp: Path, size: tuple[int, int], times: list[float]) -> tuple[list[Path], list[str]]:
-    frames = []
+AUDIT_JS = r"""
+(args) => {
+  const [W, H] = args, found = [];
+  const effective = (el) => { let o = 1, n = el; while (n && n.nodeType === 1) { const cs = getComputedStyle(n); if (cs.display === "none" || cs.visibility === "hidden") return 0; o *= parseFloat(cs.opacity); n = n.parentElement; } return o; };
+  const seen = new Set();
+  for (const el of document.querySelectorAll("body *")) {
+    const own = Array.from(el.childNodes).filter((n) => n.nodeType === 3 && n.textContent.trim()).map((n) => n.textContent.trim()).join(" ");
+    if (!own || effective(el) < 0.35) continue;
+    const r = el.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2) continue;
+    const label = own.slice(0, 40);
+    if (seen.has(label)) continue;
+    if (r.right > W * 1.03 || r.left < -W * 0.03 || r.bottom > H * 1.03 || r.top < -H * 0.03) { seen.add(label); found.push("text runs outside the frame: «" + label + "»"); }
+    else if (r.height > 0 && el.scrollWidth > el.clientWidth + 4 && getComputedStyle(el).overflow !== "visible") { seen.add(label); found.push("text is clipped by its box: «" + label + "»"); }
+    else if (H / W > 1.5 && (r.bottom > H * 0.88 || r.top < H * 0.06) && parseFloat(getComputedStyle(el).fontSize) > W * 0.05) { seen.add(label); found.push("large text sits in the zone covered by the app UI: «" + label + "»"); }
+  }
+  if (!document.fonts.check('700 40px "Yekan Bakh FaNum"')) found.push("the Persian font did not load");
+  return found;
+}
+"""
+
+
+def _sample(comp: Path, size: tuple[int, int], times: list[float]) -> tuple[list[Path], list[str], list[str]]:
+    """Frames for the reviewer, JS errors, and layout problems found by measuring the page itself (cheaper and more reliable than asking a model to spot them)."""
+    frames, layout = [], []
     with _Page(comp, size, scale=0.4) as page:
         for i, t in enumerate(times):
             path = comp / f"review{i}.jpg"
             page.shot(t, path, quality=80)
             frames.append(path)
-        return frames, page.errors[:8]
+            try:
+                layout += [f"at {t}s: {issue}" for issue in page.page.evaluate(AUDIT_JS, list(size))]
+            except Exception:  # pragma: no cover
+                logger.warning("Layout audit failed", exc_info=True)
+        sizes = [f.stat().st_size for f in frames]
+        if sizes and min(sizes) < 4000:
+            layout.append("at least one sampled frame is almost empty (nothing visible)")
+        if len(frames) > 1 and len({f.read_bytes() for f in frames}) == 1:
+            layout.append("every sampled frame is identical, so nothing changes over time")
+        return frames, page.errors[:8], list(dict.fromkeys(layout))[:10]
 
 
 WORKERS = max(1, int(os.getenv("VIDEO_WORKERS", str(min(3, os.cpu_count() or 1)))))
@@ -667,31 +731,35 @@ def build(scenario: dict, settings: dict, clips: list[Path], logo: Path | None, 
     brief = _brief(scenario, settings, size, data)
     times = _review_times(scenes)
     finger = _fingerprint(scenario, settings, size, len(clips))
+    if REUSE and not base_html:
+        finger["vec"] = _embed(finger["text"])
 
     def review(html: str) -> str | None:
         """Render frames, let the cheaper model send patches; None when the composition cannot be made to work."""
         for round_no in range(MAX_ROUNDS + 1):
             (comp / "index.html").write_text(html, encoding="utf-8")
             try:
-                frames, errors = _sample(comp, size, times)
+                frames, errors, layout = _sample(comp, size, times)
             except AgentError:
-                frames, errors = [], ["The page did not define window.seek as a function."]
+                frames, errors, layout = [], ["The page did not define window.seek as a function."], []
             except Exception as exc:
                 logger.warning("Sample render failed: %s", exc)
-                frames, errors = [], [f"render crashed: {exc}"]
+                frames, errors, layout = [], [f"render crashed: {exc}"], []
             clean = bool(frames) and not errors
-            logger.info("Review round %d: %d frames sampled, %d render errors%s", round_no + 1, len(frames), len(errors), (" (" + "; ".join(errors[:2])[:200] + ")") if errors else "")
+            logger.info("Review round %d: %d frames sampled, %d render errors, %d layout problems%s", round_no + 1, len(frames), len(errors), len(layout),
+                        (" (" + "; ".join([*errors, *layout][:2])[:240] + ")") if errors or layout else "")
             if round_no == MAX_ROUNDS:
                 return html if clean else None
             text = (f"{brief}\n\nCurrent composition:\n```html\n{html}\n```\n\nFrames at t = " + ", ".join(f"{t}s" for t in times) + " (in order).\n"
-                    + ("Errors captured while rendering:\n" + "\n".join(errors) + "\n" if errors else "No render errors.\n"))
+                    + ("Errors captured while rendering:\n" + "\n".join(errors) + "\n" if errors else "No render errors.\n")
+                    + ("Measured layout problems (fix these first, they are facts, not opinions):\n" + "\n".join(layout) + "\n" if layout else "Measured layout: no problems found.\n"))
             try:
                 reply = ask([{"role": "user", "content": [{"type": "text", "text": text}, *[_image_part(f) for f in frames]]}], REVIEW_SYSTEM, models=vm.REVIEW_MODELS, max_tokens=6000)
             except AgentStop:
                 raise
             except AgentError:
                 return html if clean else None
-            if reply.strip().upper().startswith("OK") and clean:
+            if reply.strip().upper().startswith("OK") and clean and not layout:
                 logger.info("Review round %d: approved as is", round_no + 1)
                 return html
             patched, applied = _apply_patches(html, reply)

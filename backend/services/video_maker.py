@@ -103,6 +103,16 @@ class VideoError(Exception):
     pass
 
 
+def _trim(text: str, limit: int) -> str:
+    """Shorten at a sentence (or word) boundary so the narrator never reads half a sentence."""
+    if len(text) <= limit:
+        return text
+    cut = text[:limit]
+    ends = [cut.rfind(mark) for mark in ".!?؟۔"]
+    best = max(ends)
+    return cut[:best + 1] if best >= limit * 0.4 else cut.rsplit(" ", 1)[0]
+
+
 def _clamp_scene(raw: dict, clip_count: int) -> dict:
     text = str(raw.get("text", "")).strip()
     narration = str(raw.get("narration", "")).strip()
@@ -121,7 +131,7 @@ def _clamp_scene(raw: dict, clip_count: int) -> dict:
         "title": str(raw.get("title", ""))[:60],
         "text": text[:200],
         "highlight": str(raw.get("highlight") or "").strip()[:60],
-        "narration": narration[:400],
+        "narration": _trim(narration, 400),
         "duration": round(min(MAX_SCENE, max(MIN_SCENE, duration)), 1),
         "asset": asset,
         "visual": str(raw.get("visual") or "").strip()[:240],
@@ -153,6 +163,18 @@ def clean_settings(patch: dict, current: dict | None = None) -> dict:
     return out
 
 
+def _parse_json_object(text: str) -> dict:
+    """The first complete JSON object in a model reply, tolerant of code fences and prose around it."""
+    text = re.sub(r"```(?:json)?", "", text)
+    start = text.find("{")
+    if start < 0:
+        raise ValueError("no JSON object in the reply")
+    value, _ = json.JSONDecoder().raw_decode(text[start:])
+    if not isinstance(value, dict):
+        raise ValueError("the reply is not a JSON object")
+    return value
+
+
 async def _ask_json(system: str, user: str | list[dict], history: list[dict] | None = None) -> dict:
     api_key = os.getenv("GAPGPT_API_KEY", "")
     if not api_key:
@@ -170,7 +192,7 @@ async def _ask_json(system: str, user: str | list[dict], history: list[dict] | N
                     response = await client.post(f"{base_url}/chat/completions", headers={"Authorization": f"Bearer {api_key}"}, json=payload)
                     response.raise_for_status()
                     content = response.json()["choices"][0]["message"]["content"]
-                return json.loads(re.search(r"\{.*\}", content, re.S).group(0))
+                return _parse_json_object(content)
             except (httpx.HTTPError, KeyError, IndexError, ValueError, AttributeError) as exc:
                 logger.warning("AI call to %s failed via %s: %s", model, base_url, exc)
     raise VideoError("ارتباط با دستیار برقرار نشد، دوباره تلاش کنید")
@@ -187,10 +209,63 @@ def _state_for_prompt(project: dict) -> str:
     }, ensure_ascii=False)
 
 
+WORDS_PER_SECOND = 2.3
+_GREETING = re.compile(r"^\s*(سلام|درود|خوش\s*آمد|به\s+.*\s+خوش)")
+_SCREEN_ONLY = re.compile(r"^(متن|تایپ|text)\b.*(روی صفحه|on screen)|^text on screen", re.I)
+
+
+def lint_scenario(scenario: dict, requested_seconds: float) -> list[str]:
+    """Deterministic checks of what the scriptwriting prompt promises; the model gets one chance to repair what this finds."""
+    scenes, issues = scenario["scenes"], []
+    if not 3 <= len(scenes) <= 6:
+        issues.append(f"use 3 to 6 scenes, not {len(scenes)}")
+    if scenes and scenes[0]["kind"] != "hook":
+        issues.append("the first scene must have kind hook")
+    if scenes and scenes[-1]["kind"] != "cta":
+        issues.append("the last scene must have kind cta")
+    total = sum(sc["duration"] for sc in scenes)
+    if requested_seconds and abs(total - requested_seconds) > requested_seconds * 0.2:
+        issues.append(f"scene durations add up to {total:.0f}s but {requested_seconds:.0f}s were requested")
+    for i, sc in enumerate(scenes):
+        words = len(sc["narration"].split())
+        if words > sc["duration"] * WORDS_PER_SECOND + 1:
+            issues.append(f"scene {i}: {words} narration words do not fit {sc['duration']}s (max {WORDS_PER_SECOND} words per second); shorten the narration or lengthen the scene")
+        if re.search(r"\d", sc["narration"]):
+            issues.append(f"scene {i}: the narration contains digits; write numbers as Persian words so the voice reads them correctly")
+        if len(sc["text"].split()) > 10:
+            issues.append(f"scene {i}: the on-screen headline has more than 10 words")
+        if sc["highlight"] and sc["highlight"] not in sc["text"]:
+            issues.append(f"scene {i}: highlight must be a word that appears in the headline text")
+        if not sc["visual"] or _SCREEN_ONLY.search(sc["visual"]):
+            issues.append(f"scene {i}: visual must describe a concrete image or motion, not text on a screen")
+    if scenes and _GREETING.search(scenes[0]["narration"]):
+        issues.append("the hook must start with a concrete tension or question, never a greeting")
+    return issues
+
+
+def _user_text(message: str | list[dict]) -> str:
+    return message if isinstance(message, str) else " ".join(part.get("text", "") for part in message if isinstance(part, dict) and part.get("type") == "text")
+
+
 async def chat_turn(project: dict, message: str | list[dict]) -> dict:
     """One agent turn: returns reply, quick replies, info patch, updated scenario (or None) and readiness."""
     history = [{"role": m["role"], "content": m["content"]} for m in project["messages"][-16:]]
-    data = await _ask_json(AGENT_PROMPT + "\n\nCurrent state:\n" + _state_for_prompt(project), message, history)
+    system = AGENT_PROMPT + "\n\nCurrent state:\n" + _state_for_prompt(project)
+    data = await _ask_json(system, message, history)
+    if isinstance(data.get("scenario"), dict):
+        try:
+            issues = lint_scenario(normalize_scenario(data["scenario"], len(project["clips"])), project["settings"]["duration"])
+        except VideoError:
+            issues = ["the scenario is malformed"]
+        if issues:
+            logger.info("Scenario failed %d checks, asking for one repair: %s", len(issues), "; ".join(issues[:3]))
+            try:
+                fixed = await _ask_json(system, "Your last scenario broke these rules. Fix exactly these problems, keep everything else, and return the complete JSON object again in the same shape:\n- "
+                                        + "\n- ".join(issues), [*history, {"role": "user", "content": _user_text(message)}, {"role": "assistant", "content": json.dumps(data, ensure_ascii=False)}])
+                if isinstance(fixed.get("scenario"), dict) and len(lint_scenario(normalize_scenario(fixed["scenario"], len(project["clips"])), project["settings"]["duration"])) < len(issues):
+                    data = fixed
+            except (VideoError, ValueError):
+                pass
     reply = str(data.get("reply", "")).strip()
     if not reply:
         raise VideoError("پاسخ دستیار خالی بود، دوباره تلاش کنید")
